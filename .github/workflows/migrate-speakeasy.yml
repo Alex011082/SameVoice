@@ -21,15 +21,16 @@ jobs:
         run: |
           set -euo pipefail
           cat .migration/payload.part* > /tmp/speakeasy.b64
-          base64 --decode /tmp/speakeasy.b64 > /tmp/speakeasy.tar.gz
-          tar -tzf /tmp/speakeasy.tar.gz >/dev/null
+          base64 --decode /tmp/speakeasy.b64 > /tmp/speakeasy.tar.xz
+          tar -tJf /tmp/speakeasy.tar.xz >/dev/null
 
       - name: Extract source baseline
         shell: bash
         run: |
           set -euo pipefail
-          tar -xzf /tmp/speakeasy.tar.gz -C .
+          tar -xJf /tmp/speakeasy.tar.xz -C .
           rm -rf .migration
+          rm -f .github/workflows/migrate-speakeasy.yml
 
       - name: Commit migrated source
         shell: bash
