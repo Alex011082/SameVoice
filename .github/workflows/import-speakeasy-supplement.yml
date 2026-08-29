@@ -1,0 +1,48 @@
+name: Complete SpeakEasy source migration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.import/speakeasy-missing42.tar.gz'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify supplemental archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "8ef4ff338f917ecf48d0559a50f3e0de9f878c9affce895706cf9759bc9b4570  .import/speakeasy-missing42.tar.gz" | sha256sum -c -
+          tar -tzf .import/speakeasy-missing42.tar.gz >/dev/null
+
+      - name: Import remaining tracked source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf .import/speakeasy-missing42.tar.gz -C .
+          rm -rf .import
+          rm -f .github/workflows/import-speakeasy.yml
+          rm -f .github/workflows/import-speakeasy-supplement.yml
+
+      - name: Commit completed migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Nothing to import.'
+            exit 0
+          fi
+          git commit -m 'Complete SpeakEasy source migration'
+          git push origin main
