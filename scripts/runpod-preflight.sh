@@ -30,6 +30,8 @@ mkdir -p \
   "$WORKSPACE/datasets" \
   "$WORKSPACE/benchmarks" \
   "$WORKSPACE/hf-cache" \
+  "$WORKSPACE/voices/ru" \
+  "$WORKSPACE/voices/he" \
   "$WORKSPACE/logs/archive" \
   "$WORKSPACE/logs/calls" \
   "$WORKSPACE/config"
@@ -63,6 +65,22 @@ missing = [name for name in ("torch", "transformers", "fastapi", "uvicorn") if i
 if missing:
     raise SystemExit("ERROR: THINK runtime missing packages: " + ", ".join(missing))
 print("  think packages: present")
+PY
+fi
+
+if [[ -n "${LOCAL_TTS_CMD:-}" ]]; then
+  if [[ ! -x /opt/venvs/speak/bin/python ]]; then
+    echo 'ERROR: local-TTS hook is enabled but /opt/venvs/speak is missing.' >&2
+    echo 'Build the image with INSTALL_TTS_ENGINE=1.' >&2
+    exit 1
+  fi
+  printf '  speak:  %s\n' "$(/opt/venvs/speak/bin/python --version)"
+  /opt/venvs/speak/bin/python - <<'PY'
+import importlib.util
+missing = [name for name in ("torch", "chatterbox", "fastapi", "uvicorn") if importlib.util.find_spec(name) is None]
+if missing:
+    raise SystemExit("ERROR: SPEAK runtime missing packages: " + ", ".join(missing))
+print("  speak packages: present")
 PY
 fi
 
