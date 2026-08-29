@@ -159,7 +159,12 @@ class RunpodSttSession:
                     engine = payload.get("engine")
                     if isinstance(engine, str) and engine.strip():
                         self.last_engine = engine.strip()
-                    self.last_server_latency_ms = _number(payload.get("latency_ms"))
+                    # speech_start/speech_end often have no inference latency.
+                    # Preserve the most recent measured ASR latency instead of
+                    # erasing it with None when a marker event follows a partial.
+                    server_latency = _number(payload.get("latency_ms"))
+                    if server_latency is not None:
+                        self.last_server_latency_ms = server_latency
                     yield SttEvent(
                         type=event_type,  # type: ignore[arg-type]
                         text=text.strip(),
