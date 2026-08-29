@@ -46,10 +46,23 @@ Candidate configuration:
 
 Production architecture will be decided only after measured R&D results.
 
+## RunPod container preparation
+
+The repository now contains a reproducible R&D container scaffold:
+
+- `Dockerfile.runpod` — CUDA 12.8 runtime, Node 22, Python 3.13 via `uv`, backend/web/agent dependencies and compiled web/backend;
+- `docker/entrypoint.sh` — starts the current app services and reserves independent GPU hooks for predictor/MT and TTS;
+- `docker/healthcheck.sh` — verifies web, backend and agent;
+- `docker/runpod.env.example` — non-secret runtime layout;
+- `scripts/runpod-preflight.sh` — checks the 2-GPU runtime and persistent `/workspace` before paid benchmark work starts;
+- `docs/RUNPOD_RND.md` and `docker/README.md` — deployment and benchmark notes.
+
+The image is **not built or deployed yet**. Model weights are intentionally not downloaded during repository preparation.
+
 ## Repository policy
 
 This repository is **private**. Do not publish predictor internals, patentable implementation details, private datasets, user audio, voice embeddings, API keys, model weights with restrictive licenses, or consent-sensitive data.
 
 ## Status
 
-Repository initialized. Existing SpeakEasy/SameVoice source will be migrated and normalized before the RunPod image is built.
+The tracked SpeakEasy application source has been migrated into `main`. Current application code includes the web client, Fastify backend, Python relay agent, panel, scripts, tests and evaluation tooling. The repository is now being normalized for the first RunPod R&D image and the later local predictor/MT/TTS services.
