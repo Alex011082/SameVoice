@@ -21,7 +21,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .migration/core.part* > /tmp/speakeasy-core.b64
+
+          cat .migration/repair.part* > /tmp/repair.b64
+          test "$(wc -c < /tmp/repair.b64)" -eq 91752
+          echo "0ea544ba871eb3d79799a8e5b66ee275b52731a835981e9dcecda8fee103542e  /tmp/repair.b64" | sha256sum -c -
+
+          {
+            cat .migration/core.part00
+            cat .migration/core.part01
+            cat .migration/core.part02
+            cat .migration/core.part03
+            cat .migration/core.part04
+            cat .migration/core.part05
+            cat .migration/core.part06
+            head -c 12000 .migration/core.part07
+            cat .migration/core.part08
+            cat .migration/core.part09
+            cat .migration/core.part10
+            dd if=/tmp/repair.b64 bs=1 skip=0 count=12000 status=none
+            cat .migration/core.part12
+            dd if=/tmp/repair.b64 bs=1 skip=12000 count=12000 status=none
+            cat .migration/core.part14
+            cat .migration/core.part15
+            dd if=/tmp/repair.b64 bs=1 skip=24000 status=none
+          } > /tmp/speakeasy-core.b64
+
+          test "$(wc -c < /tmp/speakeasy-core.b64)" -eq 259752
           base64 --decode /tmp/speakeasy-core.b64 > /tmp/speakeasy-core.tar.xz
           echo "41854d759b6fc43d188a68aa1a4f28ac71c2e738e14f8dc9cf75ea9fa1853efb  /tmp/speakeasy-core.tar.xz" | sha256sum -c -
           tar -tJf /tmp/speakeasy-core.tar.xz >/dev/null
