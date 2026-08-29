@@ -18,19 +18,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify prep bundle
+      - name: Reconstruct and verify prep bundle
         shell: bash
         run: |
           set -euo pipefail
-          test "$(wc -c < .bootstrap/samevoice-prep.tar.xz)" -eq 292844
-          echo "067c48205bad2adade503c3502140dab9956c601264a4a4a7138feebcf21cd7e  .bootstrap/samevoice-prep.tar.xz" | sha256sum -c -
-          tar -tJf .bootstrap/samevoice-prep.tar.xz >/dev/null
+          cat .bootstrap/part* > /tmp/samevoice-prep.tar.xz.b64
+          test "$(wc -c < /tmp/samevoice-prep.tar.xz.b64)" -eq 390460
+          echo "31c09852affe57a4cde5c4c4b79b12d956bb6c5c567c250439738803611681a3  /tmp/samevoice-prep.tar.xz.b64" | sha256sum -c -
+          base64 --decode /tmp/samevoice-prep.tar.xz.b64 > /tmp/samevoice-prep.tar.xz
+          test "$(wc -c < /tmp/samevoice-prep.tar.xz)" -eq 292844
+          echo "067c48205bad2adade503c3502140dab9956c601264a4a4a7138feebcf21cd7e  /tmp/samevoice-prep.tar.xz" | sha256sum -c -
+          tar -tJf /tmp/samevoice-prep.tar.xz >/dev/null
 
       - name: Apply source and container prep
         shell: bash
         run: |
           set -euo pipefail
-          tar -xJf .bootstrap/samevoice-prep.tar.xz -C .
+          tar -xJf /tmp/samevoice-prep.tar.xz -C .
           rm -rf .bootstrap
           rm -f .github/workflows/apply-runpod-prep.yml
 
