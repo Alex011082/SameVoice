@@ -52,19 +52,31 @@ printf '  npm:    %s\n' "$(npm --version 2>/dev/null || echo missing)"
 printf '  uv:     %s\n' "$(uv --version 2>/dev/null || echo missing)"
 printf '  agent:  %s\n' "$(cd /opt/samevoice/agent 2>/dev/null && uv run python --version 2>/dev/null || python3 --version 2>/dev/null || echo missing)"
 
-if [[ -n "${PREDICTOR_CMD:-}" || -n "${LOCAL_MT_CMD:-}" ]]; then
+if [[ -n "${ACOUSTIC_SCOUT_CMD:-}" || -n "${PREDICTOR_CMD:-}" || -n "${LOCAL_MT_CMD:-}" ]]; then
   if [[ ! -x /opt/venvs/think/bin/python ]]; then
-    echo 'ERROR: predictor/local-MT hook is enabled but /opt/venvs/think is missing.' >&2
+    echo 'ERROR: a GPU0 THINK hook is enabled but /opt/venvs/think is missing.' >&2
     echo 'Build the image with INSTALL_GPU_ENGINES=1.' >&2
     exit 1
   fi
   printf '  think:  %s\n' "$(/opt/venvs/think/bin/python --version)"
   /opt/venvs/think/bin/python - <<'PY'
 import importlib.util
-missing = [name for name in ("torch", "transformers", "fastapi", "uvicorn") if importlib.util.find_spec(name) is None]
+required = ["torch", "transformers", "fastapi", "uvicorn"]
+missing = [name for name in required if importlib.util.find_spec(name) is None]
 if missing:
     raise SystemExit("ERROR: THINK runtime missing packages: " + ", ".join(missing))
 print("  think packages: present")
+PY
+fi
+
+if [[ -n "${ACOUSTIC_SCOUT_CMD:-}" ]]; then
+  /opt/venvs/think/bin/python - <<'PY'
+import importlib.util
+required = ["silero_vad", "faster_whisper", "numpy"]
+missing = [name for name in required if importlib.util.find_spec(name) is None]
+if missing:
+    raise SystemExit("ERROR: acoustic runtime missing packages: " + ", ".join(missing))
+print("  acoustic packages: present")
 PY
 fi
 
