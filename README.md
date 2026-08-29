@@ -48,16 +48,18 @@ Production architecture will be decided only after measured R&D results.
 
 ## RunPod container preparation
 
-The repository now contains a reproducible R&D container scaffold:
+The repository contains a reproducible R&D container scaffold:
 
-- `Dockerfile.runpod` — CUDA 12.8 runtime, Node 22, Python 3.13 via `uv`, backend/web/agent dependencies and compiled web/backend;
+- `Dockerfile.runpod` — CUDA 12.8 runtime, Node 22, Python 3.13 via pinned `uv`, locked backend/web/agent dependencies and compiled web/backend;
 - `docker/entrypoint.sh` — starts the current app services and reserves independent GPU hooks for predictor/MT and TTS;
 - `docker/healthcheck.sh` — verifies web, backend and agent;
 - `docker/runpod.env.example` — non-secret runtime layout;
 - `scripts/runpod-preflight.sh` — checks the 2-GPU runtime and persistent `/workspace` before paid benchmark work starts;
 - `docs/RUNPOD_RND.md` and `docker/README.md` — deployment and benchmark notes.
 
-The image is **not built or deployed yet**. Model weights are intentionally not downloaded during repository preparation.
+GitHub CI now validates the source with locked dependencies, smoke tests and production builds. A separate container smoke workflow builds the CUDA-based R&D image and boots it with keyless mock providers; the first full build-and-boot validation passed.
+
+No RunPod Pod has been deployed and no model weights are baked into the image. A registry image will only be published when the local model/service choices are ready.
 
 ## Repository policy
 
@@ -65,4 +67,4 @@ This repository is **private**. Do not publish predictor internals, patentable i
 
 ## Status
 
-The tracked SpeakEasy application source has been migrated into `main`. Current application code includes the web client, Fastify backend, Python relay agent, panel, scripts, tests and evaluation tooling. The repository is now being normalized for the first RunPod R&D image and the later local predictor/MT/TTS services.
+The SpeakEasy application runtime source is in `main`. Current application code includes the web client, Fastify backend, Python relay agent, panel, scripts, tests and evaluation tooling. The base application and R&D container scaffold are green in CI; the remaining R&D work is to implement and benchmark the local acoustic/predictor/MT/TTS services rather than spend paid GPU time on environment setup.
