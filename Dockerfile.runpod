@@ -2,6 +2,7 @@ ARG CUDA_BASE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 FROM ${CUDA_BASE}
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG INSTALL_GPU_ENGINES=0
 ENV TZ=Etc/UTC \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -39,8 +40,9 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
-# Pin uv as well as application dependencies. The lockfiles below then make
-# every application dependency install fail closed if package metadata drifts.
+# Pin uv as well as application dependencies. The application agent stays on
+# Python 3.13. GPU model services use their own Python 3.11 environment so
+# inference libraries can evolve without destabilising the call relay.
 ARG UV_VERSION=0.10.0
 RUN curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version \
@@ -53,11 +55,24 @@ WORKDIR /opt/samevoice
 COPY backend/package.json backend/package-lock.json backend/
 COPY web/package.json web/package-lock.json web/
 COPY agent/pyproject.toml agent/uv.lock agent/README.md agent/
+COPY gpu/think-requirements.txt gpu/think-requirements.txt
 
 RUN npm --prefix backend ci --no-audit --no-fund \
     && npm --prefix web ci --no-audit --no-fund \
     && cd agent \
     && uv sync --frozen --python 3.13 --extra api --no-install-project
+
+# Normal CI leaves INSTALL_GPU_ENGINES=0, so it never downloads torch or other
+# heavyweight inference packages. The manually built RunPod image sets it to 1
+# and bakes GPU0 software dependencies into the image before paid Pod time.
+# Model WEIGHTS are still excluded and populate /workspace only at runtime.
+RUN if [ "$INSTALL_GPU_ENGINES" = "1" ]; then \
+      uv python install 3.11 \
+      && uv venv --python 3.11 /opt/venvs/think \
+      && uv pip install --python /opt/venvs/think/bin/python -r gpu/think-requirements.txt; \
+    else \
+      echo "Skipping optional GPU inference dependencies"; \
+    fi
 
 COPY . .
 
