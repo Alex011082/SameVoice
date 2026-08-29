@@ -19,9 +19,7 @@ class RunpodMtProvider:
 
     def __init__(self, cfg: "Config") -> None:
         base = cfg.runpod_mt_url.strip().rstrip("/")
-        if not base:
-            raise ProviderError("MT_PROVIDER=runpod requires RUNPOD_MT_URL or LOCAL_MT_URL")
-        self._url = base if base.endswith("/v1/translate") else base + "/v1/translate"
+        self._url = (base if base.endswith("/v1/translate") else base + "/v1/translate") if base else ""
         self._variant = "local-marian"
         self._timeout = aiohttp.ClientTimeout(total=4.0, sock_connect=1.0)
         self.last_server_latency_ms: float | None = None
@@ -32,6 +30,14 @@ class RunpodMtProvider:
         return self._variant
 
     async def translate(self, req: MtRequest) -> MtResult:
+        # Keep the repository's zero-credential mock smoke behavior: selecting
+        # the dormant provider object without an endpoint is import-safe. A real
+        # R&D profile always supplies RUNPOD_MT_URL/LOCAL_MT_URL.
+        if not self._url:
+            raise NotImplementedError(
+                "runpod provider is a Stage-1 stub until RUNPOD_MT_URL or LOCAL_MT_URL is configured"
+            )
+
         started = time.perf_counter()
         try:
             async with shared_session().post(
