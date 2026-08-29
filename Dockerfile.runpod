@@ -39,7 +39,10 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
+# Pin uv as well as application dependencies. The lockfiles below then make
+# every application dependency install fail closed if package metadata drifts.
+ARG UV_VERSION=0.10.0
+RUN curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version \
     && uv python install 3.13
 
@@ -47,15 +50,14 @@ WORKDIR /opt/samevoice
 
 # Dependency layers are intentionally separate from the source copy so normal
 # code edits do not force every npm/Python dependency to be downloaded again.
-COPY backend/package.json backend/package.json
-COPY web/package.json web/package.json
-COPY agent/pyproject.toml agent/pyproject.toml
-COPY agent/README.md agent/README.md
+COPY backend/package.json backend/package-lock.json backend/
+COPY web/package.json web/package-lock.json web/
+COPY agent/pyproject.toml agent/uv.lock agent/README.md agent/
 
-RUN npm --prefix backend install \
-    && npm --prefix web install \
+RUN npm --prefix backend ci --no-audit --no-fund \
+    && npm --prefix web ci --no-audit --no-fund \
     && cd agent \
-    && uv sync --python 3.13 --extra api --no-install-project
+    && uv sync --frozen --python 3.13 --extra api --no-install-project
 
 COPY . .
 
@@ -63,7 +65,7 @@ COPY . .
 # services. The browser talks to /api on the same origin; Vite preview proxies
 # those requests to the backend inside this container.
 RUN cd agent \
-    && uv sync --python 3.13 --extra api \
+    && uv sync --frozen --python 3.13 --extra api \
     && cd /opt/samevoice \
     && npm --prefix backend run build \
     && VITE_BACKEND_URL=/ npm --prefix web run build \
