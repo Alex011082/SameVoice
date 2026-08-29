@@ -1,0 +1,40 @@
+{
+  "name": "speakeasy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Real-time voice-call translation messenger — Stage 0 skeleton (RU<->HE)",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check:env": "node scripts/check-env.mjs",
+    "check:env:cloud": "SPEAKEASY_PROFILE=cloud node scripts/check-env.mjs",
+    "deps": "npm run deps:backend && npm run deps:web && npm run deps:agent",
+    "deps:backend": "npm --prefix backend install",
+    "deps:web": "npm --prefix web install",
+    "deps:agent": "cd agent && uv venv --python 3.13 && uv sync",
+    "deps:agent:api": "cd agent && uv sync --extra api",
+    "deps:livekit": "bash scripts/install-livekit.sh",
+    "dev": "bash scripts/dev.sh",
+    "dev:cloud": "SPEAKEASY_PROFILE=cloud bash scripts/dev.sh",
+    "tunnel": "bash scripts/tunnel.sh",
+    "dev:livekit": "bash scripts/livekit.sh",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix web run dev -- --host",
+    "dev:agent": "cd agent && uv run python -m speakeasy_agent.main",
+    "panel": "node panel/server.mjs",
+    "review": "node scripts/review-call.mjs",
+    "review:flagged": "node scripts/review-call.mjs latest --flagged",
+    "demo:pipeline": "cd agent && uv run python scripts/mock_pipeline_demo.py",
+    "smoke": "bash scripts/smoke-all.sh",
+    "smoke:backend": "npm --prefix backend test",
+    "smoke:agent": "cd agent && uv run pytest -q",
+    "smoke:web": "npm --prefix web test",
+    "clean:logs": "find logs -maxdepth 1 -type f -name '*.log' -delete 2>/dev/null; echo 'service logs removed; logs/calls (eval data) kept — npm run clean:evals deletes those'",
+    "clean:evals": "rm -rf logs/calls",
+    "clean": "npm run clean:logs && rm -rf backend/node_modules backend/dist web/node_modules web/dist agent/.venv agent/.pytest_cache && find agent -type d -name __pycache__ -prune -exec rm -rf {} +",
+    "smoke:panel": "node --test \"panel/test/*.mjs\""
+  }
+}
