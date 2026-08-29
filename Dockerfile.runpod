@@ -1,0 +1,77 @@
+ARG CUDA_BASE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+FROM ${CUDA_BASE}
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_LINK_MODE=copy \
+    HF_HOME=/workspace/hf-cache \
+    TORCH_HOME=/workspace/torch-cache \
+    XDG_CACHE_HOME=/workspace/cache \
+    UV_CACHE_DIR=/workspace/uv-cache \
+    MODEL_DIR=/workspace/models \
+    CHECKPOINT_DIR=/workspace/checkpoints \
+    DATASET_DIR=/workspace/datasets \
+    BENCHMARK_DIR=/workspace/benchmarks \
+    CALL_ARCHIVE_DIR=/workspace/logs/archive \
+    EVAL_LOG_DIR=/workspace/logs/calls \
+    BACKEND_HOST=0.0.0.0 \
+    AGENT_HOST=127.0.0.1 \
+    WEB_PORT=5173 \
+    BACKEND_PORT=8787 \
+    AGENT_PORT=8788
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        build-essential \
+        ca-certificates \
+        curl \
+        ffmpeg \
+        git \
+        gnupg \
+        libsndfile1 \
+        tini \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && node --version \
+    && npm --version
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
+    && uv --version \
+    && uv python install 3.13
+
+WORKDIR /opt/samevoice
+
+# Dependency layers are intentionally separate from the source copy so normal
+# code edits do not force every npm/Python dependency to be downloaded again.
+COPY backend/package.json backend/package.json
+COPY web/package.json web/package.json
+COPY agent/pyproject.toml agent/pyproject.toml
+COPY agent/README.md agent/README.md
+
+RUN npm --prefix backend install \
+    && npm --prefix web install \
+    && cd agent \
+    && uv sync --python 3.13 --extra api --no-install-project
+
+COPY . .
+
+# Install the local agent project after its source exists, then compile the Node
+# services. The browser talks to /api on the same origin; Vite preview proxies
+# those requests to the backend inside this container.
+RUN cd agent \
+    && uv sync --python 3.13 --extra api \
+    && cd /opt/samevoice \
+    && npm --prefix backend run build \
+    && VITE_BACKEND_URL=/ npm --prefix web run build \
+    && chmod +x docker/entrypoint.sh docker/healthcheck.sh scripts/runpod-preflight.sh
+
+EXPOSE 5173 8787 8788 8101 8102 8103 8104
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=35s --retries=3 \
+    CMD ["/opt/samevoice/docker/healthcheck.sh"]
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/samevoice/docker/entrypoint.sh"]
