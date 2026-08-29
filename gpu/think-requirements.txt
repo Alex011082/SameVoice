@@ -7,3 +7,10 @@ torch>=2.8,<3
 sentencepiece>=0.2,<1
 safetensors>=0.5,<1
 accelerate>=1.10,<2
+
+# Acoustic Stage 1: CPU VAD plus the RU streaming / HE quality-control engines.
+# Silero works at 16 kHz and is intentionally kept on CPU so GPU0 remains
+# available for the ASR/predictor/MT critical path.
+silero-vad>=6.2,<7
+faster-whisper>=1.2,<2
+numpy>=2,<3
