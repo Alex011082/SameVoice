@@ -1,0 +1,29 @@
+services:
+  samevoice:
+    build:
+      context: ..
+      dockerfile: Dockerfile.runpod
+    image: samevoice-rnd:local
+    env_file:
+      - ../.env
+    environment:
+      WORKSPACE_ROOT: /workspace
+      SAMEVOICE_START_AGENT: "1"
+      SAMEVOICE_START_BACKEND: "1"
+      SAMEVOICE_START_WEB: "1"
+      ACOUSTIC_CUDA_VISIBLE_DEVICES: "0"
+      PREDICTOR_CUDA_VISIBLE_DEVICES: "0"
+      LOCAL_MT_CUDA_VISIBLE_DEVICES: "0"
+      TTS_CUDA_VISIBLE_DEVICES: "1"
+    ports:
+      - "5173:5173"
+      - "8787:8787"
+    volumes:
+      - ../.workspace:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
