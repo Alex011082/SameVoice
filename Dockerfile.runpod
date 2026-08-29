@@ -2,6 +2,8 @@ ARG CUDA_BASE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 FROM ${CUDA_BASE}
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG INSTALL_GPU_ENGINES=0
+ARG INSTALL_TTS_ENGINE=0
 ENV TZ=Etc/UTC \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -39,8 +41,9 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
-# Pin uv as well as application dependencies. The lockfiles below then make
-# every application dependency install fail closed if package metadata drifts.
+# Pin uv as well as application dependencies. The application agent stays on
+# Python 3.13. GPU model services use isolated Python 3.11 environments so
+# inference-library pins cannot destabilise the call relay or each other.
 ARG UV_VERSION=0.10.0
 RUN curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version \
@@ -53,11 +56,32 @@ WORKDIR /opt/samevoice
 COPY backend/package.json backend/package-lock.json backend/
 COPY web/package.json web/package-lock.json web/
 COPY agent/pyproject.toml agent/uv.lock agent/README.md agent/
+COPY gpu/think-requirements.txt gpu/think-requirements.txt
+COPY gpu/tts-requirements.txt gpu/tts-requirements.txt
 
 RUN npm --prefix backend ci --no-audit --no-fund \
     && npm --prefix web ci --no-audit --no-fund \
     && cd agent \
     && uv sync --frozen --python 3.13 --extra api --no-install-project
+
+# Normal CI leaves both optional flags at 0. Manual RunPod-image builds can bake
+# the heavy software into the image before paid Pod time. Model WEIGHTS remain
+# excluded and populate the persistent /workspace cache only at runtime.
+RUN if [ "$INSTALL_GPU_ENGINES" = "1" ]; then \
+      uv python install 3.11 \
+      && uv venv --python 3.11 /opt/venvs/think \
+      && uv pip install --python /opt/venvs/think/bin/python -r gpu/think-requirements.txt; \
+    else \
+      echo "Skipping optional GPU0 THINK dependencies"; \
+    fi
+
+RUN if [ "$INSTALL_TTS_ENGINE" = "1" ]; then \
+      uv python install 3.11 \
+      && uv venv --python 3.11 /opt/venvs/speak \
+      && uv pip install --python /opt/venvs/speak/bin/python -r gpu/tts-requirements.txt; \
+    else \
+      echo "Skipping optional GPU1 TTS dependencies"; \
+    fi
 
 COPY . .
 

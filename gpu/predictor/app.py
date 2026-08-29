@@ -1,0 +1,203 @@
+"""SameVoice rolling next-SOURCE-word predictor benchmark service.
+
+This service intentionally predicts only the next source word. It does not
+branch whole future sentences. Incoming acoustic evidence will later prune the
+returned Top-K list in the acoustic service before any irreversible commit.
+"""
+
+from __future__ import annotations
+
+import os
+import threading
+import time
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+from .text import RawCandidate, collapse_candidates
+
+Lang = Literal["ru", "he"]
+MODEL_ID = os.getenv("PREDICTOR_MODEL", "Qwen/Qwen3-0.6B-Base")
+
+
+class PredictRequest(BaseModel):
+    prefix: str = Field(min_length=1, max_length=12000)
+    lang: Lang
+    top_k: int = Field(default=20, ge=1, le=50)
+    context_terms: list[str] = Field(default_factory=list, max_length=256)
+    max_new_tokens: int = Field(default=6, ge=2, le=12)
+
+
+class Candidate(BaseModel):
+    word: str
+    probability: float
+    log_score: float
+
+
+class PredictResponse(BaseModel):
+    candidates: list[Candidate]
+    model: str
+    latency_ms: float
+    load_ms: float = 0.0
+    beam_count: int
+
+
+class PredictorEngine:
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._tokenizer = None
+        self._model = None
+        self._device = "unloaded"
+
+    @property
+    def loaded(self) -> bool:
+        return self._model is not None
+
+    @property
+    def device(self) -> str:
+        return self._device
+
+    def _load(self) -> float:
+        if self.loaded:
+            return 0.0
+        with self._lock:
+            if self.loaded:
+                return 0.0
+            started = time.perf_counter()
+            try:
+                import torch
+                from transformers import AutoModelForCausalLM, AutoTokenizer
+            except ImportError as exc:  # pragma: no cover - GPU image only
+                raise RuntimeError(
+                    "predictor dependencies are not installed; build the R&D image "
+                    "with INSTALL_GPU_ENGINES=1"
+                ) from exc
+
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+            model = AutoModelForCausalLM.from_pretrained(MODEL_ID)
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            if device == "cuda":
+                model = model.to(device=device, dtype=torch.float16)
+            else:
+                model = model.to(device=device)
+            model.eval()
+            self._tokenizer = tokenizer
+            self._model = model
+            self._device = device
+            return (time.perf_counter() - started) * 1000.0
+
+    def warmup(self) -> dict[str, object]:
+        load_ms = self._load()
+        return {
+            "ok": True,
+            "model": MODEL_ID,
+            "device": self.device,
+            "load_ms": load_ms,
+        }
+
+    def predict(self, req: PredictRequest) -> PredictResponse:
+        prefix = req.prefix.rstrip()
+        if not prefix:
+            raise ValueError("prefix must contain non-whitespace text")
+        load_ms = self._load()
+
+        import torch
+
+        tokenizer = self._tokenizer
+        model = self._model
+        assert tokenizer is not None and model is not None
+
+        encoded = tokenizer(prefix, return_tensors="pt")
+        input_ids = encoded["input_ids"].to(self._device)
+        attention_mask = encoded.get("attention_mask")
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(self._device)
+
+        # We deliberately over-generate beams because multiple token sequences
+        # often collapse to the same visible first word. This is bounded: even
+        # top_k=50 never creates a sentence tree; every sequence is cut after a
+        # handful of tokens and only its first Unicode word survives.
+        beam_count = min(max(req.top_k * 2, 8), 64)
+        started = time.perf_counter()
+        with torch.inference_mode():
+            generated = model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                do_sample=False,
+                num_beams=beam_count,
+                num_return_sequences=beam_count,
+                max_new_tokens=req.max_new_tokens,
+                return_dict_in_generate=True,
+                output_scores=True,
+                early_stopping=False,
+            )
+
+        continuation_ids = generated.sequences[:, input_ids.shape[1] :]
+        decoded = tokenizer.batch_decode(continuation_ids, skip_special_tokens=True)
+        sequence_scores = getattr(generated, "sequences_scores", None)
+        if sequence_scores is None:
+            scores = [0.0] * len(decoded)
+        else:
+            scores = [float(value) for value in sequence_scores.detach().cpu().tolist()]
+
+        raw = [
+            RawCandidate(continuation=text, log_score=score)
+            for text, score in zip(decoded, scores, strict=True)
+        ]
+        collapsed = collapse_candidates(
+            raw,
+            top_k=req.top_k,
+            context_terms=req.context_terms,
+        )
+        latency_ms = (time.perf_counter() - started) * 1000.0
+        return PredictResponse(
+            candidates=[
+                Candidate(
+                    word=item.word,
+                    probability=item.probability,
+                    log_score=item.log_score,
+                )
+                for item in collapsed
+            ],
+            model=MODEL_ID,
+            latency_ms=latency_ms,
+            load_ms=load_ms,
+            beam_count=beam_count,
+        )
+
+
+engine = PredictorEngine()
+app = FastAPI(title="SameVoice Rolling Predictor", version="0.1.0")
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, object]:
+    return {
+        "ok": True,
+        "service": "predictor",
+        "model": MODEL_ID,
+        "loaded": engine.loaded,
+        "device": engine.device,
+    }
+
+
+@app.post("/v1/warmup")
+def warmup() -> dict[str, object]:
+    try:
+        return engine.warmup()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/v1/predict", response_model=PredictResponse)
+def predict(req: PredictRequest) -> PredictResponse:
+    try:
+        response = engine.predict(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not response.candidates:
+        raise HTTPException(status_code=422, detail="predictor produced no word candidates")
+    return response

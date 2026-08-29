@@ -1,0 +1,9 @@
+# GPU 0 / THINK runtime. These packages are installed only in the dedicated
+# RunPod R&D image; normal CI does not install them or download model weights.
+fastapi>=0.116,<1
+uvicorn[standard]>=0.35,<1
+transformers>=5.13,<6
+torch>=2.8,<3
+sentencepiece>=0.2,<1
+safetensors>=0.5,<1
+accelerate>=1.10,<2

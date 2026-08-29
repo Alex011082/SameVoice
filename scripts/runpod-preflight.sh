@@ -30,6 +30,8 @@ mkdir -p \
   "$WORKSPACE/datasets" \
   "$WORKSPACE/benchmarks" \
   "$WORKSPACE/hf-cache" \
+  "$WORKSPACE/voices/ru" \
+  "$WORKSPACE/voices/he" \
   "$WORKSPACE/logs/archive" \
   "$WORKSPACE/logs/calls" \
   "$WORKSPACE/config"
@@ -48,12 +50,51 @@ printf 'runtime:\n'
 printf '  node:   %s\n' "$(node --version 2>/dev/null || echo missing)"
 printf '  npm:    %s\n' "$(npm --version 2>/dev/null || echo missing)"
 printf '  uv:     %s\n' "$(uv --version 2>/dev/null || echo missing)"
-printf '  python: %s\n' "$(cd /opt/samevoice/agent 2>/dev/null && uv run python --version 2>/dev/null || python3 --version 2>/dev/null || echo missing)"
+printf '  agent:  %s\n' "$(cd /opt/samevoice/agent 2>/dev/null && uv run python --version 2>/dev/null || python3 --version 2>/dev/null || echo missing)"
+
+if [[ -n "${PREDICTOR_CMD:-}" || -n "${LOCAL_MT_CMD:-}" ]]; then
+  if [[ ! -x /opt/venvs/think/bin/python ]]; then
+    echo 'ERROR: predictor/local-MT hook is enabled but /opt/venvs/think is missing.' >&2
+    echo 'Build the image with INSTALL_GPU_ENGINES=1.' >&2
+    exit 1
+  fi
+  printf '  think:  %s\n' "$(/opt/venvs/think/bin/python --version)"
+  /opt/venvs/think/bin/python - <<'PY'
+import importlib.util
+missing = [name for name in ("torch", "transformers", "fastapi", "uvicorn") if importlib.util.find_spec(name) is None]
+if missing:
+    raise SystemExit("ERROR: THINK runtime missing packages: " + ", ".join(missing))
+print("  think packages: present")
+PY
+fi
+
+if [[ -n "${LOCAL_TTS_CMD:-}" ]]; then
+  if [[ ! -x /opt/venvs/speak/bin/python ]]; then
+    echo 'ERROR: local-TTS hook is enabled but /opt/venvs/speak is missing.' >&2
+    echo 'Build the image with INSTALL_TTS_ENGINE=1.' >&2
+    exit 1
+  fi
+  printf '  speak:  %s\n' "$(/opt/venvs/speak/bin/python --version)"
+  /opt/venvs/speak/bin/python - <<'PY'
+import importlib.util
+missing = [name for name in ("torch", "chatterbox", "fastapi", "uvicorn") if importlib.util.find_spec(name) is None]
+if missing:
+    raise SystemExit("ERROR: SPEAK runtime missing packages: " + ", ".join(missing))
+print("  speak packages: present")
+PY
+fi
 
 echo
 printf 'GPU split:\n'
 printf '  GPU %s -> acoustic scout / predictor / local MT\n' "${PREDICTOR_CUDA_VISIBLE_DEVICES:-0}"
 printf '  GPU %s -> local TTS\n' "${TTS_CUDA_VISIBLE_DEVICES:-1}"
+
+echo
+printf 'enabled local engines:\n'
+printf '  predictor: %s\n' "$([[ -n "${PREDICTOR_CMD:-}" ]] && echo yes || echo no)"
+printf '  acoustic:  %s\n' "$([[ -n "${ACOUSTIC_SCOUT_CMD:-}" ]] && echo yes || echo no)"
+printf '  local MT:  %s\n' "$([[ -n "${LOCAL_MT_CMD:-}" ]] && echo yes || echo no)"
+printf '  local TTS: %s\n' "$([[ -n "${LOCAL_TTS_CMD:-}" ]] && echo yes || echo no)"
 
 echo
 printf 'PASS preflight\n'
