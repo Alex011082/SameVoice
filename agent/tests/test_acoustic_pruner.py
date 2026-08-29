@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from gpu.acoustic.pruner import (
+import sys
+from pathlib import Path
+
+# Agent tests run with cwd=agent/, while the GPU R&D package intentionally lives
+# at the repository root and is not installed into the realtime agent venv.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from gpu.acoustic.pruner import (  # noqa: E402
     CandidateInput,
     edit_distance,
     normalize_fragment,
