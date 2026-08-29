@@ -56,19 +56,28 @@ __all__ = [
 
 def build_stt(name: str, cfg: "Config") -> SttProvider:
     key = name.strip().lower()
+    provider: SttProvider
     if key == "mock":
         from .stt_mock import MockSttProvider
 
-        return MockSttProvider()
-    if key == "deepgram":
+        provider = MockSttProvider()
+    elif key == "deepgram":
         from .stt_deepgram import DeepgramSttProvider
 
-        return DeepgramSttProvider(cfg)
-    if key == "runpod":
+        provider = DeepgramSttProvider(cfg)
+    elif key == "runpod":
         from .stt_runpod import RunpodSttProvider
 
-        return RunpodSttProvider(cfg)
-    raise ValueError(f"unknown STT provider {name!r}; valid: {', '.join(STT_PROVIDERS)}")
+        provider = RunpodSttProvider(cfg)
+    else:
+        raise ValueError(f"unknown STT provider {name!r}; valid: {', '.join(STT_PROVIDERS)}")
+
+    # Predictor shadow mode wraps the selected recognizer without changing its
+    # emitted STT events or provider identity. With the flag off this is exactly
+    # the original provider object.
+    from ..speculation_provider import maybe_wrap_stt
+
+    return maybe_wrap_stt(provider, cfg)
 
 
 def build_mt(name: str, cfg: "Config") -> MtProvider:
