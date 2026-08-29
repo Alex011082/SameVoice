@@ -87,6 +87,15 @@ class PredictorEngine:
             self._device = device
             return (time.perf_counter() - started) * 1000.0
 
+    def warmup(self) -> dict[str, object]:
+        load_ms = self._load()
+        return {
+            "ok": True,
+            "model": MODEL_ID,
+            "device": self.device,
+            "load_ms": load_ms,
+        }
+
     def predict(self, req: PredictRequest) -> PredictResponse:
         prefix = req.prefix.rstrip()
         if not prefix:
@@ -171,6 +180,14 @@ def healthz() -> dict[str, object]:
         "loaded": engine.loaded,
         "device": engine.device,
     }
+
+
+@app.post("/v1/warmup")
+def warmup() -> dict[str, object]:
+    try:
+        return engine.warmup()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.post("/v1/predict", response_model=PredictResponse)
