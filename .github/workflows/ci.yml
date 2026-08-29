@@ -1,0 +1,67 @@
+name: SameVoice CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            web/package-lock.json
+
+      - name: Install pinned uv and Python 3.13
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -LsSf https://astral.sh/uv/0.10.0/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/uv" python install 3.13
+
+      - name: Prepare keyless mock environment
+        shell: bash
+        run: cp .env.example .env
+
+      - name: Install locked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix backend ci --no-audit --no-fund
+          npm --prefix web ci --no-audit --no-fund
+          cd agent
+          "$HOME/.local/bin/uv" sync --frozen --python 3.13 --extra api
+
+      - name: Smoke tests
+        shell: bash
+        run: npm run smoke
+
+      - name: Production builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix backend run build
+          VITE_BACKEND_URL=/ npm --prefix web run build
+
+      - name: Validate RunPod shell entrypoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n docker/entrypoint.sh
+          bash -n docker/healthcheck.sh
+          bash -n scripts/runpod-preflight.sh
