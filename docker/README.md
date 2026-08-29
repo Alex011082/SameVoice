@@ -31,19 +31,21 @@ The intended 2 x RTX 4090 layout is service-parallel, not model-parallel:
 
 The optional GPU engines are exposed as command hooks in `docker/entrypoint.sh`. They stay blank until the actual model services are committed. This avoids shipping fake placeholder servers while preserving the final process topology.
 
-## Build later, not now
+## Reproducible build
 
-When the code/model choices are ready:
+Backend, web and Python dependencies are committed with lockfiles. The image uses `npm ci` and `uv sync --frozen`, and `uv` itself is pinned in `Dockerfile.runpod`.
+
+Local build command:
 
 ```bash
 docker build -f Dockerfile.runpod -t samevoice-rnd:local .
 ```
 
-No image needs to be built just to keep preparing the repository.
+`.github/workflows/container-smoke.yml` performs the same build on GitHub and then boots the resulting CUDA-based image with mock providers. This does not require an NVIDIA GPU because the optional local GPU engines are not started during packaging validation. The first build-and-boot check passed.
 
 ## Keyless mock smoke run
 
-After an image exists, a mock-only boot can be tested without vendor keys:
+A mock-only boot can be tested without vendor keys:
 
 ```bash
 docker run --rm \
@@ -58,7 +60,7 @@ That explicitly copies `.env.example` to the disposable container. It must **not
 
 Use RunPod Secrets/environment for credentials. Do not bake `.env`, API keys, user audio, voice embeddings, datasets or model weights into the image.
 
-The persistent volume should be mounted at `/workspace`. On first boot run:
+The persistent volume should be mounted at `/workspace`. On first GPU boot run:
 
 ```bash
 /opt/samevoice/scripts/runpod-preflight.sh
@@ -81,3 +83,7 @@ Docker health is green only when all three current services answer:
 - `http://127.0.0.1:5173/`
 
 If one long-running process exits, the entrypoint exits too instead of leaving a half-working benchmark Pod alive.
+
+## Not done yet
+
+The container is packaging-ready, not model-ready. `runpod` STT/MT/TTS adapters in the current agent are still Stage-1 stubs, and the acoustic scout / rolling predictor services have not yet been implemented. Do not start paying for the 2-GPU Pod until those local service contracts and model choices are prepared.
