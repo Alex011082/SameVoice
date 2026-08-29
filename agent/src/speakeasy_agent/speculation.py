@@ -16,19 +16,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import time
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol, Sequence
+from dataclasses import dataclass
+from typing import Any, AsyncIterator, Protocol, Sequence
 
 import aiohttp
+from livekit import rtc
 
 from .evallog import CallEvalLog
 from .httpclient import shared_session
-from .providers.base import Lang, Speaker
-
-if TYPE_CHECKING:  # pragma: no cover
-    from .config import Config
+from .providers.base import Lang, Speaker, SttEvent, SttProvider, SttSession
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +45,25 @@ def common_prefix_len(left: Sequence[str], right: Sequence[str]) -> int:
         if left[index] != right[index]:
             return index
     return limit
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _env_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("%s=%r is not an integer; using %d", name, raw, default)
+        return default
+    return max(minimum, min(maximum, value))
 
 
 @dataclass(frozen=True)
@@ -196,7 +214,7 @@ class PredictionShadow:
         current = words(text)
         stable_count = len(current) if final else common_prefix_len(self._previous_words, current)
 
-        # Resolve older predictions only when the next word is itself stable.
+        # Resolve older predictions only when the following word is itself stable.
         for attempt in self._attempts:
             if attempt.actual_word is not None or attempt.logged:
                 continue
@@ -218,13 +236,14 @@ class PredictionShadow:
                     attempt.status = "no_next_word"
                     self._emit_if_ready(attempt)
             self._previous_words = ()
+            self._prune()
             return
 
         stable_prefix = tuple(current[:stable_count])
         self._previous_words = current
         if len(stable_prefix) < self.min_prefix_words:
             return
-        if any(attempt.prefix == stable_prefix for attempt in self._attempts):
+        if any(attempt.prefix == stable_prefix and not attempt.logged for attempt in self._attempts):
             return
 
         attempt = _Attempt(prefix=stable_prefix, requested_at=observed_at)
@@ -241,6 +260,15 @@ class PredictionShadow:
             if not attempt.logged and attempt.actual_word is None and attempt.status == "pending":
                 attempt.status = reason
                 self._emit_if_ready(attempt)
+        self._prune()
+
+    def _prune(self) -> None:
+        # Long calls can produce thousands of hypotheses. Once an attempt has
+        # been logged it has no runtime value; keep only a small diagnostic tail.
+        if len(self._attempts) > 512:
+            unresolved = [attempt for attempt in self._attempts if not attempt.logged]
+            logged_tail = [attempt for attempt in self._attempts if attempt.logged][-128:]
+            self._attempts = logged_tail + unresolved
 
     async def _run(self, attempt: _Attempt) -> None:
         try:
@@ -343,10 +371,10 @@ class PredictionShadow:
     async def aclose(self) -> None:
         if self._closed:
             return
-        self._closed = True
         self.reset(reason="closed")
+        self._closed = True
         if self._tasks:
-            done, pending = await asyncio.wait(self._tasks, timeout=1.0)
+            _, pending = await asyncio.wait(self._tasks, timeout=1.0)
             for task in pending:
                 task.cancel()
             if pending:
@@ -354,28 +382,124 @@ class PredictionShadow:
         await self.client.aclose()
 
 
-def build_prediction_shadow(
-    cfg: "Config",
+class ShadowSttSession:
+    """Transparent STT session wrapper; yielded events are never modified."""
+
+    def __init__(self, inner: SttSession, shadow: PredictionShadow) -> None:
+        self._inner = inner
+        self._shadow = shadow
+
+    def push_frame(self, frame: rtc.AudioFrame) -> None:
+        self._inner.push_frame(frame)
+
+    async def flush(self) -> None:
+        await self._inner.flush()
+
+    def __aiter__(self) -> AsyncIterator[SttEvent]:
+        return self._iterate()
+
+    async def _iterate(self) -> AsyncIterator[SttEvent]:
+        async for event in self._inner:
+            now = time.monotonic()
+            try:
+                if event.type == "speech_start":
+                    self._shadow.reset(reason="speech_start")
+                elif event.type == "partial":
+                    self._shadow.observe(event.text, now=now, final=False)
+                elif event.type == "final":
+                    self._shadow.observe(event.text, now=now, final=True)
+            except Exception as exc:
+                # Shadow mode is observational. A bug here must never damage a call.
+                logger.warning("prediction shadow observation failed: %s", exc)
+            yield event
+
+    async def aclose(self) -> None:
+        try:
+            await self._shadow.aclose()
+        finally:
+            await self._inner.aclose()
+
+
+class ShadowSttProvider:
+    """Per-direction wrapper that preserves the actual STT provider identity."""
+
+    def __init__(
+        self,
+        inner: SttProvider,
+        *,
+        call_id: str,
+        speaker: Speaker,
+        eval_log: CallEvalLog | None,
+        predictor_url: str,
+        top_k: int,
+        min_prefix_words: int,
+        timeout_ms: int,
+        context_terms: Sequence[str],
+    ) -> None:
+        self._inner = inner
+        self._call_id = call_id
+        self._speaker = speaker
+        self._eval_log = eval_log
+        self._predictor_url = predictor_url
+        self._top_k = top_k
+        self._min_prefix_words = min_prefix_words
+        self._timeout_ms = timeout_ms
+        self._context_terms = tuple(context_terms)
+        self.name = getattr(inner, "name", "stt")
+        self.preferred_sample_rate = inner.preferred_sample_rate
+        self.preferred_num_channels = inner.preferred_num_channels
+
+    @property
+    def variant(self) -> str | None:
+        return getattr(self._inner, "variant", None)
+
+    async def start(self, *, lang: Lang) -> SttSession:
+        inner_session = await self._inner.start(lang=lang)
+        shadow = PredictionShadow(
+            call_id=self._call_id,
+            speaker=self._speaker,
+            client=HttpPredictorClient(self._predictor_url, timeout_ms=self._timeout_ms),
+            eval_log=self._eval_log,
+            top_k=self._top_k,
+            min_prefix_words=self._min_prefix_words,
+            context_terms=self._context_terms,
+        )
+        return ShadowSttSession(inner_session, shadow)
+
+    async def aclose(self) -> None:
+        # Relay owns the shared underlying provider and closes it exactly once.
+        return None
+
+
+def build_shadow_stt_provider(
+    inner: SttProvider,
     *,
     call_id: str,
     speaker: Speaker,
     eval_log: CallEvalLog | None,
     glossary: dict[str, str] | None = None,
-) -> PredictionShadow | None:
-    if not cfg.predictor_shadow_enabled:
-        return None
-    if not cfg.predictor_url.strip():
+) -> SttProvider:
+    """Return the original provider unless shadow mode is explicitly enabled."""
+    if not _env_bool("PREDICTOR_SHADOW_ENABLED", False):
+        return inner
+    predictor_url = os.environ.get("PREDICTOR_URL", "").strip()
+    if not predictor_url:
         logger.warning("PREDICTOR_SHADOW_ENABLED=1 but PREDICTOR_URL is empty; shadow disabled")
-        return None
-    context = list((glossary or {}).keys()) + list((glossary or {}).values())
-    return PredictionShadow(
+        return inner
+    top_k = _env_int("PREDICTOR_TOP_K", 20, minimum=1, maximum=50)
+    min_prefix_words = _env_int("PREDICTOR_MIN_PREFIX_WORDS", 3, minimum=1, maximum=20)
+    timeout_ms = _env_int("PREDICTOR_TIMEOUT_MS", 600, minimum=50, maximum=5000)
+    terms = list((glossary or {}).keys()) + list((glossary or {}).values())
+    return ShadowSttProvider(
+        inner,
         call_id=call_id,
         speaker=speaker,
-        client=HttpPredictorClient(cfg.predictor_url, timeout_ms=cfg.predictor_timeout_ms),
         eval_log=eval_log,
-        top_k=cfg.predictor_top_k,
-        min_prefix_words=cfg.predictor_min_prefix_words,
-        context_terms=context,
+        predictor_url=predictor_url,
+        top_k=top_k,
+        min_prefix_words=min_prefix_words,
+        timeout_ms=timeout_ms,
+        context_terms=terms,
     )
 
 
@@ -385,7 +509,9 @@ __all__ = [
     "PredictionResult",
     "PredictionShadow",
     "PredictionShadowStats",
-    "build_prediction_shadow",
+    "ShadowSttProvider",
+    "ShadowSttSession",
+    "build_shadow_stt_provider",
     "common_prefix_len",
     "words",
 ]
