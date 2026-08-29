@@ -25,7 +25,7 @@ Default runtime bindings:
 - `Helsinki-NLP/opus-mt-ru-he`
 - `Helsinki-NLP/opus-mt-he-ru`
 
-Generation is greedy (`num_beams=1`) for the first latency baseline. The main Python agent now has a real HTTP `RunpodMtProvider` adapter for this service. Deep call-context conditioning is intentionally not faked into Marian; quality is compared against the existing Gemini path before any default changes.
+Generation is greedy (`num_beams=1`) for the first latency baseline. The main Python agent has a real HTTP `RunpodMtProvider` adapter for this service. Deep call-context conditioning is intentionally not faked into Marian; quality is compared against the existing Gemini path before any default changes.
 
 Both services share `/opt/venvs/think` (Python 3.11) in images built with `INSTALL_GPU_ENGINES=1`. `CUDA_VISIBLE_DEVICES=0` is applied by the outer entrypoint, so each process sees its assigned physical 4090 as local `cuda:0`.
 
@@ -36,7 +36,7 @@ Port `8102` remains reserved. First A/B candidates are:
 - NVIDIA Nemotron 3.5 ASR Streaming 0.6B for native cache-aware streaming;
 - ivrit-ai Whisper Large v3 Turbo as a Hebrew-specific quality control/fallback.
 
-Do not replace Deepgram in the call path until live Hebrew/Russian WER, partial stability and prediction-lead-time measurements are available.
+Do not replace Deepgram in the call path until live Hebrew/Russian WER, partial stability, utterance-boundary/VAD behaviour and prediction-lead-time measurements are available.
 
 ## GPU 1 — SPEAK
 
@@ -44,15 +44,27 @@ Default binding:
 
 - `TTS_CUDA_VISIBLE_DEVICES=1`
 
-Port `8104` remains reserved. Planned first A/B candidates are Qwen3-TTS 0.6B for Russian and Chatterbox Multilingual for Hebrew/Russian. Cartesia remains the external streaming quality control, especially for Hebrew, until local TTFA, voice identity and naturalness are measured.
+### Implemented A/B service — port 8104
+
+`gpu.tts.app` is a deliberately **batch-labelled** Chatterbox Multilingual V3 service for RU/HE quality testing. It supports the built-in voice and safe named reference WAVs under `/workspace/voices/<lang>/<voice_id>.wav`. It returns mono s16le PCM plus explicit headers for sample rate, model, generation latency, streaming status and watermark status.
+
+The main agent now has a `RunpodTtsProvider` client that can consume this PCM contract. The client splits the completed waveform into 20 ms chunks for the existing resampler, but this does **not** turn a batch server response into true streaming. `mt_done_to_first_audio_ms` therefore remains the relevant measurement and will expose the full generation wait.
+
+The Chatterbox runtime is isolated in `/opt/venvs/speak` and is installed only when `INSTALL_TTS_ENGINE=1`. This prevents its torch/transformers dependency pins from contaminating the GPU0 predictor/MT environment.
+
+Cartesia remains the realtime quality control. Qwen3-TTS remains a later Russian-specific streaming/voice-clone A/B candidate; it is not used for Hebrew because Hebrew is outside its official language set.
 
 ## Runtime profiles
 
 `docker/runpod.env.example` remains the conservative scaffold with all local engine hooks disabled.
 
-`docker/runpod-gpu.env.example` is the Stage-1 benchmark profile. It enables only the implemented predictor and local MT services. Acoustic and local TTS hooks stay blank on purpose.
+`docker/runpod-gpu.env.example` enables the implemented GPU0 predictor + local MT services only.
 
-## Promotion gates
+`docker/runpod-gpu-tts-ab.env.example` additionally enables the batch Chatterbox service on GPU1. It is an explicit A/B profile, not the realtime default.
+
+## Benchmark harness
+
+`scripts/runpod-stage1-bench.py` warms the predictor and both local MT directions, runs repeat loopback requests, reports p50/p90/p95 and writes a JSON artifact under `/workspace/benchmarks`.
 
 A local engine is promoted into the realtime path only after reproducible measurements. At minimum record:
 
