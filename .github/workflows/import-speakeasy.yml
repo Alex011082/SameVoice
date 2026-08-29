@@ -1,0 +1,49 @@
+name: Import SpeakEasy baseline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.migration/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .migration/import.part* > /tmp/speakeasy-import.b64
+          base64 --decode /tmp/speakeasy-import.b64 > /tmp/speakeasy-import.tar.gz
+          echo "404331454924359b31b2be3d4fdbf3a2c963bfc6f6262edaf38ecba1548cba8c  /tmp/speakeasy-import.tar.gz" | sha256sum -c -
+          tar -tzf /tmp/speakeasy-import.tar.gz >/dev/null
+
+      - name: Extract tracked source baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf /tmp/speakeasy-import.tar.gz -C .
+          rm -rf .migration
+          rm -f scripts/.keep web/.keep web/src/.keep backend/.keep panel/.keep agent/scripts/.keep
+
+      - name: Commit imported source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Nothing to import.'
+            exit 0
+          fi
+          git commit -m 'Import SpeakEasy source baseline'
+          git push origin main
