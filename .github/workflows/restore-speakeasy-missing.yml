@@ -1,0 +1,43 @@
+name: Restore missing SpeakEasy tracked files
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.import/missing40.tar.xz'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify restoration archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "0a32deb34df3a38bd6bb542db4479ec5d1e74b22b031b55a990907af27af84f6  .import/missing40.tar.xz" | sha256sum -c -
+          tar -tJf .import/missing40.tar.xz >/dev/null
+
+      - name: Restore tracked files
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xJf .import/missing40.tar.xz -C .
+          rm -rf .import
+          rm -f .github/workflows/restore-speakeasy-missing.yml
+
+      - name: Commit restoration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Restore remaining SpeakEasy tracked files'
+          git push origin main
