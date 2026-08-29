@@ -1,0 +1,88 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.next/
+.vite/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ML / model caches
+.cache/
+cache/
+hf-cache/
+.huggingface/
+.torch/
+triton-cache/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.engine
+*.gguf
+models/
+checkpoints/
+weights/
+
+# Datasets / user data
+data/
+datasets/
+recordings/
+audio/
+voice-embeddings/
+user-memory/
+consented-data/
+logs/calls/
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.webm
+
+# Runtime
+logs/
+tmp/
+temp/
+*.log
+*.pid
+*.sock
+
+# Docker / local overrides
+docker-compose.override.yml
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local benchmark artifacts
+benchmarks/results/
+eval/results/
+profiles/
