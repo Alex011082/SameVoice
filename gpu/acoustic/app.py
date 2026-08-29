@@ -33,6 +33,7 @@ VAD_WINDOW_SAMPLES = 512  # 32 ms at 16 kHz, required by Silero VAD.
 VAD_THRESHOLD = float(os.getenv("ACOUSTIC_VAD_THRESHOLD", "0.5"))
 VAD_MIN_SILENCE_MS = int(os.getenv("ACOUSTIC_VAD_MIN_SILENCE_MS", "180"))
 VAD_SPEECH_PAD_MS = int(os.getenv("ACOUSTIC_VAD_SPEECH_PAD_MS", "40"))
+VAD_POOL_SIZE = max(2, int(os.getenv("ACOUSTIC_VAD_POOL_SIZE", "2")))
 PRE_ROLL_MS = int(os.getenv("ACOUSTIC_PRE_ROLL_MS", "320"))
 HE_PARTIAL_INTERVAL_MS = int(os.getenv("ACOUSTIC_HE_PARTIAL_INTERVAL_MS", "480"))
 HE_PARTIAL_MIN_AUDIO_MS = int(os.getenv("ACOUSTIC_HE_PARTIAL_MIN_AUDIO_MS", "700"))
@@ -43,14 +44,27 @@ class WarmupRequest(BaseModel):
 
 
 class SileroVadFactory:
+    """A tiny CPU VAD pool with one stateful model per speech direction.
+
+    Silero stores recurrent state on the model object itself. Sharing one model
+    between the two directions of a call would mix speaker histories, and one
+    iterator's reset would reset the other. Two ~2 MB CPU models are cheaper
+    than making that race invisible in latency measurements.
+    """
+
     def __init__(self) -> None:
-        self._model: Any = None
+        self._available: asyncio.Queue[Any] = asyncio.Queue()
+        self._loaded_count = 0
         self._lock = asyncio.Lock()
         self.load_ms = 0.0
 
     @property
     def loaded(self) -> bool:
-        return self._model is not None
+        return self._loaded_count >= VAD_POOL_SIZE
+
+    @property
+    def available(self) -> int:
+        return self._available.qsize()
 
     async def load(self) -> float:
         if self.loaded:
@@ -60,7 +74,7 @@ class SileroVadFactory:
                 return 0.0
             started = time.perf_counter()
 
-            def _load():
+            def _load_one():
                 try:
                     import torch
                     from silero_vad import load_silero_vad
@@ -71,21 +85,32 @@ class SileroVadFactory:
                 torch.set_num_threads(max(1, int(os.getenv("ACOUSTIC_VAD_CPU_THREADS", "1"))))
                 return load_silero_vad()
 
-            self._model = await asyncio.to_thread(_load)
+            while self._loaded_count < VAD_POOL_SIZE:
+                model = await asyncio.to_thread(_load_one)
+                self._available.put_nowait(model)
+                self._loaded_count += 1
             self.load_ms = (time.perf_counter() - started) * 1000.0
             return self.load_ms
 
-    async def new_iterator(self):
+    async def acquire_iterator(self):
         await self.load()
         from silero_vad import VADIterator
 
+        model = await self._available.get()
         return VADIterator(
-            self._model,
+            model,
             threshold=VAD_THRESHOLD,
             sampling_rate=SAMPLE_RATE,
             min_silence_duration_ms=VAD_MIN_SILENCE_MS,
             speech_pad_ms=VAD_SPEECH_PAD_MS,
         )
+
+    def release_iterator(self, iterator: Any) -> None:
+        with suppress(Exception):
+            iterator.reset_states()
+        model = getattr(iterator, "model", None)
+        if model is not None:
+            self._available.put_nowait(model)
 
 
 vad_factory = SileroVadFactory()
@@ -157,8 +182,7 @@ class AcousticSession:
         self._samples_seen += int(chunk.size)
         was_speaking = self._utterance is not None
         self._pre_roll.append(chunk.copy())
-        signal = self.vad(torch.from_numpy(chunk), return_seconds=False)
-        signal = signal or {}
+        signal = self.vad(torch.from_numpy(chunk), return_seconds=False) or {}
 
         if "start" in signal and self._utterance is None:
             self._utterance_seq += 1
@@ -334,12 +358,17 @@ class AcousticSession:
         if self._closed:
             return
         await self.flush()
-        # Wait until every final event queued above has reached the websocket.
-        await self._outgoing.join()
+        # A remote disconnect can kill the sender while finals remain queued.
+        # Never let cleanup hang the whole relay waiting on an impossible join.
+        with suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(self._outgoing.join(), timeout=1.0)
         self._closed = True
         self._outgoing.put_nowait(None)
-        with suppress(Exception):
-            await self._sender
+        if not self._sender.done():
+            with suppress(asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                await asyncio.wait_for(self._sender, timeout=1.0)
+        if not self._sender.done():
+            self._sender.cancel()
 
 
 app = FastAPI(title="SameVoice Acoustic Stage 1", version="0.1.0")
@@ -351,7 +380,9 @@ def healthz() -> dict[str, object]:
         "ok": True,
         "service": "acoustic-stage1",
         "sample_rate": SAMPLE_RATE,
-        "vad_loaded": vad_factory.loaded,
+        "vad_pool_size": VAD_POOL_SIZE,
+        "vad_pool_loaded": vad_factory.loaded,
+        "vad_pool_available": vad_factory.available,
         "ru_engine": NEMOTRON_MODEL,
         "ru_loaded": nemotron_engine.loaded,
         "ru_streaming_latency_ms": nemotron_engine.streaming_latency_ms,
@@ -391,6 +422,7 @@ async def warmup(req: WarmupRequest) -> dict[str, object]:
 async def stream(websocket: WebSocket) -> None:
     await websocket.accept()
     session: AcousticSession | None = None
+    vad: Any = None
     try:
         first = await websocket.receive_text()
         try:
@@ -401,7 +433,7 @@ async def stream(websocket: WebSocket) -> None:
             await websocket.close(code=1008)
             return
 
-        vad = await vad_factory.new_iterator()
+        vad = await vad_factory.acquire_iterator()
         session = AcousticSession(websocket, lang=lang, vad=vad)
         session.emit(
             AcousticEvent(
@@ -441,5 +473,7 @@ async def stream(websocket: WebSocket) -> None:
         if session is not None:
             with suppress(Exception):
                 await session.close()
+        if vad is not None:
+            vad_factory.release_iterator(vad)
         with suppress(Exception):
             await websocket.close()
