@@ -1,5 +1,7 @@
 name: SameVoice container smoke
 
+# Builds and boots the CUDA-based image without requiring a GPU. Local GPU
+# engines remain disabled; the existing mock providers validate packaging.
 on:
   push:
     branches: [main]
