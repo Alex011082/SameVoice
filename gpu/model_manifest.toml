@@ -6,21 +6,30 @@ updated = "2026-08-30"
 
 [[models]]
 id = "nvidia/nemotron-3.5-asr-streaming-0.6b"
-role = "acoustic_stt"
+role = "acoustic_stt_ru"
 gpu = 0
 license = "OpenMDW-1.1"
-languages = ["ru-RU", "he-IL"]
-status = "benchmark"
-notes = "Native cache-aware streaming ASR. Russian is a primary transcription locale; Hebrew is adaptation-ready and must be measured against the Hebrew-specific Whisper fallback before promotion."
+languages = ["ru-RU"]
+status = "stage1_runtime"
+notes = "Native cache-aware streaming ASR used for Russian Stage 1. Default Transformers lookahead=3 gives a nominal 320 ms streaming chunk; benchmark 0/3/6/13 on real Israeli calls rather than assuming the lowest lookahead wins."
 
 [[models]]
-id = "ivrit-ai/whisper-large-v3-turbo"
-role = "hebrew_asr_ab"
+id = "ivrit-ai/whisper-large-v3-turbo-ct2"
+role = "acoustic_stt_he"
 gpu = 0
 license = "Apache-2.0"
 languages = ["he"]
-status = "benchmark_fallback"
-notes = "Hebrew-specific Whisper Large v3 Turbo finetune. Force language=he; its model card warns language detection degraded during continued training. Used for HE quality A/B, not as the rolling low-latency default."
+status = "stage1_runtime_fallback"
+notes = "Hebrew-specific Faster-Whisper CT2 checkpoint (~1.62 GB). Force language=he. Stage 1 exposes rolling snapshots plus a final transcript; this is not native RNNT streaming."
+
+[[models]]
+id = "nvidia/nemotron-3.5-asr-streaming-0.6b"
+role = "acoustic_stt_he_future"
+gpu = 0
+license = "OpenMDW-1.1"
+languages = ["he-IL"]
+status = "finetune_required"
+notes = "Hebrew is recognized by the tokenizer but NVIDIA classifies it as adaptation-ready, not transcription-ready. Do not route Hebrew production audio through stock weights."
 
 [[models]]
 id = "Qwen/Qwen3-0.6B-Base"
