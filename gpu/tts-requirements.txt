@@ -1,0 +1,6 @@
+# GPU 1 / SPEAK A/B runtime. Kept separate from GPU0 because TTS packages may
+# pin different torch/transformers versions.
+fastapi>=0.116,<1
+uvicorn[standard]>=0.35,<1
+chatterbox-tts>=0.1.7,<0.2
+numpy>=2,<3
