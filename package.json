@@ -32,9 +32,12 @@
     "smoke:backend": "npm --prefix backend test",
     "smoke:agent": "cd agent && uv run pytest -q",
     "smoke:web": "npm --prefix web test",
+    "smoke:panel": "node --test \"panel/test/*.mjs\"",
+    "runpod:preflight": "bash scripts/runpod-preflight.sh",
+    "docker:build:rnd": "docker build -f Dockerfile.runpod -t samevoice-rnd:local .",
+    "docker:run:mock": "docker run --rm -e SAMEVOICE_BOOTSTRAP_MOCK_ENV=1 -p 5173:5173 samevoice-rnd:local",
     "clean:logs": "find logs -maxdepth 1 -type f -name '*.log' -delete 2>/dev/null; echo 'service logs removed; logs/calls (eval data) kept — npm run clean:evals deletes those'",
     "clean:evals": "rm -rf logs/calls",
-    "clean": "npm run clean:logs && rm -rf backend/node_modules backend/dist web/node_modules web/dist agent/.venv agent/.pytest_cache && find agent -type d -name __pycache__ -prune -exec rm -rf {} +",
-    "smoke:panel": "node --test \"panel/test/*.mjs\""
+    "clean": "npm run clean:logs && rm -rf backend/node_modules backend/dist web/node_modules web/dist agent/.venv agent/.pytest_cache && find agent -type d -name __pycache__ -prune -exec rm -rf {} +"
   }
 }
