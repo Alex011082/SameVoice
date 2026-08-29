@@ -1,0 +1,714 @@
+/* SameVoice — телефонное приложение.
+ *
+ * Правила, которым подчинён этот файл:
+ *   1. Экран принадлежит человеку, с которым говоришь, а не приложению.
+ *      Отсюда крупные имена, большие круглые кнопки и почти невидимая шапка.
+ *   2. Ничего технического на виду. Режим звонка, задержка, идентификаторы —
+ *      всё это диагностика; она существует, но живёт под `body[data-debug]`.
+ *   3. Пальцем, а не мышью: минимальная цель нажатия — 44 px, safe-area
+ *      учитывается снизу и сверху (iPhone с вырезом).
+ */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0b0d12;
+  --bg-lift: #141822;
+  --bg-lift-2: #1c2130;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --fg: #f2f5fa;
+  --fg-dim: #97a1b4;
+  --fg-faint: #5f6a7d;
+
+  --accent: #4f9dff;
+  --accept: #34c759;
+  --end: #ff3b30;
+  --warn: #ffb020;
+
+  --r-sm: 10px;
+  --r: 16px;
+  --r-lg: 24px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
+          "Helvetica Neue", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+body {
+  /* Мягкое свечение сверху: экран выглядит как поверхность, а не как лист. */
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgba(79, 157, 255, 0.13), transparent 60%);
+  background-attachment: fixed;
+}
+
+#app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: calc(var(--safe-top) + 8px) 16px calc(var(--safe-bottom) + 12px);
+}
+
+main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* ------------------------------------------------------------------ шапка */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 14px;
+}
+
+.brand-mark {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--fg-dim);
+}
+.brand-stage { display: none; } /* «stage 0» — не для глаз пользователя */
+
+.whoami {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  color: var(--fg-dim);
+}
+.whoami button {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 2px;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+/* ----------------------------------------------------------------- баннер */
+
+.banner {
+  margin: 0 0 12px;
+  padding: 11px 14px;
+  border-radius: var(--r);
+  font-size: 14.5px;
+  background: var(--bg-lift);
+  border: 1px solid var(--line);
+  color: var(--fg-dim);
+}
+.banner[data-tone='error'] {
+  background: rgba(255, 59, 48, 0.12);
+  border-color: rgba(255, 59, 48, 0.35);
+  color: #ffb4af;
+}
+
+/* ----------------------------------------------------------------- экраны */
+
+.screen { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.screen[hidden] { display: none; }
+
+.screen-title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 4px 0 18px;
+}
+
+h1 { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+
+.hint { color: var(--fg-dim); font-size: 15px; margin: 0 0 18px; }
+.label { color: var(--fg-faint); font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; }
+
+.error {
+  color: #ff9b93;
+  font-size: 14.5px;
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.28);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin: 14px 0 0;
+}
+.error[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- заставка */
+
+.intro { text-align: center; padding: 26px 0 30px; }
+.intro-mark {
+  width: 62px; height: 62px;
+  margin: 0 auto 18px;
+  color: var(--accent);
+  opacity: 0.9;
+}
+.intro-mark svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------------- список людей */
+
+.people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 14px;
+  background: var(--bg-lift);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  min-height: 74px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.card:active { background: var(--bg-lift-2); }
+
+/* Аватар — инициал в круге; цвет выводится из имени в ui.ts. */
+.avatar {
+  flex: 0 0 auto;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 19px; font-weight: 650;
+  color: #fff;
+  background: var(--avatar, #3a4356);
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+
+.card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+
+.card-name {
+  font-size: 17.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: 13.5px;
+  color: var(--fg-dim);
+}
+
+/* Точка присутствия. Текст внутри нужен скринридеру, глазами читается точка. */
+.presence {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--fg-faint);
+  font-size: 0; color: transparent; overflow: hidden;
+}
+.presence[data-state='online'] { background: var(--accept); box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.16); }
+.presence[data-state='offline'] { background: var(--fg-faint); }
+.presence[data-state='unknown'] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--fg-faint); }
+
+.lang-chip {
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* Технические метки: режим звонка, override, переключатель принудительного
+   перевода. Пользователю не показываются — включаются только в отладке. */
+.card-meta .badge,
+.card-meta code,
+.card-toggle { display: none; }
+
+body[data-debug] .card-meta .badge,
+body[data-debug] .card-meta code,
+body[data-debug] .card-toggle { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Кнопка звонка — зелёный круг. Только в списке контактов: в отладочном
+   списке профилей та же разметка означает «Это я», а не «позвонить». */
+#contact-list .card > .btn {
+  flex: 0 0 auto;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--accept);
+  border: 0;
+  color: #04240f;
+  font-size: 0;
+  display: grid; place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(52, 199, 89, 0.3);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+#contact-list .card > .btn::after {
+  content: '';
+  width: 23px; height: 23px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+#contact-list .card > .btn:active { transform: scale(0.93); filter: brightness(1.08); }
+
+/* --------------------------------------------------------- исходящий вызов */
+
+.outgoing {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+  background: var(--bg-lift);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  position: relative;
+  overflow: hidden;
+}
+.outgoing[hidden] { display: none; }
+
+.outgoing-pulse {
+  position: absolute; inset: 0;
+  background: radial-gradient(80% 120% at 0% 50%, rgba(79, 157, 255, 0.16), transparent 70%);
+  animation: pulse 1.9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+
+.outgoing-main { flex: 1; min-width: 0; position: relative; }
+.outgoing-main strong { font-size: 17px; font-weight: 600; display: block; }
+.outgoing-detail { margin: 2px 0 0; color: var(--fg-dim); font-size: 14px; }
+
+/* -------------------------------------------------- присоединиться по коду */
+
+.joinbox {
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg-lift);
+  overflow: hidden;
+}
+.joinbox > summary {
+  padding: 14px;
+  cursor: pointer;
+  color: var(--fg-dim);
+  font-size: 15px;
+  list-style: none;
+}
+.joinbox > summary::-webkit-details-marker { display: none; }
+.joinbox > summary::after { content: ' ›'; color: var(--fg-faint); }
+.joinbox[open] > summary { border-bottom: 1px solid var(--line); }
+.joinbox[open] > summary::after { content: ' ⌄'; }
+
+.joinbox-row { display: flex; gap: 8px; padding: 14px; }
+.joinbox-row input { flex: 1; min-width: 0; }
+
+input[type='text'] {
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px; /* < 16px заставляет iOS зумить страницу при фокусе */
+  padding: 11px 12px;
+  min-height: 44px;
+  width: 100%;
+}
+input[type='text']:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* ---------------------------------------------------------------- кнопки */
+
+.btn {
+  font: inherit;
+  font-size: 15.5px;
+  font-weight: 550;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-lift-2);
+  color: var(--fg);
+  padding: 11px 16px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.btn:active { filter: brightness(1.15); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn-ghost { background: transparent; }
+.btn-danger { background: var(--end); border-color: var(--end); color: #fff; }
+.btn-accept { background: var(--accept); border-color: var(--accept); color: #04240f; }
+
+/* Круглые кнопки телефона. */
+.round {
+  width: 66px; height: 66px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #fff;
+  position: relative;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.round svg { width: 27px; height: 27px; }
+.round:active { transform: scale(0.92); }
+.round-accept { background: var(--accept); color: #04240f; box-shadow: 0 6px 20px rgba(52, 199, 89, 0.34); }
+.round-end { background: var(--end); box-shadow: 0 6px 20px rgba(255, 59, 48, 0.32); }
+.round-end svg { transform: rotate(134deg); }
+.round-mute { background: var(--bg-lift-2); color: var(--fg); border: 1px solid var(--line-strong); }
+.round-mute[data-muted='true'] { background: var(--warn); color: #2a1a00; border-color: var(--warn); }
+
+/* Подпись под круглой кнопкой, вне круга. */
+.round-label {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.outgoing .round { width: 52px; height: 52px; }
+.outgoing .round svg { width: 22px; height: 22px; }
+.outgoing .round-label { display: none; }
+
+/* ------------------------------------------------------- экран разговора */
+
+.screen-call { gap: 0; }
+
+.call-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 0 18px;
+  text-align: center;
+}
+.call-peer { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.call-peer .label { display: none; } /* «Разговор с» — лишнее, когда имя крупное */
+.call-peer strong {
+  font-size: 28px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+/* Технические бейджи режима и соединения — только в отладке. */
+.call-badges { display: none; }
+body[data-debug] .call-badges { display: flex; gap: 8px; }
+
+.badge {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--fg-dim);
+}
+.badge[data-state='connected'] { color: var(--accept); }
+.badge[data-state='reconnecting'], .badge[data-state='connecting'] { color: var(--warn); }
+.badge[data-state='disconnected'] { color: var(--end); }
+
+.mode-explainer { display: none; }
+body[data-debug] .mode-explainer {
+  display: block;
+  color: var(--fg-dim);
+  font-size: 13.5px;
+  margin: 0 0 12px;
+}
+
+.invite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--bg-lift);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  margin-bottom: 12px;
+}
+.invite[hidden] { display: none; }
+.invite input { flex: 1; min-width: 140px; font-size: 14px; }
+
+.unlock {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--accent);
+  background: rgba(79, 157, 255, 0.14);
+  color: var(--fg);
+  font: inherit;
+  font-size: 15.5px;
+  cursor: pointer;
+  min-height: 48px;
+}
+.unlock[hidden] { display: none; }
+
+/* ------------------------------------------------------------- субтитры */
+
+.subtitles {
+  flex: 1;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px;
+  background: var(--bg-lift);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.subtitle-committed { display: flex; flex-direction: column; gap: 10px; }
+
+/* Реплика: перевод крупно, оригинал мельче под ним. Направление письма
+   ставится поэлементно из subtitles.ts — иврит должен идти справа налево
+   даже когда соседняя строка русская. */
+.sub-line { display: flex; flex-direction: column; gap: 2px; }
+.sub-line .dst { font-size: 18px; line-height: 1.38; }
+.sub-line .src { font-size: 13.5px; color: var(--fg-faint); }
+.sub-line[data-flagged='true'] .dst { color: var(--warn); text-decoration: underline wavy var(--warn) 1px; }
+.sub-line[data-mine='true'] .dst { color: var(--fg-dim); }
+
+.subtitle-partial { font-size: 17px; color: var(--fg-dim); opacity: 0.75; }
+.subtitle-empty { color: var(--fg-faint); font-size: 14.5px; margin: 0; text-align: center; }
+
+/* ---------------------------------------------------------------- судья */
+
+.judge {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-lift);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.judge[hidden] { display: none; }
+.judge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-flag { background: rgba(255, 176, 32, 0.14); border-color: rgba(255, 176, 32, 0.4); color: #ffd08a; }
+.judge-prev { font-size: 14px; }
+.judge-target { color: var(--fg-dim); font-size: 13.5px; margin: 9px 0 0; }
+.judge-fix { display: flex; gap: 8px; margin-top: 10px; }
+.judge-fix[hidden] { display: none; }
+.judge-status { color: var(--accept); font-size: 13.5px; margin: 8px 0 0; }
+.judge-status[hidden] { display: none; }
+
+/* --------------------------------------------------------- метрики, низ */
+
+.metrics { display: none; }
+body[data-debug] .metrics {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--fg-faint);
+  margin-top: 10px;
+  white-space: pre-wrap;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 46px;
+  padding: 30px 0 34px;
+}
+
+/* Подвал держит строку с адресами провайдеров — чистая диагностика. */
+.footer { display: none; }
+body[data-debug] .footer {
+  display: block;
+  margin-top: 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--fg-faint);
+  word-break: break-all;
+}
+
+/* --------------------------------------------------------- входящий звонок */
+
+.incoming {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  /* Непрозрачный, а не полупрозрачный: входящий звонок на телефоне забирает
+     экран целиком. Полупрозрачная подложка пропускала сквозь себя субтитры
+     идущего разговора, и обе поверхности становились нечитаемыми — blur этого
+     не спасает, если под ним крупный контрастный текст. */
+  background: var(--bg);
+  background-image:
+    radial-gradient(90% 55% at 50% 8%, rgba(79, 157, 255, 0.16), transparent 62%);
+  animation: fade 0.22s ease;
+}
+.incoming[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+.incoming-card {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 34px 22px calc(30px + var(--safe-bottom));
+}
+
+.incoming-eyebrow {
+  color: var(--fg-dim);
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  animation: pulse 1.9s ease-in-out infinite;
+}
+.incoming-title { font-size: 33px; font-weight: 700; letter-spacing: -0.025em; }
+.incoming-meta { display: flex; gap: 8px; align-items: center; color: var(--fg-dim); font-size: 14.5px; }
+.incoming-meta .badge { display: none; }
+body[data-debug] .incoming-meta .badge { display: inline-block; }
+.incoming-explainer { color: var(--fg-dim); font-size: 14.5px; margin: 2px 0 0; }
+body:not([data-debug]) .incoming-explainer { display: none; }
+
+.incoming-actions {
+  display: flex;
+  justify-content: center;
+  gap: 58px;
+  margin-top: 34px;
+  margin-bottom: 22px;
+}
+.incoming-actions[hidden] { display: none; }
+.incoming-dismiss { margin-top: 18px; }
+.incoming-note { margin-top: 14px; }
+
+/* ------------------------------------------------------------- мелочи */
+
+#audio-sink { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* Узкий телефон: чуть плотнее, но цели нажатия не уменьшаем. */
+@media (max-width: 360px) {
+  #app { padding-left: 12px; padding-right: 12px; }
+  .incoming-title { font-size: 29px; }
+  .controls { gap: 34px; }
+  .incoming-actions { gap: 44px; }
+}
+
+/* ------------------------------------------------- выбор роли (пол, язык) */
+
+.steps { display: flex; flex-direction: column; }
+.step[hidden] { display: none; }
+
+.step-q {
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--fg-dim);
+  text-align: center;
+  margin: 0 0 14px;
+}
+
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 128px;
+  padding: 20px 12px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--bg-lift);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.choice:hover { border-color: var(--line-strong); }
+.choice:active { transform: scale(0.97); background: var(--bg-lift-2); }
+.choice-ico { font-size: 34px; line-height: 1; }
+.choice-t { font-size: 16.5px; font-weight: 600; }
+
+.step-back {
+  align-self: center;
+  margin-top: 18px;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  padding: 10px 14px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+/* Полный список профилей — только для отладки. */
+#identity-list { display: none; }
+body[data-debug] #identity-list { display: flex; margin-top: 26px; }
+
+/* --- самоконтроль говорящего (только ?debug=1) -----------------------------
+   Появился после звонка 26.08.2026: два человека потратили сессию на
+   «слышно? / не слышу», потому что подтверждения работы не было ни у кого.
+   Это диагностика, а не продукт — на обычном экране её нет. */
+.selfmon { display: none; }
+body[data-debug] .selfmon {
+  display: block;
+  margin: 10px 16px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #2a2f3a);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-elev, #171a21) 92%, transparent);
+}
+.selfmon-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, #8b93a3);
+}
+.selfmon-src { margin: 0; font-size: 15px; line-height: 1.35; color: var(--fg, #e8ebf0); }
+.selfmon-dst { margin: 4px 0 0; font-size: 14px; line-height: 1.35; color: var(--accent, #6ea8fe); }
+.selfmon-empty { margin: 0; font-size: 13px; color: var(--muted, #8b93a3); }
+.selfmon[data-live='1'] .selfmon-empty { display: none; }
+.selfmon-src:empty, .selfmon-dst:empty { display: none; }
+
+/* --- подсказка про громкий динамик ----------------------------------------
+   Веб-страница не может играть в разговорный динамик у уха: такого API нет.
+   Человек, привыкший к телефону, подносит трубку к уху и слышит тишину —
+   ровно это случилось 26.08.2026. Предупреждение дешевле поддержки. */
+.audio-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 16px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent, #6ea8fe) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #6ea8fe) 34%, transparent);
+}
+.audio-hint[hidden] { display: none; }
+.audio-hint p {
+  margin: 0;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg, #e8ebf0);
+}
+.audio-hint button { flex: 0 0 auto; }

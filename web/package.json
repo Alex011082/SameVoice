@@ -1,0 +1,22 @@
+{
+  "name": "speakeasy-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SpeakEasy Stage 0 browser client (two testers, RU<->HE)",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "livekit-client": "2.22.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.2.2",
+    "vitest": "4.1.11"
+  }
+}

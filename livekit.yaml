@@ -1,0 +1,62 @@
+# SpeakEasy — single-node LiveKit SFU config for local development.
+#
+#   livekit-server --config livekit.yaml
+#
+# THIS FILE IS READ ONLY IN THE `local` TRANSPORT PROFILE (SPEAKEASY_PROFILE in
+# .env). In the `cloud` profile LiveKit Cloud is the SFU, scripts/dev.sh does not
+# start a local server, and nothing here is loaded — which also means the
+# key/secret below stop being the ones that matter. scripts/check-env.mjs only
+# cross-checks `keys:` against .env while LIVEKIT_URL points at this machine.
+#
+# Run it with THIS FILE, never with `--dev`:
+#   * `--dev` binds 127.0.0.1/::1 only, so anything else on the LAN times out
+#     with no useful error;
+#   * `--dev` muxes all WebRTC media onto a single UDP port 7882, so every
+#     firewall rule copied from the docs (which show a port range) is wrong.
+
+# HTTP API + WebSocket signalling. This is the port in LIVEKIT_URL.
+port: 7880
+
+# Listen on every interface so a phone on the same Wi-Fi can reach the SFU.
+bind_addresses:
+  - 0.0.0.0
+
+rtc:
+  # ICE/TCP fallback for networks that block UDP.
+  tcp_port: 7881
+  # ICE/UDP media candidates. Deliberately narrow — 101 ports is far more than
+  # two testers need, and a small range keeps any firewall rule reviewable.
+  port_range_start: 50000
+  port_range_end: 50100
+  # Advertise the LAN address rather than probing for a public IP. Set to true
+  # only if this server is ever reachable from the open internet.
+  use_external_ip: false
+
+# Defining `keys:` SUPPRESSES livekit-server's automatic devkey/secret
+# injection (it only injects when the key map is empty). This pair must stay
+# byte-identical to LIVEKIT_API_KEY / LIVEKIT_API_SECRET in .env, or every
+# token the backend mints is rejected. Secret is 43 chars; below 32 the server
+# logs a non-fatal but alarming ERROR.
+keys:
+  devkey: devsecret0000000000000000000000000000000000
+
+room:
+  # The backend never pre-creates rooms; the first participant to join
+  # call-<callId> brings it into existence.
+  auto_create: true
+  # Seconds an empty room lingers before it is closed.
+  empty_timeout: 300
+  # Seconds after the last participant leaves before the room is torn down.
+  departure_timeout: 20
+  # Two humans + the relay agent = 3. The 4th slot is headroom for a debug
+  # observer; a low cap makes a runaway test obvious immediately.
+  max_participants: 4
+
+logging:
+  level: info
+  # Pion is the underlying WebRTC stack and is extremely chatty at info.
+  pion_level: error
+  json: false
+
+# No `redis:` block on purpose. Redis is only needed for multi-node routing;
+# a single node logs "using single-node routing" and works without it.

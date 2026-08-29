@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ru" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0d12" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SameVoice" />
+    <title>SameVoice</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Top bar. Deliberately thin: on a phone the screen belongs to the
+           person you are calling, not to the app's own name. -->
+      <header id="topbar">
+        <div class="brand">
+          <span class="brand-mark">SameVoice</span>
+        </div>
+        <div id="whoami" class="whoami"></div>
+      </header>
+
+      <div id="banner" class="banner" role="status" hidden></div>
+
+      <main>
+        <!-- ============ 1. кто вы: пол, потом язык ============
+             Одна ссылка на всех. Профиль не выбирается из списка, а собирается
+             из двух ответов: пол и язык. Пара разрешается в посаженного
+             пользователя, и только после этого открывается телефон. -->
+        <section id="screen-identity" class="screen" hidden>
+          <div class="intro">
+            <div class="intro-mark" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 10v28M24 4v40M33 10v28M6 19v10M42 19v10" />
+              </svg>
+            </div>
+            <h1 id="setup-title">Говорите на своём</h1>
+            <p class="hint" id="setup-hint">Собеседник услышит свой язык. Вашим голосом.</p>
+          </div>
+
+          <div class="steps" id="setup">
+            <!-- шаг 1 -->
+            <div class="step" data-step="gender">
+              <h2 class="step-q">Ваш голос</h2>
+              <div class="choices">
+                <button type="button" class="choice" data-gender="m">
+                  <span class="choice-ico" aria-hidden="true">♂</span>
+                  <span class="choice-t">Мужской</span>
+                </button>
+                <button type="button" class="choice" data-gender="f">
+                  <span class="choice-ico" aria-hidden="true">♀</span>
+                  <span class="choice-t">Женский</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- шаг 2 -->
+            <div class="step" data-step="lang" hidden>
+              <h2 class="step-q">Ваш язык</h2>
+              <div class="choices">
+                <button type="button" class="choice" data-lang="ru">
+                  <span class="choice-ico" aria-hidden="true">🇷🇺</span>
+                  <span class="choice-t">Русский</span>
+                </button>
+                <button type="button" class="choice" data-lang="he" dir="rtl" lang="he">
+                  <span class="choice-ico" aria-hidden="true">🇮🇱</span>
+                  <span class="choice-t">עברית</span>
+                </button>
+              </div>
+              <button type="button" class="step-back" id="setup-back">← Назад</button>
+            </div>
+          </div>
+
+          <!-- Остаётся для отладки: полный список профилей по ?debug=1. -->
+          <ul id="identity-list" class="people"></ul>
+          <p id="identity-error" class="error" hidden></p>
+        </section>
+
+        <!-- ============ 2. контакты ============ -->
+        <section id="screen-contacts" class="screen" hidden>
+          <h1 class="screen-title">Контакты</h1>
+
+          <!-- Исходящий вызов: что видит звонящий, пока идут гудки. -->
+          <div id="outgoing" class="outgoing" hidden role="status">
+            <span class="outgoing-pulse" aria-hidden="true"></span>
+            <div class="outgoing-main">
+              <strong id="outgoing-title"></strong>
+              <p id="outgoing-detail" class="outgoing-detail"></p>
+            </div>
+            <button id="outgoing-cancel" type="button" class="round round-end" aria-label="Отменить">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hangup" /></svg>
+            </button>
+          </div>
+
+          <ul id="contact-list" class="people"></ul>
+
+          <details class="joinbox">
+            <summary>Присоединиться по приглашению</summary>
+            <form id="join-form" class="joinbox-row">
+              <input
+                id="join-input"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="Ссылка или код звонка"
+                aria-label="Ссылка или код звонка"
+              />
+              <button id="join-submit" type="submit" class="btn">Войти</button>
+            </form>
+          </details>
+
+          <p id="contacts-error" class="error" hidden></p>
+        </section>
+
+        <!-- ============ 3. разговор ============ -->
+        <section id="screen-call" class="screen screen-call" hidden>
+          <div class="call-head">
+            <div class="call-peer">
+              <span class="label">Разговор с</span>
+              <strong id="call-peer-name"></strong>
+              <span id="call-peer-lang" class="lang-chip"></span>
+            </div>
+            <div class="call-badges">
+              <span id="mode-badge" class="badge"></span>
+              <span id="conn-badge" class="badge badge-conn"></span>
+            </div>
+          </div>
+
+          <p id="mode-explainer" class="mode-explainer"></p>
+
+          <div id="invite" class="invite" hidden>
+            <span class="label">Ссылка-приглашение</span>
+            <input id="invite-link" type="text" readonly aria-label="Ссылка-приглашение" />
+            <button id="invite-copy" type="button" class="btn btn-ghost">Копировать</button>
+          </div>
+
+          <button id="audio-unlock" type="button" class="unlock" hidden>
+            Нажмите, чтобы включить звук
+          </button>
+
+          <!-- Звонок 26.08.2026: собеседница держала телефон у уха и не слышала
+               ничего. Звук шёл в НИЖНИЙ динамик — так и должно быть, страница в
+               браузере физически не может занять разговорный динамик у уха: такого
+               API в вебе нет. Значит единственное честное решение — предупредить. -->
+          <div id="audio-hint" class="audio-hint" hidden>
+            <p>
+              Звук идёт в <strong>громкий динамик</strong>, как на громкой связи.
+              Держите телефон перед собой или наденьте наушники — у уха слышно не будет.
+            </p>
+            <button id="audio-hint-ok" type="button" class="btn btn-ghost">Понятно</button>
+          </div>
+
+          <!-- Живые субтитры — сердце экрана разговора: перевод виден раньше,
+               чем дозвучит синтез. -->
+          <section id="subtitles" class="subtitles" aria-live="polite" aria-atomic="false">
+            <div id="subtitle-committed" class="subtitle-committed"></div>
+            <div id="subtitle-partial" class="subtitle-partial"></div>
+            <p id="subtitle-empty" class="subtitle-empty"></p>
+          </section>
+
+          <!-- Самоконтроль, только под ?debug=1: что система услышала ОТ МЕНЯ.
+               Не продуктовый экран. Появился после звонка 26.08.2026, где обе
+               стороны десять минут выясняли «слышно?» вместо теста. -->
+          <section id="selfmon" class="selfmon" aria-live="polite">
+            <h3 class="selfmon-title">Система слышит меня так</h3>
+            <p id="selfmon-src" class="selfmon-src" lang="ru"></p>
+            <p id="selfmon-dst" class="selfmon-dst"></p>
+            <p id="selfmon-empty" class="selfmon-empty">Скажите что-нибудь…</p>
+          </section>
+
+          <!-- Кнопка судьи: одно нажатие помечает последнюю реплику неверной. -->
+          <div id="judge" class="judge" hidden>
+            <div class="judge-row">
+              <button id="judge-wrong" type="button" class="btn btn-flag">
+                <span aria-hidden="true">⚑</span> Перевод неверный
+              </button>
+              <button id="judge-prev" type="button" class="btn btn-ghost judge-prev">
+                предыдущую
+              </button>
+            </div>
+            <p id="judge-target" class="judge-target"></p>
+            <form id="judge-fix" class="judge-fix" hidden>
+              <input
+                id="judge-fix-input"
+                type="text"
+                autocomplete="off"
+                autocapitalize="sentences"
+                spellcheck="false"
+                placeholder="Надо было сказать…"
+                aria-label="Как должно было быть"
+              />
+              <button id="judge-fix-save" type="submit" class="btn btn-ghost">Сохранить</button>
+            </form>
+            <p id="judge-status" class="judge-status" role="status" hidden></p>
+          </div>
+
+          <div id="metrics" class="metrics" aria-label="Задержка"></div>
+
+          <div class="controls">
+            <button id="btn-mute" type="button" class="round round-mute" aria-label="Микрофон">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mic" /></svg>
+              <span class="round-label">Микрофон</span>
+            </button>
+            <button id="btn-hangup" type="button" class="round round-end" aria-label="Завершить">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hangup" /></svg>
+              <span class="round-label">Завершить</span>
+            </button>
+          </div>
+
+          <p id="call-error" class="error" hidden></p>
+        </section>
+      </main>
+
+      <footer id="footer" class="footer"></footer>
+    </div>
+
+    <!-- Входящий звонок. Намеренно вне #app: это оверлей, который должен
+         появляться поверх любого экрана, не трогая его вёрстку. -->
+    <div id="incoming" class="incoming" hidden role="alertdialog" aria-labelledby="incoming-title">
+      <div class="incoming-card">
+        <span class="incoming-eyebrow" id="incoming-eyebrow">Входящий звонок</span>
+        <strong class="incoming-title" id="incoming-title"></strong>
+        <div class="incoming-meta" id="incoming-meta"></div>
+        <p class="incoming-explainer" id="incoming-explainer"></p>
+        <div class="incoming-actions" id="incoming-actions">
+          <button id="incoming-decline" type="button" class="round round-end" aria-label="Отклонить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-hangup" /></svg>
+            <span class="round-label">Отклонить</span>
+          </button>
+          <button id="incoming-accept" type="button" class="round round-accept" aria-label="Ответить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone" /></svg>
+            <span class="round-label">Ответить</span>
+          </button>
+        </div>
+        <button id="incoming-dismiss" type="button" class="btn btn-ghost incoming-dismiss" hidden>
+          Понятно
+        </button>
+        <p class="incoming-note error" id="incoming-note" hidden></p>
+      </div>
+    </div>
+
+    <!-- Аудио-элементы удалённых участников; iOS требует их в DOM. -->
+    <div id="audio-sink" aria-hidden="true"></div>
+
+    <!-- Иконки. Инлайном, чтобы не было ни одного сетевого запроса за спрайтом. -->
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+      </symbol>
+      <symbol id="i-hangup" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+      </symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0M12 18v4" />
+      </symbol>
+      <symbol id="i-mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 5a3 3 0 0 1 6 0v5m-6 1v-1M5 11a7 7 0 0 0 11.3 5.5M19 11a7 7 0 0 1-.6 2.8M12 18v4M3 3l18 18" />
+      </symbol>
+    </svg>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

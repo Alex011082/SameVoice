@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SameVoice — панель разработки</title>
+<link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand"><span class="dot"></span> SameVoice <span class="muted">панель разработки</span></div>
+  <div class="bar-right">
+    <span id="health-prod" class="pill" title="продакшн">прод —</span>
+    <span id="health-local" class="pill" title="локальный бэкенд">локально —</span>
+    <button id="refresh" class="ghost" type="button">Обновить</button>
+  </div>
+</header>
+
+<main class="split">
+
+  <!-- ============ ЛЕВО: предпросмотр приложения ============ -->
+  <section class="pane preview">
+    <div class="pane-head">
+      <div class="seg" role="group" aria-label="источник">
+        <button class="seg-btn is-on" data-origin="prod" type="button">Прод</button>
+        <button class="seg-btn" data-origin="local" type="button">Локально</button>
+      </div>
+      <label class="who">
+        Я:
+        <select id="identity"><option value="">загрузка…</option></select>
+      </label>
+      <button id="open-tab" class="ghost" type="button" title="Открыть в отдельной вкладке">↗</button>
+    </div>
+    <div class="frame-wrap">
+      <iframe
+        id="app"
+        title="SameVoice"
+        allow="microphone; autoplay; clipboard-write"
+        referrerpolicy="no-referrer"
+      ></iframe>
+      <p id="frame-hint" class="hint">
+        Если микрофон не спрашивают — открой в отдельной вкладке кнопкой ↗:
+        Safari не всегда отдаёт микрофон во вложенный фрейм.
+        <button id="hint-close" class="hint-x" type="button" aria-label="Скрыть">×</button>
+      </p>
+    </div>
+  </section>
+
+  <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" tabindex="0"
+       aria-label="Изменить ширину панелей"></div>
+
+  <!-- ============ ПРАВО: разработка ============ -->
+  <section class="pane dev">
+    <nav class="tabs" role="tablist">
+      <button class="tab is-on" data-tab="tasks" role="tab" type="button">Задачи</button>
+      <button class="tab" data-tab="keys" role="tab" type="button">Ключи</button>
+      <button class="tab" data-tab="progress" role="tab" type="button">Прогресс</button>
+    </nav>
+
+    <!-- ---------- Задачи ---------- -->
+    <div class="tabpane is-on" data-pane="tasks">
+      <div class="row">
+        <select id="doc-list"><option value="">— документ из репозитория —</option></select>
+        <button id="doc-load" class="primary" type="button">Разобрать</button>
+      </div>
+      <p id="doc-note" class="note"></p>
+
+      <ul id="task-list" class="tasks"></ul>
+
+      <div id="task-detail" class="detail" hidden>
+        <h2 id="d-title"></h2>
+        <p id="d-goal" class="goal"></p>
+        <div class="copy-row">
+          <button id="copy-handoff" class="primary" type="button">Копировать HANDOFF задачи</button>
+          <button id="copy-prompt" class="primary" type="button">Копировать промт</button>
+        </div>
+        <details class="peek"><summary>Посмотреть HANDOFF</summary><pre id="d-handoff"></pre></details>
+        <details class="peek"><summary>Посмотреть промт</summary><pre id="d-prompt"></pre></details>
+      </div>
+    </div>
+
+    <!-- ---------- Ключи ---------- -->
+    <div class="tabpane" data-pane="keys">
+      <p class="note">
+        Панель пишет только в локальный <code>.env</code> и никогда не показывает
+        значения обратно — у секретов виден лишь хвост. Продакшн отсюда не
+        меняется: для него панель даёт команду, которую видно в терминале.
+      </p>
+      <div id="env-groups"></div>
+      <p id="env-note" class="note"></p>
+    </div>
+
+    <!-- ---------- Прогресс ---------- -->
+    <div class="tabpane" data-pane="progress">
+      <div id="progress-body"></div>
+    </div>
+  </section>
+</main>
+
+<script src="panel.js"></script>
+</body>
+</html>
