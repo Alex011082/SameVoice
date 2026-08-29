@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # The day-one "does the skeleton work" gate.
 #
-# Runs the three offline test suites in sequence and exits non-zero on the first
-# failure. No network, no API keys, no LiveKit server, no browser.
+# Runs the offline test suites in sequence and exits non-zero on the first
+# failure. No network, no API keys, no LiveKit server, no browser and no CUDA
+# are required. GPU tests here cover only pure contracts/helpers; model runtime
+# benchmarks remain a dedicated RunPod step.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -23,6 +25,9 @@ npm --prefix "$ROOT/backend" test || fail "backend tests"
 step "agent    (pytest)"
 [ -d "$ROOT/agent/.venv" ] || fail "agent venv missing — run: npm run deps:agent"
 ( cd "$ROOT/agent" && uv run pytest -q ) || fail "agent tests"
+
+step "gpu contracts (pytest, CPU only)"
+PYTHONPATH="$ROOT" "$ROOT/agent/.venv/bin/python" -m pytest -q "$ROOT/gpu/tests" || fail "gpu contract tests"
 
 step "web      (vitest)"
 [ -d "$ROOT/web/node_modules" ] || fail "web deps missing — run: npm run deps:web"
