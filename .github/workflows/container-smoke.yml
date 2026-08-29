@@ -1,0 +1,61 @@
+name: SameVoice container smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile.runpod'
+      - '.dockerignore'
+      - 'docker/**'
+      - '.github/workflows/container-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build R&D image
+        shell: bash
+        run: docker build --progress=plain -f Dockerfile.runpod -t samevoice-rnd:ci .
+
+      - name: Boot keyless mock container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name samevoice-rnd-ci \
+            -e SAMEVOICE_BOOTSTRAP_MOCK_ENV=1 \
+            -p 5173:5173 \
+            samevoice-rnd:ci
+
+          for i in $(seq 1 30); do
+            state="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' samevoice-rnd-ci)"
+            if [[ "$state" == "healthy" ]]; then
+              break
+            fi
+            if [[ "$state" == "unhealthy" ]]; then
+              docker logs samevoice-rnd-ci
+              exit 1
+            fi
+            sleep 2
+          done
+
+          test "$(docker inspect --format '{{.State.Health.Status}}' samevoice-rnd-ci)" = healthy
+          curl -fsS http://127.0.0.1:5173/ >/dev/null
+          curl -fsS http://127.0.0.1:5173/healthz >/dev/null
+
+      - name: Show service logs
+        if: always()
+        shell: bash
+        run: docker logs samevoice-rnd-ci 2>&1 || true
+
+      - name: Remove test container
+        if: always()
+        shell: bash
+        run: docker rm -f samevoice-rnd-ci >/dev/null 2>&1 || true
