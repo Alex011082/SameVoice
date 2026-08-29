@@ -1,0 +1,77 @@
+schema_version = 1
+updated = "2026-08-30"
+
+# This manifest is the benchmark selection, not a production promise. Model
+# weights live under /workspace and are never committed to Git.
+
+[[models]]
+id = "nvidia/nemotron-3.5-asr-streaming-0.6b"
+role = "acoustic_stt"
+gpu = 0
+license = "OpenMDW-1.1"
+languages = ["ru-RU", "he-IL"]
+status = "benchmark"
+notes = "Native cache-aware streaming ASR. Russian is a primary transcription locale; Hebrew is adaptation-ready and must be measured against the Hebrew-specific Whisper fallback before promotion."
+
+[[models]]
+id = "ivrit-ai/whisper-large-v3-turbo"
+role = "hebrew_asr_ab"
+gpu = 0
+license = "Apache-2.0"
+languages = ["he"]
+status = "benchmark_fallback"
+notes = "Hebrew-specific Whisper Large v3 Turbo finetune. Force language=he; its model card warns language detection degraded during continued training. Used for HE quality A/B, not as the rolling low-latency default."
+
+[[models]]
+id = "Qwen/Qwen3-0.6B-Base"
+role = "next_word_predictor"
+gpu = 0
+license = "Apache-2.0"
+languages = ["ru", "he"]
+status = "benchmark"
+notes = "Small causal LM used only to predict Top-K candidates for the next SOURCE word. Qwen3-1.7B-Base is a later accuracy/latency A/B candidate."
+
+[[models]]
+id = "Helsinki-NLP/opus-mt-ru-he"
+role = "local_mt"
+gpu = 0
+license = "Apache-2.0"
+languages = ["ru->he"]
+status = "benchmark"
+notes = "Small pair-specific Marian baseline. Greedy decoding only for the first latency baseline."
+
+[[models]]
+id = "Helsinki-NLP/opus-mt-he-ru"
+role = "local_mt"
+gpu = 0
+license = "Apache-2.0"
+languages = ["he->ru"]
+status = "benchmark"
+notes = "Small pair-specific Marian baseline. Greedy decoding only for the first latency baseline."
+
+[[models]]
+id = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+role = "local_tts_ru"
+gpu = 1
+license = "Apache-2.0"
+languages = ["ru"]
+status = "benchmark_later"
+notes = "Streaming/voice-clone candidate for supported languages. Hebrew is not in the official 10-language set, so this model must never be selected for HE."
+
+[[models]]
+id = "ResembleAI/chatterbox"
+role = "local_tts_he_ab"
+gpu = 1
+license = "MIT"
+languages = ["he", "ru"]
+status = "benchmark_later"
+notes = "Open-source multilingual voice-cloning A/B candidate for Hebrew/Russian. Generated audio is watermarked; benchmark TTFA before considering it for the realtime path."
+
+[[models]]
+id = "cartesia/sonic-3.5"
+role = "premium_tts_external"
+gpu = -1
+license = "vendor-service"
+languages = ["he", "ru"]
+status = "current_quality_path"
+notes = "External streaming quality path. Keep as the control while local TTS is benchmarked; no vendor model weights are stored locally."
