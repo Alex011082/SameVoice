@@ -16,6 +16,14 @@ on:
           - '0'
           - '1'
         default: '0'
+      install_tts_engine:
+        description: Bake Chatterbox GPU1 A/B dependencies into the image (0 or 1)
+        required: true
+        type: choice
+        options:
+          - '0'
+          - '1'
+        default: '0'
       tag:
         description: Image tag
         required: true
@@ -55,6 +63,7 @@ jobs:
           file: Dockerfile.runpod
           build-args: |
             INSTALL_GPU_ENGINES=${{ inputs.install_gpu_engines }}
+            INSTALL_TTS_ENGINE=${{ inputs.install_tts_engine }}
           push: ${{ inputs.push_to_ghcr }}
           tags: ${{ steps.image.outputs.name }}
           provenance: false
