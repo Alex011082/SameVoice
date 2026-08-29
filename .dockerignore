@@ -1,0 +1,35 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+**/node_modules
+**/.venv
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/dist
+**/.vite
+
+logs
+models
+checkpoints
+datasets
+benchmarks
+hf-cache
+cache
+uv-cache
+
+*.zip
+*.tar
+*.tar.gz
+*.tar.xz
+
+# Evaluation audio is data, not application source. Keep code/metadata in the
+# build context but do not bake recorded WAV files into the container image.
+eval/**/*.wav
+
+.DS_Store
+Thumbs.db
