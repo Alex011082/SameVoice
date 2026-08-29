@@ -58,10 +58,11 @@ jobs:
           npm --prefix backend run build
           VITE_BACKEND_URL=/ npm --prefix web run build
 
-      - name: Validate RunPod shell entrypoints
+      - name: Validate RunPod and GPU service sources
         shell: bash
         run: |
           set -euo pipefail
           bash -n docker/entrypoint.sh
           bash -n docker/healthcheck.sh
           bash -n scripts/runpod-preflight.sh
+          python3 -m compileall -q gpu scripts/runpod-stage1-bench.py
