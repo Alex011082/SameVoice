@@ -104,3 +104,19 @@ When the Pod is running, GPU time is billed continuously. When stopped, GPU bill
 The live production inference model must not update its weights directly during a call. Training is offline/versioned:
 
 `live model → collect consented data → train candidate → offline eval → shadow/canary → promote or reject`.
+
+## Exporting results before the Pod is stopped
+
+`scripts/runpod-export.sh` implements step 7 of the acceptance test in `docs/RUNPOD_READINESS.md` — "export the artifacts off the Pod **before** stopping it, and write a run manifest next to them" — which until now was specified and never built. Run `bash /opt/samevoice/scripts/runpod-export.sh` as the last step of every paid session: after the measurements, before the Pod is stopped. Not after — a stop is the event the export exists to survive. Run it again after any further experiment; each run writes its own timestamped bundle and never overwrites an earlier one, including when two runs land in the same second.
+
+The risk is structural, not hypothetical. Every result path in the image points inside `/workspace` (`BENCHMARK_DIR`, `EVAL_LOG_DIR`, `CALL_ARCHIVE_DIR`), and nothing else in this repository moves a byte off the Pod. `docker/entrypoint.sh`'s `cleanup()` only kills child processes, so a stop signal flushes and copies nothing. Worse, `scripts/runpod-preflight.sh` proves only that `/workspace` is *writable*, which the ephemeral container overlay is too — a Pod created without a volume passes preflight and still loses the whole session on stop. The export script therefore compares filesystem device ids and refuses to write when its destination turns out to be container disk, saying why.
+
+The bundle is one timestamped `.tar.gz` under `/workspace/exports` holding the eval JSONL logs, the benchmark artifacts, an `nvidia-smi` snapshot taken at export time, `gpu/model_manifest.toml` plus each service's `/healthz` (which reports the model id that actually loaded, not the one that was configured), the non-secret environment and a run manifest. The script then prints the one-line `scp`/`rsync` command to run from the laptop. Secrets, raw audio and voice embeddings are excluded by allow-list — voice is biometrics here — and every skipped file is named in `EXCLUDED.txt` inside the bundle.
+
+Three limits to know before the session starts:
+
+- `CALL_ARCHIVE_DIR` is a result path but is deliberately **not** exported. It holds one JSON file per finished call — a conversation between two named people, readable by exactly those two — so the script treats `/workspace/logs/archive` the same way it treats model weights and voice references: pointing a source at it, or at any directory containing it, aborts the run rather than producing a bundle;
+- `.dockerignore` excludes `.git` from the image and no build argument records a commit, so the run manifest carries `git_sha: null` on a Pod. Attribute a bundle by the image tag/digest from the RunPod console instead;
+- a `/healthz` is only captured for a service that is actually up. Each miss is recorded as a note in the manifest, because a benchmark number whose checkpoint cannot be confirmed should not be quoted as if it could.
+
+Stop the Pod only once the tarball is on the laptop and its `sha256` matches.
