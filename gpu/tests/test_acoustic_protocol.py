@@ -50,3 +50,103 @@ def test_event_serialization_keeps_stt_vocabulary():
         "engine": "test-engine",
         "latency_ms": 123.457,
     }
+
+
+def test_queue_wait_reaches_the_wire_next_to_latency():
+    # latency_ms alone is a mixture: it is stamped in NemotronUtterance.__init__
+    # and therefore already contains the wait for the shared generate lock. The
+    # wait was computed and thrown away; a consumer that sees only latency_ms
+    # cannot tell a slow model from a contended card.
+    payload = AcousticEvent(
+        type="final",
+        text="привет",
+        lang="ru",
+        engine="test-engine",
+        latency_ms=412.0,
+        queue_wait_ms=37.25,
+    ).as_dict()
+    assert payload["latency_ms"] == 412.0
+    assert payload["queue_wait_ms"] == 37.25
+
+
+def test_queue_wait_is_omitted_when_it_was_not_measured():
+    # Zero and "not measured" are different claims, and this repo does not
+    # publish invented numbers: events with no queue behind them stay silent.
+    assert "queue_wait_ms" not in AcousticEvent(type="ready", lang="he").as_dict()
+
+
+def test_engine_update_carries_no_invented_zero_wait():
+    # The omission above is only honest if the producer can actually produce
+    # "not measured". `HebrewWhisperEngine.transcribe` short-circuits on empty
+    # audio without ever taking the lock, and a Nemotron final can be emitted
+    # while `run_model` is still blocked on `_generate_lock`; with a 0.0 default
+    # both would have published a measured "no wait".
+    from gpu.acoustic.engines import TranscriptUpdate
+
+    update = TranscriptUpdate(text="", latency_ms=0.0, engine="test-engine")
+    assert update.queue_wait_ms is None
+    assert "queue_wait_ms" not in AcousticEvent(
+        type="final",
+        text="x",
+        lang="he",
+        latency_ms=update.latency_ms,
+        queue_wait_ms=update.queue_wait_ms,
+    ).as_dict()
+
+
+def test_hebrew_latency_contains_its_own_queue_wait():
+    """`latency_ms` must mean the same thing for both engines on the wire.
+
+    `AcousticEvent.latency_ms` is one field and both engines write it. Nemotron
+    anchors it in `NemotronUtterance.__init__`, i.e. before its wait on
+    `_generate_lock`, so ru events publish a latency that already contains the
+    wait. If the Hebrew engine anchored after its lock instead, the same field
+    would mean "wait included" for ru and "wait excluded" for he, and the only
+    consumer of the number (`last_server_latency_ms` in
+    `agent/src/speakeasy_agent/providers/stt_runpod.py`) has no way to tell the
+    two apart. `latency_ms - queue_wait_ms` would then be right for one language
+    and double-subtract for the other.
+    """
+    import threading
+    import time
+
+    from gpu.acoustic.engines import HebrewWhisperEngine
+
+    block_ms = 60.0
+
+    class FakeSegment:
+        text = "שלום"
+
+    class FakeWhisper:
+        def transcribe(self, audio, **kwargs):
+            time.sleep(block_ms / 1000.0)
+            return [FakeSegment()], None
+
+    engine = HebrewWhisperEngine()
+    engine._model = FakeWhisper()
+    engine.device = "cpu"
+
+    results: list = []
+    lock = threading.Lock()
+
+    def call() -> None:
+        update = engine.transcribe([0.0] * 160)
+        with lock:
+            results.append(update)
+
+    threads = [threading.Thread(target=call) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10.0)
+
+    assert len(results) == 2
+    waited = max(results, key=lambda update: update.queue_wait_ms or 0.0)
+    # The second caller really queued behind the first, so there is a wait to
+    # misattribute in the first place.
+    assert waited.queue_wait_ms is not None and waited.queue_wait_ms > 0.5 * block_ms
+    for update in results:
+        assert update.queue_wait_ms is not None
+        # The invariant: the wait is a component of latency_ms, never an addend.
+        assert update.latency_ms >= update.queue_wait_ms
+    assert waited.latency_ms >= waited.queue_wait_ms + 0.5 * block_ms

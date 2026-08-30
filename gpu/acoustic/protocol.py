@@ -26,6 +26,24 @@ class AcousticEvent:
     confidence: float = 0.0
     engine: str = ""
     latency_ms: float | None = None
+    # One rule holds for both engines: latency_ms is anchored *before* that
+    # engine's wait for its lock and therefore already contains it, so
+    # queue_wait_ms is a breakdown of latency_ms and must never be added to it.
+    # ru: anchored in `NemotronUtterance.__init__`, wait computed in
+    #     `_start_model.run_model` on `_generate_lock`.
+    # he: anchored in `HebrewWhisperEngine.transcribe`, wait computed on the
+    #     engine's own `_lock`.
+    # Both waits used to be discarded, which left the published number
+    # impossible to split into model or queue afterwards
+    # (docs/12-latency-timestamps.md, docs/RUNPOD_READINESS.md:36).
+    #
+    # What the remainder means is NOT the same in the two languages, and no
+    # consumer can tell them apart without also reading `engine`:
+    # he: `latency_ms - queue_wait_ms` is model time exactly.
+    # ru: the anchor is the utterance constructor, not the start of the forward
+    #     pass, so the remainder also contains the time spent feeding audio. It
+    #     is an upper bound on model time, not model time.
+    queue_wait_ms: float | None = None
 
     def as_dict(self) -> dict[str, object]:
         data: dict[str, object] = {
@@ -41,6 +59,8 @@ class AcousticEvent:
             data["engine"] = self.engine
         if self.latency_ms is not None:
             data["latency_ms"] = round(float(self.latency_ms), 3)
+        if self.queue_wait_ms is not None:
+            data["queue_wait_ms"] = round(float(self.queue_wait_ms), 3)
         return data
 
 

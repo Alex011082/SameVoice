@@ -221,6 +221,7 @@ class AcousticSession:
                             end=self._samples_seen / SAMPLE_RATE,
                             engine=update.engine,
                             latency_ms=update.latency_ms,
+                            queue_wait_ms=update.queue_wait_ms,
                         )
                     )
 
@@ -283,6 +284,7 @@ class AcousticSession:
                 end=self._samples_seen / SAMPLE_RATE,
                 engine=update.engine,
                 latency_ms=update.latency_ms,
+                queue_wait_ms=update.queue_wait_ms,
             )
         )
 
@@ -325,6 +327,7 @@ class AcousticSession:
                     confidence=0.0,
                     engine=update.engine,
                     latency_ms=update.latency_ms,
+                    queue_wait_ms=update.queue_wait_ms,
                 )
             )
         self.emit(
