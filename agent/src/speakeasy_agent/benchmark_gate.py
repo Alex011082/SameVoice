@@ -294,7 +294,7 @@ def evaluate_promotion_gate(
         pred = pred if isinstance(pred, Mapping) else {}
         sample_count = pred.get("samples")
         add(
-            "minimum samples",
+            "minimum predictor samples",
             lang,
             sample_count,
             ">=",
@@ -309,7 +309,11 @@ def evaluate_promotion_gate(
             ">=",
             float(gate["predictorTop20RecallMin"]),
         )
-        if isinstance(sample_count, (int, float)) and sample_count >= gate["minSamplesPerLanguage"]:
+        predictor_enough = (
+            isinstance(sample_count, (int, float))
+            and sample_count >= gate["minSamplesPerLanguage"]
+        )
+        if predictor_enough:
             if isinstance(top20, (int, float)) and top20 < gate["rejectPredictorTop20RecallBelow"]:
                 hard_reject = True
 
@@ -321,6 +325,20 @@ def evaluate_promotion_gate(
         drop = metrics.get("conditionalDropRate") if isinstance(metrics.get("conditionalDropRate"), Mapping) else {}
         lead = metrics.get("coldParallelLeadVsSttMs") if isinstance(metrics.get("coldParallelLeadVsSttMs"), Mapping) else {}
         rtt = metrics.get("roundTripMs") if isinstance(metrics.get("roundTripMs"), Mapping) else {}
+
+        acoustic_samples = metrics.get("samples")
+        rtt_samples = rtt.get("samples") if isinstance(rtt, Mapping) else None
+        min_samples = float(gate["minSamplesPerLanguage"])
+        add(f"{target} ms acoustic samples", lang, acoustic_samples, ">=", min_samples)
+        add(f"{target} ms pruner round-trip samples", lang, rtt_samples, ">=", min_samples)
+        acoustic_enough = (
+            isinstance(acoustic_samples, (int, float))
+            and acoustic_samples >= gate["minSamplesPerLanguage"]
+        )
+        rtt_enough = (
+            isinstance(rtt_samples, (int, float))
+            and rtt_samples >= gate["minSamplesPerLanguage"]
+        )
 
         top5_ret = retention.get("top5") if isinstance(retention, Mapping) else None
         top3_ret = retention.get("top3") if isinstance(retention, Mapping) else None
@@ -369,9 +387,10 @@ def evaluate_promotion_gate(
             float(gate["prunerRoundTripP95MsMax"]),
         )
 
-        if isinstance(sample_count, (int, float)) and sample_count >= gate["minSamplesPerLanguage"]:
+        if acoustic_enough:
             if isinstance(top10_ret, (int, float)) and top10_ret < gate["rejectConditionalTop10RetentionBelow"]:
                 hard_reject = True
+        if rtt_enough:
             p95 = rtt.get("p95") if isinstance(rtt, Mapping) else None
             if isinstance(p95, (int, float)) and p95 > gate["rejectPrunerRoundTripP95MsAbove"]:
                 hard_reject = True
