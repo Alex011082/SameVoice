@@ -32,6 +32,24 @@ status = "finetune_required"
 notes = "Hebrew is recognized by the tokenizer but NVIDIA classifies it as adaptation-ready, not transcription-ready. Do not route Hebrew production audio through stock weights."
 
 [[models]]
+id = "bond005/wav2vec2-base-ru"
+role = "acoustic_pruner_ru"
+gpu = 0
+license = "Apache-2.0"
+languages = ["ru"]
+status = "stage2_benchmark"
+notes = "Small Russian CTC recognizer used only as an early grapheme/acoustic evidence scorer for predictor candidates. It does not replace the main Russian ASR."
+
+[[models]]
+id = "imvladikon/wav2vec2-large-xlsr-53-hebrew"
+role = "acoustic_pruner_he"
+gpu = 0
+license = "Apache-2.0"
+languages = ["he"]
+status = "stage2_benchmark"
+notes = "Hebrew CTC recognizer used only to derive early grapheme evidence from short next-word windows. Benchmark +50/+100/+150/+200/+250 ms before any hard pruning policy."
+
+[[models]]
 id = "Qwen/Qwen3-0.6B-Base"
 role = "next_word_predictor"
 gpu = 0

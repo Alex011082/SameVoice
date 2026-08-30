@@ -52,7 +52,7 @@ printf '  npm:    %s\n' "$(npm --version 2>/dev/null || echo missing)"
 printf '  uv:     %s\n' "$(uv --version 2>/dev/null || echo missing)"
 printf '  agent:  %s\n' "$(cd /opt/samevoice/agent 2>/dev/null && uv run python --version 2>/dev/null || python3 --version 2>/dev/null || echo missing)"
 
-if [[ -n "${ACOUSTIC_SCOUT_CMD:-}" || -n "${PREDICTOR_CMD:-}" || -n "${LOCAL_MT_CMD:-}" ]]; then
+if [[ -n "${ACOUSTIC_SCOUT_CMD:-}" || -n "${ACOUSTIC_PRUNER_CMD:-}" || -n "${PREDICTOR_CMD:-}" || -n "${LOCAL_MT_CMD:-}" ]]; then
   if [[ ! -x /opt/venvs/think/bin/python ]]; then
     echo 'ERROR: a GPU0 THINK hook is enabled but /opt/venvs/think is missing.' >&2
     echo 'Build the image with INSTALL_GPU_ENGINES=1.' >&2
@@ -80,6 +80,17 @@ print("  acoustic packages: present")
 PY
 fi
 
+if [[ -n "${ACOUSTIC_PRUNER_CMD:-}" ]]; then
+  /opt/venvs/think/bin/python - <<'PY'
+import importlib.util
+required = ["numpy", "torch", "transformers"]
+missing = [name for name in required if importlib.util.find_spec(name) is None]
+if missing:
+    raise SystemExit("ERROR: acoustic-pruner runtime missing packages: " + ", ".join(missing))
+print("  acoustic-pruner packages: present")
+PY
+fi
+
 if [[ -n "${LOCAL_TTS_CMD:-}" ]]; then
   if [[ ! -x /opt/venvs/speak/bin/python ]]; then
     echo 'ERROR: local-TTS hook is enabled but /opt/venvs/speak is missing.' >&2
@@ -98,15 +109,16 @@ fi
 
 echo
 printf 'GPU split:\n'
-printf '  GPU %s -> acoustic scout / predictor / local MT\n' "${PREDICTOR_CUDA_VISIBLE_DEVICES:-0}"
+printf '  GPU %s -> acoustic scout / acoustic pruner / predictor / local MT\n' "${PREDICTOR_CUDA_VISIBLE_DEVICES:-0}"
 printf '  GPU %s -> local TTS\n' "${TTS_CUDA_VISIBLE_DEVICES:-1}"
 
 echo
 printf 'enabled local engines:\n'
-printf '  predictor: %s\n' "$([[ -n "${PREDICTOR_CMD:-}" ]] && echo yes || echo no)"
-printf '  acoustic:  %s\n' "$([[ -n "${ACOUSTIC_SCOUT_CMD:-}" ]] && echo yes || echo no)"
-printf '  local MT:  %s\n' "$([[ -n "${LOCAL_MT_CMD:-}" ]] && echo yes || echo no)"
-printf '  local TTS: %s\n' "$([[ -n "${LOCAL_TTS_CMD:-}" ]] && echo yes || echo no)"
+printf '  predictor:       %s\n' "$([[ -n "${PREDICTOR_CMD:-}" ]] && echo yes || echo no)"
+printf '  acoustic:        %s\n' "$([[ -n "${ACOUSTIC_SCOUT_CMD:-}" ]] && echo yes || echo no)"
+printf '  acoustic pruner: %s\n' "$([[ -n "${ACOUSTIC_PRUNER_CMD:-}" ]] && echo yes || echo no)"
+printf '  local MT:        %s\n' "$([[ -n "${LOCAL_MT_CMD:-}" ]] && echo yes || echo no)"
+printf '  local TTS:       %s\n' "$([[ -n "${LOCAL_TTS_CMD:-}" ]] && echo yes || echo no)"
 
 echo
 printf 'PASS preflight\n'

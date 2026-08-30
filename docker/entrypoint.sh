@@ -99,10 +99,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# GPU hooks are intentionally command-based until the local predictor/MT/TTS
-# implementations are committed. This already enforces the desired service
-# split without pretending that the current RunPod provider stubs are real.
+# GPU hooks are explicit so every experiment can be switched independently.
+# The acoustic pruner is a separate Stage-2 benchmark service on GPU0; it does
+# not become part of the audible path merely because it is running.
 start_gpu_hook "acoustic-scout" "${ACOUSTIC_CUDA_VISIBLE_DEVICES:-0}" "${ACOUSTIC_SCOUT_CMD:-}"
+start_gpu_hook "acoustic-pruner" "${ACOUSTIC_PRUNER_CUDA_VISIBLE_DEVICES:-0}" "${ACOUSTIC_PRUNER_CMD:-}"
 start_gpu_hook "predictor" "${PREDICTOR_CUDA_VISIBLE_DEVICES:-0}" "${PREDICTOR_CMD:-}"
 start_gpu_hook "local-mt" "${LOCAL_MT_CUDA_VISIBLE_DEVICES:-0}" "${LOCAL_MT_CMD:-}"
 start_gpu_hook "local-tts" "${TTS_CUDA_VISIBLE_DEVICES:-1}" "${LOCAL_TTS_CMD:-}"

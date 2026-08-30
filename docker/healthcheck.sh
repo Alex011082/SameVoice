@@ -20,3 +20,6 @@ fi
 if [[ -n "${LOCAL_TTS_CMD:-}" ]]; then
   curl -fsS --max-time 2 "${LOCAL_TTS_URL:-http://127.0.0.1:8104}/healthz" >/dev/null
 fi
+if [[ -n "${ACOUSTIC_PRUNER_CMD:-}" ]]; then
+  curl -fsS --max-time 2 "${ACOUSTIC_PRUNER_URL:-http://127.0.0.1:8105}/healthz" >/dev/null
+fi

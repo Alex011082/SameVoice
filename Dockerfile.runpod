@@ -93,9 +93,9 @@ RUN cd agent \
     && cd /opt/samevoice \
     && npm --prefix backend run build \
     && VITE_BACKEND_URL=/ npm --prefix web run build \
-    && chmod +x docker/entrypoint.sh docker/healthcheck.sh scripts/runpod-preflight.sh
+    && chmod +x docker/entrypoint.sh docker/healthcheck.sh scripts/runpod-preflight.sh scripts/runpod-warmup.sh
 
-EXPOSE 5173 8787 8788 8101 8102 8103 8104
+EXPOSE 5173 8787 8788 8101 8102 8103 8104 8105
 
 HEALTHCHECK --interval=20s --timeout=5s --start-period=35s --retries=3 \
     CMD ["/opt/samevoice/docker/healthcheck.sh"]

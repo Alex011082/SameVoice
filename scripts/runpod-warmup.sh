@@ -10,6 +10,7 @@ PREDICTOR_URL="${PREDICTOR_URL:-http://127.0.0.1:8101}"
 ACOUSTIC_URL="${ACOUSTIC_SCOUT_URL:-http://127.0.0.1:8102}"
 MT_URL="${LOCAL_MT_URL:-http://127.0.0.1:8103}"
 TTS_URL="${LOCAL_TTS_URL:-http://127.0.0.1:8104}"
+PRUNER_URL="${ACOUSTIC_PRUNER_URL:-http://127.0.0.1:8105}"
 
 wait_health() {
   local name="$1" url="$2"
@@ -36,6 +37,7 @@ post() {
 
 [[ -n "${PREDICTOR_CMD:-}" ]] && wait_health predictor "$PREDICTOR_URL"
 [[ -n "${ACOUSTIC_SCOUT_CMD:-}" ]] && wait_health acoustic "$ACOUSTIC_URL"
+[[ -n "${ACOUSTIC_PRUNER_CMD:-}" ]] && wait_health acoustic-pruner "$PRUNER_URL"
 [[ -n "${LOCAL_MT_CMD:-}" ]] && wait_health local-mt "$MT_URL"
 [[ -n "${LOCAL_TTS_CMD:-}" ]] && wait_health local-tts "$TTS_URL"
 
@@ -46,6 +48,11 @@ fi
 if [[ -n "${ACOUSTIC_SCOUT_CMD:-}" ]]; then
   post 'warm acoustic Russian (Nemotron streaming)' "$ACOUSTIC_URL/v1/warmup" '{"lang":"ru"}'
   post 'warm acoustic Hebrew (ivrit.ai Whisper)' "$ACOUSTIC_URL/v1/warmup" '{"lang":"he"}'
+fi
+
+if [[ -n "${ACOUSTIC_PRUNER_CMD:-}" ]]; then
+  post 'warm acoustic-pruner Russian CTC' "$PRUNER_URL/v1/warmup" '{"lang":"ru"}'
+  post 'warm acoustic-pruner Hebrew CTC' "$PRUNER_URL/v1/warmup" '{"lang":"he"}'
 fi
 
 if [[ -n "${LOCAL_MT_CMD:-}" ]]; then
