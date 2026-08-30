@@ -63,6 +63,31 @@ def test_gate_holds_when_dataset_is_too_small():
     assert gate["verdict"] == "HOLD"
 
 
+def test_gate_holds_when_predictor_count_is_large_but_acoustic_coverage_is_small():
+    samples = []
+    for lang in ("ru", "he"):
+        # Two valid predictor samples, but only one target-window acoustic row.
+        samples.append(_sample(f"{lang}-with-window", lang))
+        missing = _sample(f"{lang}-no-window", lang)
+        missing["windows"] = []
+        samples.append(missing)
+
+    gate = evaluate_promotion_gate(
+        summarize_replay(samples),
+        {"minSamplesPerLanguage": 2},
+    )
+    assert gate["verdict"] == "HOLD"
+    failed = {
+        (check["name"], check["lang"])
+        for check in gate["checks"]
+        if not check["pass"]
+    }
+    assert ("150 ms acoustic samples", "ru") in failed
+    assert ("150 ms acoustic samples", "he") in failed
+    assert ("150 ms pruner round-trip samples", "ru") in failed
+    assert ("150 ms pruner round-trip samples", "he") in failed
+
+
 def test_gate_rejects_very_low_predictor_recall_after_minimum_sample_count():
     samples = []
     for lang in ("ru", "he"):
