@@ -1,0 +1,26 @@
+{
+  "samples": [
+    {
+      "id": "ru-example-001",
+      "lang": "ru",
+      "wav": "audio/ru-example-001.wav",
+      "prefix": "я завтра хочу",
+      "truth": "купить",
+      "wordStartMs": 812.0,
+      "baselineSttStableMs": 610.0,
+      "predictorReadyMsFromWordOnset": -180.0,
+      "contextTerms": ["покупка"]
+    },
+    {
+      "id": "he-example-001",
+      "lang": "he",
+      "wav": "audio/he-example-001.wav",
+      "prefix": "אני רוצה עכשיו",
+      "truth": "לקנות",
+      "wordStartMs": 735.0,
+      "baselineSttStableMs": 690.0,
+      "predictorReadyMsFromWordOnset": -140.0,
+      "contextTerms": ["קנייה"]
+    }
+  ]
+}
