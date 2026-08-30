@@ -51,6 +51,9 @@ class AcousticWindowResult:
     raw_evidence: str
     inference_ms: float | None
     ranked: tuple[dict[str, Any], ...]
+    # Client-observed request completion time. Unlike inference_ms this includes
+    # transport, worker/GPU queueing, response serialization and ranking.
+    round_trip_ms: float | None = None
 
 
 class AcousticPrunerClient(Protocol):
@@ -78,6 +81,7 @@ class HttpAcousticPrunerClient:
         pcm_s16le: bytes,
         candidates: Sequence[PredictionCandidate],
     ) -> AcousticWindowResult:
+        started = time.monotonic()
         async with shared_session().post(
             self._url,
             json={
@@ -93,6 +97,7 @@ class HttpAcousticPrunerClient:
             payload: Any = await response.json(content_type=None)
             if response.status >= 400:
                 raise RuntimeError(f"acoustic pruner HTTP {response.status}: {str(payload)[:300]}")
+        round_trip_ms = (time.monotonic() - started) * 1000.0
         if not isinstance(payload, dict):
             raise RuntimeError("acoustic pruner returned a non-object response")
         ranked_raw = payload.get("ranked")
@@ -108,6 +113,7 @@ class HttpAcousticPrunerClient:
                 else None
             ),
             ranked=ranked,
+            round_trip_ms=round_trip_ms,
         )
 
     async def aclose(self) -> None:
@@ -130,6 +136,7 @@ class _Arm:
     scores: list[AcousticWindowResult] = field(default_factory=list)
     score_error: str | None = None
     scoring_started: bool = False
+    scoring_task: asyncio.Task | None = None
     logged: bool = False
 
 
@@ -164,13 +171,23 @@ class LiveAcousticPruningCollector:
         self._tasks: set[asyncio.Task] = set()
         self._closed = False
 
+    @staticmethod
+    def _occupies_active_slot(item: _Arm) -> bool:
+        if item.logged:
+            return False
+        task_running = item.scoring_task is not None and not item.scoring_task.done()
+        # Waiting live arms still reserve the single sampled probe slot. Any
+        # terminal arm with a running scorer must also keep counting until that
+        # request chain actually finishes/cancels.
+        return item.status in ("armed", "resolved") or task_running
+
     def arm(self, prefix: str) -> int | None:
         if self._closed:
             return None
         self._attempt_seq += 1
         if (self._attempt_seq - 1) % self.every_n != 0:
             return None
-        active = sum(1 for item in self._arms if not item.logged and item.status in ("armed", "resolved"))
+        active = sum(1 for item in self._arms if self._occupies_active_slot(item))
         if active >= self.max_active:
             return None
         prefix_words = words(prefix)
@@ -271,6 +288,7 @@ class LiveAcousticPruningCollector:
             return
         arm.scoring_started = True
         task = asyncio.create_task(self._score(arm), name=f"acoustic-prune-shadow:{self.lang}:{arm.id}")
+        arm.scoring_task = task
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
@@ -292,6 +310,7 @@ class LiveAcousticPruningCollector:
                         raw_evidence=result.raw_evidence,
                         inference_ms=result.inference_ms,
                         ranked=result.ranked,
+                        round_trip_ms=result.round_trip_ms,
                     )
                 )
         except asyncio.CancelledError:
@@ -302,17 +321,18 @@ class LiveAcousticPruningCollector:
         finally:
             self._maybe_log(arm)
 
-    def _maybe_log(self, arm: _Arm) -> None:
+    def _maybe_log(self, arm: _Arm, *, force: bool = False) -> None:
         if arm.logged:
             return
-        if arm.status in ("armed",):
-            return
-        if arm.scoring_started and len(arm.scores) < len(self.windows_ms) and arm.score_error is None:
-            return
-        if not arm.scoring_started and arm.status == "resolved" and arm.candidates and len(arm.audio) < self._max_bytes:
-            # Wait for enough future audio to finish the configured arm-relative
-            # windows; the actual next word may stabilize before +250 ms after arm.
-            return
+        if not force:
+            if arm.status in ("armed",):
+                return
+            if arm.scoring_started and len(arm.scores) < len(self.windows_ms) and arm.score_error is None:
+                return
+            if not arm.scoring_started and arm.status == "resolved" and arm.candidates and len(arm.audio) < self._max_bytes:
+                # Wait for enough future audio to finish the configured arm-relative
+                # windows; the actual next word may stabilize before +250 ms after arm.
+                return
 
         rows: list[dict[str, Any]] = []
         for score in arm.scores:
@@ -325,11 +345,11 @@ class LiveAcousticPruningCollector:
                         truth_rank = int(rank) if isinstance(rank, int) else None
                         break
             estimated_lead = None
-            if arm.truth_stable_at is not None and score.inference_ms is not None:
+            if arm.truth_stable_at is not None and score.round_trip_ms is not None:
                 estimated_lead = round(
                     (arm.truth_stable_at - arm.armed_at) * 1000.0
                     - score.window_ms
-                    - score.inference_ms,
+                    - score.round_trip_ms,
                     1,
                 )
             rows.append(
@@ -338,6 +358,7 @@ class LiveAcousticPruningCollector:
                     "evidence": score.evidence,
                     "rawEvidence": score.raw_evidence,
                     "inferenceMs": round(score.inference_ms, 1) if score.inference_ms is not None else None,
+                    "roundTripMs": round(score.round_trip_ms, 1) if score.round_trip_ms is not None else None,
                     "truthRank": truth_rank,
                     "retained": {
                         "top3": truth_rank is not None and truth_rank <= 3,
@@ -345,10 +366,8 @@ class LiveAcousticPruningCollector:
                         "top10": truth_rank is not None and truth_rank <= 10,
                         "top20": truth_rank is not None and truth_rank <= 20,
                     },
-                    # Positive is a *component estimate*: window availability +
-                    # CTC inference would precede ordinary STT truth stability if
-                    # scheduled immediately. HTTP/queue contention is represented
-                    # only insofar as the pruner's inferenceMs includes it.
+                    # Positive now reflects client-observed completion, including
+                    # HTTP transport, worker/GPU queueing and response handling.
                     "estimatedLeadVsSttMs": estimated_lead,
                     "top5": list(score.ranked[:5]),
                 }
@@ -356,7 +375,7 @@ class LiveAcousticPruningCollector:
 
         record = {
             "kind": "acoustic_pruning_shadow",
-            "v": 1,
+            "v": 2,
             "ts": round(time.time(), 3),
             "callId": self.call_id,
             "srcLang": self.lang,
@@ -398,10 +417,16 @@ class LiveAcousticPruningCollector:
             if pending:
                 await asyncio.gather(*pending, return_exceptions=True)
         for arm in self._arms:
-            if not arm.logged:
-                if arm.status == "armed":
-                    arm.status = "closed"
-                self._maybe_log(arm)
+            if arm.logged:
+                continue
+            incomplete_scoring = arm.scoring_started and len(arm.scores) < len(self.windows_ms)
+            if arm.status == "resolved":
+                arm.status = "closed_incomplete"
+            elif arm.status == "armed":
+                arm.status = "closed"
+            elif incomplete_scoring and not arm.status.endswith("_incomplete"):
+                arm.status = f"{arm.status}_incomplete"
+            self._maybe_log(arm, force=True)
         await self.client.aclose()
 
 
