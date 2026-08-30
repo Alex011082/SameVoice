@@ -24,10 +24,7 @@
       <div id="banner" class="banner" role="status" hidden></div>
 
       <main>
-        <!-- ============ 1. кто вы: пол, потом язык ============
-             Одна ссылка на всех. Профиль не выбирается из списка, а собирается
-             из двух ответов: пол и язык. Пара разрешается в посаженного
-             пользователя, и только после этого открывается телефон. -->
+        <!-- ============ 1. подтверждение номера ============ -->
         <section id="screen-identity" class="screen" hidden>
           <div class="intro">
             <div class="intro-mark" aria-hidden="true">
@@ -36,11 +33,83 @@
                 <path d="M15 10v28M24 4v40M33 10v28M6 19v10M42 19v10" />
               </svg>
             </div>
-            <h1 id="setup-title">Говорите на своём</h1>
-            <p class="hint" id="setup-hint">Собеседник услышит свой язык. Вашим голосом.</p>
+            <h1 id="setup-title">Ваш номер</h1>
+            <p class="hint" id="setup-hint">Он станет вашим адресом в SameVoice.</p>
           </div>
 
-          <div class="steps" id="setup">
+          <div id="phone-auth" class="phone-auth">
+            <form id="phone-form" class="auth-card">
+              <label for="phone-input">Номер телефона</label>
+              <input
+                id="phone-input"
+                type="tel"
+                inputmode="tel"
+                autocomplete="tel"
+                placeholder="050 123 4567"
+                aria-describedby="phone-note"
+                required
+              />
+              <p id="phone-note" class="field-note">Израильский номер или международный формат с «+».</p>
+              <button type="submit" class="btn btn-primary">Получить код</button>
+            </form>
+
+            <form id="phone-code-form" class="auth-card" hidden>
+              <p class="verified-destination">Код для <strong id="phone-destination"></strong></p>
+              <div class="dev-code" role="status">
+                <span>Временный код</span>
+                <strong id="phone-dev-code"></strong>
+                <small>SMS подключим позже — пока код показывается здесь.</small>
+              </div>
+              <label for="phone-code-input">Введите код</label>
+              <input
+                id="phone-code-input"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                placeholder="000000"
+                required
+              />
+              <button type="submit" class="btn btn-primary">Подтвердить номер</button>
+              <button type="button" id="phone-change" class="step-back">← Изменить номер</button>
+            </form>
+          </div>
+
+          <form id="profile-form" class="auth-card" hidden>
+            <p class="verified-destination">Подтверждён: <strong id="profile-phone"></strong></p>
+            <label for="profile-name">Как вас зовут</label>
+            <input
+              id="profile-name"
+              type="text"
+              autocomplete="name"
+              maxlength="64"
+              placeholder="Ваше имя"
+              required
+            />
+            <div class="profile-grid">
+              <label>
+                Ваш язык
+                <select id="profile-lang">
+                  <option value="ru">Русский</option>
+                  <option value="he">עברית</option>
+                </select>
+              </label>
+              <label>
+                Ваш голос
+                <select id="profile-gender">
+                  <option value="m">Мужской</option>
+                  <option value="f">Женский</option>
+                  <option value="u">Не указывать</option>
+                </select>
+              </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Создать профиль</button>
+          </form>
+
+          <!-- Постоянный внутренний тестовый контур. В обычном входе скрыт;
+               ?debug=1 открывает четыре предустановленные личности напрямую. -->
+          <div class="steps" id="setup" hidden>
             <!-- шаг 1 -->
             <div class="step" data-step="gender">
               <h2 class="step-q">Ваш голос</h2>
@@ -75,6 +144,7 @@
 
           <!-- Остаётся для отладки: полный список профилей по ?debug=1. -->
           <ul id="identity-list" class="people"></ul>
+          <p id="phone-auth-error" class="error" hidden></p>
           <p id="identity-error" class="error" hidden></p>
         </section>
 

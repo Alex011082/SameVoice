@@ -1,6 +1,7 @@
 import { ConnectionQuality, ConnectionState } from 'livekit-client';
 import type { CallMetrics } from './call';
 import { flagPreview, type FlagTarget } from './flags';
+import type { PhoneAuthState } from './phone-auth';
 import { outgoingText, ringClosedText, ringModeText, type RingState } from './ring';
 import { dirForLang, langLabel, type SubtitleLine, type SubtitleView } from './subtitles';
 import type { CallMode, ContactCard, Gender, JoinResponse, Lang, Tone, UserProfile } from './types';
@@ -19,6 +20,20 @@ const el = {
   screenIdentity: () => must<HTMLElement>('screen-identity'),
   identityList: () => must<HTMLUListElement>('identity-list'),
   identityError: () => must<HTMLParagraphElement>('identity-error'),
+  phoneAuth: () => must<HTMLDivElement>('phone-auth'),
+  phoneForm: () => must<HTMLFormElement>('phone-form'),
+  phoneInput: () => must<HTMLInputElement>('phone-input'),
+  phoneCodeForm: () => must<HTMLFormElement>('phone-code-form'),
+  phoneCodeInput: () => must<HTMLInputElement>('phone-code-input'),
+  phoneDestination: () => must<HTMLElement>('phone-destination'),
+  phoneDevCode: () => must<HTMLElement>('phone-dev-code'),
+  phoneChange: () => must<HTMLButtonElement>('phone-change'),
+  phoneAuthError: () => must<HTMLParagraphElement>('phone-auth-error'),
+  profileForm: () => must<HTMLFormElement>('profile-form'),
+  profilePhone: () => must<HTMLElement>('profile-phone'),
+  profileName: () => must<HTMLInputElement>('profile-name'),
+  profileLang: () => must<HTMLSelectElement>('profile-lang'),
+  profileGender: () => must<HTMLSelectElement>('profile-gender'),
 
   screenContacts: () => must<HTMLElement>('screen-contacts'),
   contactList: () => must<HTMLUListElement>('contact-list'),
@@ -109,6 +124,81 @@ export const setCallError = (text: string | null): void => setError(el.callError
 
 export function setFooter(parts: string[]): void {
   el.footer().textContent = parts.join('  ·  ');
+}
+
+export interface PhoneAuthHandlers {
+  onStart(phone: string): void;
+  onVerify(code: string): void;
+  onRestart(): void;
+}
+
+export function renderPhoneAuth(state: PhoneAuthState, handlers: PhoneAuthHandlers): void {
+  const title = must<HTMLElement>('setup-title');
+  const hint = must<HTMLElement>('setup-hint');
+  const setup = must<HTMLElement>('setup');
+  const phoneForm = el.phoneForm();
+  const codeForm = el.phoneCodeForm();
+
+  el.phoneAuth().hidden = state.phase === 'verified';
+  phoneForm.hidden = state.phase !== 'phone';
+  codeForm.hidden = state.phase !== 'code';
+  setup.hidden = true;
+  el.profileForm().hidden = state.phase !== 'verified';
+  setError(el.phoneAuthError(), state.error);
+
+  phoneForm.onsubmit = (event) => {
+    event.preventDefault();
+    handlers.onStart(el.phoneInput().value);
+  };
+  codeForm.onsubmit = (event) => {
+    event.preventDefault();
+    handlers.onVerify(el.phoneCodeInput().value.trim());
+  };
+  el.phoneChange().onclick = () => handlers.onRestart();
+
+  if (state.phase === 'code') {
+    title.textContent = 'Подтвердите номер';
+    hint.textContent = 'Шесть цифр — и номер ваш.';
+    el.phoneDestination().textContent = state.phone;
+    el.phoneDevCode().textContent = state.devCode;
+    queueMicrotask(() => el.phoneCodeInput().focus());
+  } else if (state.phase === 'verified') {
+    title.textContent = 'Создайте профиль';
+    hint.textContent = 'Имя увидят люди, которые добавят вас в контакты.';
+    el.profilePhone().textContent = state.phone;
+  } else {
+    title.textContent = 'Ваш номер';
+    hint.textContent = 'Он станет вашим адресом в SameVoice.';
+  }
+}
+
+export interface ProfileRegistrationInput {
+  displayName: string;
+  lang: Lang;
+  gender: Gender;
+}
+
+export function renderProfileRegistration(
+  onSubmit: (profile: ProfileRegistrationInput) => void,
+): void {
+  const form = el.profileForm();
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    onSubmit({
+      displayName: el.profileName().value.trim(),
+      lang: el.profileLang().value as Lang,
+      gender: el.profileGender().value as Gender,
+    });
+  };
+  queueMicrotask(() => el.profileName().focus());
+}
+
+export function showSeededIdentitySetup(): void {
+  el.phoneAuth().hidden = true;
+  el.profileForm().hidden = true;
+  must<HTMLElement>('setup').hidden = false;
+  must<HTMLElement>('setup-title').textContent = 'Быстрый тест';
+  must<HTMLElement>('setup-hint').textContent = 'Выберите одну из предустановленных личностей.';
 }
 
 /**

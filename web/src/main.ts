@@ -6,7 +6,10 @@ import { startRingingAttention, stopRingingAttention } from './attention';
 import { AutoJoinGate } from './autojoin';
 import { CallSession, micFailureText, type CallMetrics, type MicFailureKind } from './call';
 import { FlagLog, type FlagTarget } from './flags';
+import { phoneAuthInitial, reducePhoneAuth, type PhoneAuthState } from './phone-auth';
+import { profileUrl } from './profile-navigation';
 import { RingPoller } from './ringpoll';
+import { selectSeededIdentities } from './seeded-identities';
 import type { RingState } from './ring';
 import { diagnoseCurrentOrigin, insecureContextMessage } from './secure';
 import { SubtitleModel } from './subtitles';
@@ -73,6 +76,8 @@ const state: AppState = {
   judge: { log: new FlagLog(), correcting: null, status: null, statusTimer: null },
   ringEpitaphTimer: null,
 };
+
+let phoneAuth: PhoneAuthState = phoneAuthInitial();
 
 // --- url helpers ----------------------------------------------------------
 
@@ -375,8 +380,32 @@ async function boot(): Promise<void> {
 async function showIdentityPicker(): Promise<void> {
   ui.showScreen('identity');
   ui.renderWhoami(null, () => undefined);
+  if (param('debug') === '1') {
+    ui.showSeededIdentitySetup();
+    await renderSeededIdentities();
+    return;
+  }
+  ui.renderPhoneAuth(phoneAuth, {
+    onStart: (phone) => {
+      void startPhoneConfirmation(phone);
+    },
+    onVerify: (code) => {
+      void verifyPhoneConfirmation(code);
+    },
+    onRestart: () => {
+      phoneAuth = reducePhoneAuth(phoneAuth, { type: 'restart' });
+      void showIdentityPicker();
+    },
+  });
+  if (phoneAuth.phase !== 'verified') return;
+  ui.renderProfileRegistration((profile) => {
+    void registerProfile(profile);
+  });
+}
+
+async function renderSeededIdentities(): Promise<void> {
   try {
-    const users = await api.listUsers();
+    const users = selectSeededIdentities(await api.listUsers());
     const pick = (userId: string): void => {
       setParams({ me: userId });
       window.location.reload();
@@ -388,6 +417,50 @@ async function showIdentityPicker(): Promise<void> {
     ui.renderIdentityPicker(users, pick);
   } catch (err) {
     ui.setIdentityError(describeError(err));
+  }
+}
+
+async function startPhoneConfirmation(phone: string): Promise<void> {
+  try {
+    const challenge = await api.startPhoneVerification(phone);
+    phoneAuth = reducePhoneAuth(phoneAuth, {
+      type: 'code_sent',
+      challengeId: challenge.challengeId,
+      phone: challenge.phone,
+      devCode: challenge.devCode,
+    });
+  } catch (err) {
+    phoneAuth = reducePhoneAuth(phoneAuth, { type: 'failed', message: describeError(err) });
+  }
+  await showIdentityPicker();
+}
+
+async function verifyPhoneConfirmation(code: string): Promise<void> {
+  if (phoneAuth.phase !== 'code') return;
+  try {
+    const verified = await api.verifyPhone(phoneAuth.challengeId, code);
+    if (verified.existingUser) {
+      window.location.assign(profileUrl(window.location.href, verified.existingUser.id));
+      return;
+    }
+    phoneAuth = reducePhoneAuth(phoneAuth, {
+      type: 'verified',
+      registrationToken: verified.registrationToken,
+    });
+  } catch (err) {
+    phoneAuth = reducePhoneAuth(phoneAuth, { type: 'failed', message: describeError(err) });
+  }
+  await showIdentityPicker();
+}
+
+async function registerProfile(profile: ui.ProfileRegistrationInput): Promise<void> {
+  if (phoneAuth.phase !== 'verified') return;
+  try {
+    const registered = await api.registerProfile(phoneAuth.registrationToken, profile);
+    window.location.assign(profileUrl(window.location.href, registered.user.id));
+  } catch (err) {
+    phoneAuth = reducePhoneAuth(phoneAuth, { type: 'failed', message: describeError(err) });
+    await showIdentityPicker();
   }
 }
 

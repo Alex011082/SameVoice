@@ -151,6 +151,130 @@ describe("health and config", () => {
   });
 });
 
+describe("development phone verification", () => {
+  it("normalizes an Israeli mobile number and returns a six-digit code for the web prototype", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "050-123-4567" },
+    });
+
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.json().phone, "+972501234567");
+    assert.match(res.json().challengeId, /^pv_[0-9a-f]{24}$/);
+    assert.match(res.json().devCode, /^\d{6}$/);
+    assert.equal(res.json().expiresInSeconds, 300);
+  });
+
+  it("rejects a wrong code, accepts the displayed code once, and rejects replay", async () => {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "+972 52 765 4321" },
+    });
+    const challenge = started.json();
+    const wrongCode = challenge.devCode === "000000" ? "999999" : "000000";
+
+    const wrong = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: wrongCode },
+    });
+    assert.equal(wrong.statusCode, 400);
+    assert.equal(wrong.json().error.code, "invalid_code");
+
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    assert.equal(verified.statusCode, 200);
+    assert.equal(verified.json().verified, true);
+    assert.equal(verified.json().phone, "+972527654321");
+    assert.match(verified.json().registrationToken, /^vr_[0-9a-f]{48}$/);
+    assert.equal(verified.json().existingUser, null);
+
+    const replay = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    assert.equal(replay.statusCode, 400);
+    assert.equal(replay.json().error.code, "invalid_challenge");
+  });
+
+  it("creates a real profile from a verified number and recognizes it on the next verification", async () => {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "054-222-3344" },
+    });
+    const challenge = started.json();
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    const registrationToken = verified.json().registrationToken as string;
+
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        registrationToken,
+        displayName: "Давид",
+        lang: "ru",
+        gender: "m",
+      },
+    });
+    assert.equal(registered.statusCode, 201);
+    assert.equal(registered.json().created, true);
+    assert.match(registered.json().user.id, /^u_[0-9a-f]{16}$/);
+    assert.deepEqual(
+      {
+        displayName: registered.json().user.displayName,
+        lang: registered.json().user.lang,
+        gender: registered.json().user.gender,
+        tone: registered.json().user.tone,
+      },
+      { displayName: "Давид", lang: "ru", gender: "m", tone: "friendly" },
+    );
+
+    const replay = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { registrationToken, displayName: "Другой", lang: "he", gender: "f" },
+    });
+    assert.equal(replay.statusCode, 400);
+    assert.equal(replay.json().error.code, "invalid_verification");
+
+    const startedAgain = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "+972542223344" },
+    });
+    const againChallenge = startedAgain.json();
+    const verifiedAgain = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: againChallenge.challengeId, code: againChallenge.devCode },
+    });
+    assert.equal(verifiedAgain.statusCode, 200);
+    assert.equal(verifiedAgain.json().existingUser.id, registered.json().user.id);
+    assert.equal(verifiedAgain.json().existingUser.displayName, "Давид");
+  });
+
+  it("rejects phone input that cannot be normalized", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "123" },
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.json().error.code, "bad_request");
+  });
+});
+
 describe("seeded users and contacts", () => {
   it("seeds the Stage-0 testers with gender and tone", async () => {
     const res = await app.inject({ method: "GET", url: "/api/users" });
