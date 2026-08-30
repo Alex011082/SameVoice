@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable
@@ -119,11 +120,25 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("jsonl", type=Path, help="logs/calls/<callId>.jsonl")
     parser.add_argument("--compact", action="store_true")
+    # Без --output отчёт жил только в stdout. На арендованном поде это значит,
+    # что предикторские числа печатаются в терминал и умирают вместе с подом:
+    # scripts/runpod-export.sh забирает файлы, а не историю чужой консоли.
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="also write the report to this file so a Pod export can pick it up",
+    )
     args = parser.parse_args()
     if not args.jsonl.is_file():
         raise SystemExit(f"not found: {args.jsonl}")
     report = summarize(_read(args.jsonl))
-    print(json.dumps(report, ensure_ascii=False, indent=None if args.compact else 2, sort_keys=True))
+    text = json.dumps(report, ensure_ascii=False, indent=None if args.compact else 2, sort_keys=True)
+    print(text)
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(text + "\n", encoding="utf-8")
+        print(f"written: {args.output}", file=sys.stderr)
 
 
 if __name__ == "__main__":
