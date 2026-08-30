@@ -36,6 +36,16 @@ class TranscriptUpdate:
     text: str
     latency_ms: float
     engine: str
+    # Carried alongside latency_ms so a partial/final on the wire can be split
+    # into model time and time spent waiting for the card. Both engines here
+    # serialise on a lock, so without this the wait is invisible in the log.
+    #
+    # None, not 0.0: an update produced before the lock was ever reached (an
+    # empty-audio short circuit, or a final emitted while `run_model` is still
+    # blocked) has no measured wait, and `AcousticEvent.as_dict` omits the field
+    # in that case. A default of 0.0 would publish "no wait" as a measurement --
+    # the invented number `gpu/tests/test_acoustic_protocol.py` exists to forbid.
+    queue_wait_ms: float | None = None
 
 
 class NemotronEngine:
@@ -121,7 +131,10 @@ class NemotronUtterance:
         self._transcript = ""
         self._next_start_idx = 0
         self._started_at = time.perf_counter()
-        self.queue_wait_ms = 0.0
+        # Stays None until `run_model` actually acquires the shared generate
+        # lock; a partial/final emitted before that reports no wait rather than
+        # a zero one.
+        self.queue_wait_ms: float | None = None
         self.error: BaseException | None = None
 
     @property
@@ -208,6 +221,7 @@ class NemotronUtterance:
                         text=self.transcript,
                         latency_ms=(time.perf_counter() - self._started_at) * 1000.0,
                         engine=NEMOTRON_MODEL,
+                        queue_wait_ms=self.queue_wait_ms,
                     )
                     self.loop.call_soon_threadsafe(self.on_partial, update)
             except BaseException as exc:
@@ -251,6 +265,7 @@ class NemotronUtterance:
                 text=self.transcript,
                 latency_ms=(time.perf_counter() - self._started_at) * 1000.0,
                 engine=NEMOTRON_MODEL,
+                queue_wait_ms=self.queue_wait_ms,
             )
         self._closed = True
 
@@ -288,6 +303,7 @@ class NemotronUtterance:
             text=self.transcript,
             latency_ms=(time.perf_counter() - self._started_at) * 1000.0,
             engine=NEMOTRON_MODEL,
+            queue_wait_ms=self.queue_wait_ms,
         )
 
 
@@ -335,8 +351,25 @@ class HebrewWhisperEngine:
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if audio.size == 0:
             return TranscriptUpdate(text="", latency_ms=0.0, engine=HEBREW_MODEL)
+        # latency_ms is anchored here, before the lock, and therefore still
+        # contains the wait -- deliberately, because `AcousticEvent.latency_ms`
+        # is one field carrying both engines. Nemotron anchors it in
+        # `NemotronUtterance.__init__`, which is also before its own wait, and
+        # a consumer reading `last_server_latency_ms` (`stt_runpod.py`) cannot
+        # tell which engine produced the event without also reading `engine`.
+        # Anchoring this one after the lock instead would give the same field
+        # two meanings -- "wait included" for ru, "wait excluded" for he -- so
+        # `latency_ms - queue_wait_ms` would be right for one language and
+        # double-subtract for the other, and it would silently change what he
+        # numbers mean across this commit while ru numbers stayed put.
+        # The split is published, not folded in: queue_wait_ms below is the
+        # separable component, and for this engine `latency_ms - queue_wait_ms`
+        # is exactly model time (the load and the numpy conversion happen above
+        # this point). For Nemotron the remainder also contains audio feeding --
+        # see the note on `AcousticEvent.queue_wait_ms` in protocol.py.
         started = time.perf_counter()
         with self._lock:
+            queue_wait_ms = (time.perf_counter() - started) * 1000.0
             segments, _info = self._model.transcribe(
                 audio,
                 language="he",
@@ -352,6 +385,7 @@ class HebrewWhisperEngine:
             text=text.strip(),
             latency_ms=(time.perf_counter() - started) * 1000.0,
             engine=HEBREW_MODEL,
+            queue_wait_ms=queue_wait_ms,
         )
 
 

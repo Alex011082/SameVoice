@@ -15,10 +15,12 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from ..queueing import GpuQueue, concurrency_from_env
 from .text import RawCandidate, collapse_candidates
 
 Lang = Literal["ru", "he"]
 MODEL_ID = os.getenv("PREDICTOR_MODEL", "Qwen/Qwen3-0.6B-Base")
+GPU_CONCURRENCY = concurrency_from_env("PREDICTOR_GPU_CONCURRENCY")
 
 
 class PredictRequest(BaseModel):
@@ -38,9 +40,20 @@ class Candidate(BaseModel):
 class PredictResponse(BaseModel):
     candidates: list[Candidate]
     model: str
+    # Stamped inside PredictorEngine.predict around beam search + decode +
+    # candidate collapsing; it excludes tokenisation and the lazy `_load()`.
+    # Kept unchanged because scripts/runpod-stage1-bench.py:66 reads this field,
+    # but it cannot answer "model or queue?" on its own, which is what the three
+    # fields below exist for.
     latency_ms: float
     load_ms: float = 0.0
     beam_count: int
+    queue_wait_ms: float = 0.0
+    # The whole blocking call held under the semaphore. On the first request
+    # after boot that includes the lazy weight load, which is why `load_ms` is
+    # published next to it rather than folded in.
+    inference_ms: float = 0.0
+    total_ms: float = 0.0
 
 
 class PredictorEngine:
@@ -168,6 +181,15 @@ class PredictorEngine:
 
 
 engine = PredictorEngine()
+
+# The predictor shares GPU 0 with the acoustic pruner, so its own beam search is
+# not the only thing that can delay an answer. Without this gate `predict` was a
+# plain `def` handler, i.e. Starlette ran `generate()` in its threadpool with no
+# bound below the pool size, so no request ever queued and any `queue_wait_ms`
+# it published would have been ~0 by construction. The gate covers this process
+# only; contention with the pruner on the same card is still invisible here.
+gpu_queue = GpuQueue("predictor", limit=GPU_CONCURRENCY)
+
 app = FastAPI(title="SameVoice Rolling Predictor", version="0.1.0")
 
 
@@ -179,25 +201,38 @@ def healthz() -> dict[str, object]:
         "model": MODEL_ID,
         "loaded": engine.loaded,
         "device": engine.device,
+        "gpu_concurrency": gpu_queue.limit,
+        "gpu_queue_waiting": gpu_queue.waiting,
     }
 
 
 @app.post("/v1/warmup")
-def warmup() -> dict[str, object]:
+async def warmup() -> dict[str, object]:
+    # Warmup goes through the same gate as /v1/predict. Moving several hundred
+    # MB of weights onto the card is GPU work like any other: run it outside the
+    # semaphore and a predict request landing during warmup waits on
+    # `PredictorEngine._lock` *inside* its own timed section, which reports the
+    # contention as `inference_ms` with `queue_wait_ms ~ 0` -- the mixture this
+    # queue exists to prevent. `scripts/runpod-warmup.sh` calls this at boot.
+    entered_at = time.perf_counter()
     try:
-        return engine.warmup()
+        result, _timing = await gpu_queue.run(engine.warmup, entered_at=entered_at)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return result
 
 
 @app.post("/v1/predict", response_model=PredictResponse)
-def predict(req: PredictRequest) -> PredictResponse:
+async def predict(req: PredictRequest) -> PredictResponse:
+    entered_at = time.perf_counter()
     try:
-        response = engine.predict(req)
+        response, timing = await gpu_queue.run(engine.predict, req, entered_at=entered_at)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if not response.candidates:
         raise HTTPException(status_code=422, detail="predictor produced no word candidates")
-    return response
+    # Built after the card is released, so the copy below is never charged to
+    # the GPU; the difference shows up as total_ms - (queue_wait_ms + inference_ms).
+    return response.model_copy(update=timing.as_metrics())

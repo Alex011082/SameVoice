@@ -127,7 +127,21 @@ def main() -> None:
                 },
                 "evidence": response.get("evidence"),
                 "rawEvidence": response.get("raw_evidence"),
-                "inferenceMs": response.get("inference_ms"),
+                # model_forward_ms is the forward-only number this column has
+                # always carried. The service kept publishing `inference_ms`,
+                # but widened it to the whole section held under the GPU
+                # semaphore, so reading `inference_ms` here would change what
+                # this column means without changing its name. Old servers do
+                # not send model_forward_ms; the fallback keeps them readable.
+                "inferenceMs": (
+                    response.get("model_forward_ms")
+                    if response.get("model_forward_ms") is not None
+                    else response.get("inference_ms")
+                ),
+                # The queue/model split the service now records. Without it a
+                # slow window cannot be told apart from a contended card.
+                "queueWaitMs": response.get("queue_wait_ms"),
+                "serviceTotalMs": response.get("total_ms"),
                 "top5": ranked[:5],
             }
         )

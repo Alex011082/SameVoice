@@ -10,6 +10,41 @@ The benchmark deliberately separates three questions:
 A PROMOTE verdict means only "safe to implement the next soft-realtime R&D
 stage". It is never a production-enable flag and never authorizes audible early
 commit.
+
+Safety vocabulary. Every rate below is measured only over samples where the
+linguistic predictor actually supplied the truth word, i.e. `predictor.truthRank`
+is not None; a predictor miss is a predictor problem and must never be charged to
+the acoustic stage:
+
+- ``erroredRate``       -- the pruner never answered for this window (HTTP
+  failure, timeout, or a clip too short for the window). Nothing is known about
+  what acoustics would have done, so this must not be read as damage. It is
+  broken out first because it is the easiest way for the numbers below to lie.
+- ``vanishedRate``      -- the pruner answered, and its ranking contained no rank
+  for the truth word. This is the only rate that means "the candidate was really
+  destroyed".
+- ``demotedBelowRate``  -- per cut K: the truth word survived but ended below K.
+  This is the loss taken when a consumer acts on Top-K.
+- ``harmedRate``        -- acoustics made the rank worse than the predictor's.
+- ``improvedRate`` / ``unchangedRate`` -- the other two thirds of the same split.
+
+A single "conditionalDropRate" field used to stand in for all of this. It was
+removed because the pruner only re-ranks and never deletes candidates -- see
+docs/11-acoustic-pruning.md, "No candidate is irreversibly deleted by the
+service" -- so its Top-20 value was structurally ~0 and still read as "pruning
+discards the correct word almost never": the founder's most dangerous question
+answered by a number that could not measure it. `vanishedRate` and `harmedRate`
+are the honest answers; `demotedBelowRate` is the Top-K consumer's actual loss.
+
+Why `erroredRate` is separate from `vanishedRate`. A window row that failed
+carries no `truthRank` at all, exactly like a genuinely destroyed candidate. Six
+clips out of thirty that are shorter than 250 ms after `wordStartMs` produce
+`{"windowMs": 250, "error": "audio shorter than requested word-onset window"}`
+in `scripts/acoustic-replay-bench.py`, and folding them into `vanishedRate`
+would report 20% of candidates destroyed at 250 ms by a pruner that was never
+called. The same holds for a pod returning 503s. The gate's Top-5 miss check
+still sums all three causes, so nothing gets quietly cheaper; the report just
+says which one it was.
 """
 
 from __future__ import annotations
@@ -100,13 +135,18 @@ def _prediction_metrics(samples: list[Mapping[str, Any]]) -> dict[str, Any]:
 
 def _window_metrics(rows: list[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> dict[str, Any]:
     # Each tuple is (sample, window-row). Predictor eligibility is deliberately
-    # tracked separately: conditional retention answers "did acoustic pruning
-    # throw away a word the linguistic predictor actually supplied?".
+    # tracked separately: every conditional rate below answers "what did acoustics
+    # do to a word the linguistic predictor actually supplied?", never "did the
+    # predictor find it" -- mixing the two is what made the old drop rate unusable.
     all_count = len(rows)
     predictor_eligible = 0
+    vanished = 0
+    errored_eligible = 0
+    demoted_below = {k: 0 for k in TOP_KS}
     ranks_all: list[int | None] = []
     conditional_ranks: list[int | None] = []
     inference: list[float] = []
+    queue_wait: list[float] = []
     round_trip: list[float] = []
     component_leads: list[float] = []
     cold_parallel_leads: list[float] = []
@@ -115,7 +155,8 @@ def _window_metrics(rows: list[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> 
     errors = 0
 
     for sample, row in rows:
-        if row.get("error"):
+        row_errored = bool(row.get("error"))
+        if row_errored:
             errors += 1
         predictor = sample.get("predictor") if isinstance(sample.get("predictor"), Mapping) else {}
         predictor_rank_raw = predictor.get("truthRank") if isinstance(predictor, Mapping) else None
@@ -125,13 +166,31 @@ def _window_metrics(rows: list[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> 
         ranks_all.append(truth_rank)
         if predictor_rank is not None:
             predictor_eligible += 1
-            conditional_ranks.append(truth_rank)
-            if truth_rank is not None:
+            # An errored row contributes no rank even if one somehow survived on
+            # it, so retention/demoted/vanished/errored stay mutually exclusive
+            # and exhaustive over the eligible samples.
+            conditional_ranks.append(None if row_errored else truth_rank)
+            if row_errored:
+                # The pruner never answered, so this row is evidence about the
+                # run, not about the scorer. An errored row carries no truthRank
+                # and would otherwise be indistinguishable from a destroyed
+                # candidate -- see the module docstring.
+                errored_eligible += 1
+            elif truth_rank is None:
+                # The pruner answered and its ranking did not contain the word
+                # the predictor did supply: the only case where the acoustic
+                # stage really destroyed the candidate.
+                vanished += 1
+            else:
                 # Positive means the acoustic scorer improved the rank.
                 rank_deltas.append(float(predictor_rank - truth_rank))
+                for k in TOP_KS:
+                    if truth_rank > k:
+                        demoted_below[k] += 1
 
         for key, target in (
             ("inferenceMs", inference),
+            ("queueWaitMs", queue_wait),
             ("roundTripMs", round_trip),
             ("componentLeadVsSttMs", component_leads),
             ("coldParallelLeadVsSttMs", cold_parallel_leads),
@@ -150,10 +209,17 @@ def _window_metrics(rows: list[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> 
         )
 
     retention = {f"top{k}": conditional_retention(k) for k in TOP_KS}
-    drop = {
-        key: (round(1.0 - value, 4) if isinstance(value, (int, float)) else None)
-        for key, value in retention.items()
+    # Per cut K the eligible samples split four ways, which is what the single
+    # removed "drop rate" hid. In counts the identity is exact:
+    #   retained[k] + demotedBelow[k] + vanished + erroredEligible == eligible
+    # The published rates are each rounded to 4 decimals independently, so their
+    # sum can miss 1.0 by up to 1.5e-4 (eligible == 3 gives 0.3333 * 3 = 0.9999).
+    # Compare the counts, not the rates, if the identity has to be checked.
+    demoted_below_rate = {
+        f"top{k}": _rate(demoted_below[k], predictor_eligible) for k in TOP_KS
     }
+    vanished_rate = _rate(vanished, predictor_eligible)
+    errored_rate = _rate(errored_eligible, predictor_eligible)
 
     def lead_metrics(values: list[float]) -> dict[str, Any]:
         result = _latencies(values)
@@ -168,16 +234,46 @@ def _window_metrics(rows: list[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> 
         "endToEndRecall": {f"top{k}": _rank_recall(ranks_all, k) for k in TOP_KS},
         # Conditional retention isolates damage/improvement caused by acoustics.
         "conditionalRetention": retention,
-        "conditionalDropRate": drop,
+        # The pruner answered and its ranking had no rank for a truth word the
+        # predictor did supply.
+        "vanishedRate": vanished_rate,
+        "vanishedSamples": vanished,
+        # The pruner never answered for this window: HTTP failure, timeout, or a
+        # clip too short for the window. Kept out of vanishedRate because it says
+        # nothing about the scorer, and out of retention because it says nothing
+        # about safety either.
+        "erroredRate": errored_rate,
+        "erroredSamples": errored_eligible,
+        # Truth word survived acoustics but ended below K: the loss a consumer
+        # takes when it acts on Top-K. Reported separately from vanishedRate
+        # because the two demand different fixes (thresholds vs. scorer).
+        "demotedBelowRate": demoted_below_rate,
         "truthRankP50": percentile(
             [float(rank) for rank in conditional_ranks if rank is not None], 0.50
         ),
+        # Denominator here is rank_deltas, i.e. only samples where the truth word
+        # had a rank before AND after acoustics -- a delta is undefined for a
+        # vanished word and for an errored row. improved + unchanged + harmed
+        # == 1 over that denominator (again up to per-rate rounding);
+        # vanishedRate and erroredRate above cover the rest of the eligible
+        # samples. `samples` is published so the two denominators are never
+        # mistaken for each other.
         "rankDelta": {
             "samples": len(rank_deltas),
             "p50": percentile(rank_deltas, 0.50),
             "improvedRate": _rate(sum(value > 0 for value in rank_deltas), len(rank_deltas)),
+            "unchangedRate": _rate(sum(value == 0 for value in rank_deltas), len(rank_deltas)),
+            # Previously only improvedRate was published, so harm hid inside the
+            # 1 - improvedRate remainder together with the unchanged samples;
+            # this is the number that decides whether pruning is safe.
+            "harmedRate": _rate(sum(value < 0 for value in rank_deltas), len(rank_deltas)),
         },
+        # Forward-only model time, from the service's `model_forward_ms`.
         "inferenceMs": _latencies(inference),
+        # Time the request spent waiting for the card before any model ran. Empty
+        # `samples` here means the pruner was too old to publish the split, not
+        # that nothing queued -- do not read a missing p95 as zero.
+        "queueWaitMs": _latencies(queue_wait),
         "roundTripMs": _latencies(round_trip),
         # componentLead assumes predictor candidates were already available at
         # word onset. coldParallelLead pessimistically starts predictor at onset.
@@ -322,7 +418,7 @@ def evaluate_promotion_gate(
         metrics = lang_windows.get(target) if isinstance(lang_windows, Mapping) else None
         metrics = metrics if isinstance(metrics, Mapping) else {}
         retention = metrics.get("conditionalRetention") if isinstance(metrics.get("conditionalRetention"), Mapping) else {}
-        drop = metrics.get("conditionalDropRate") if isinstance(metrics.get("conditionalDropRate"), Mapping) else {}
+        demoted = metrics.get("demotedBelowRate") if isinstance(metrics.get("demotedBelowRate"), Mapping) else {}
         lead = metrics.get("coldParallelLeadVsSttMs") if isinstance(metrics.get("coldParallelLeadVsSttMs"), Mapping) else {}
         rtt = metrics.get("roundTripMs") if isinstance(metrics.get("roundTripMs"), Mapping) else {}
 
@@ -343,7 +439,22 @@ def evaluate_promotion_gate(
         top5_ret = retention.get("top5") if isinstance(retention, Mapping) else None
         top3_ret = retention.get("top3") if isinstance(retention, Mapping) else None
         top10_ret = retention.get("top10") if isinstance(retention, Mapping) else None
-        top5_drop = drop.get("top5") if isinstance(drop, Mapping) else None
+        # The gate threshold key keeps its name because gpu/acoustic_gate.default.json
+        # ships it, and the summed value is still exactly 1 - conditional Top-5
+        # retention, so the gate is neither tightened nor loosened here. What
+        # changed is that the report next to it names which of the three causes
+        # produced the number, so a FAIL can be attributed instead of merely
+        # observed. erroredRate is included on purpose: a run that fails to
+        # answer must not become cheaper than one that answers badly.
+        vanished_rate = metrics.get("vanishedRate")
+        errored_rate = metrics.get("erroredRate")
+        top5_demoted = demoted.get("top5") if isinstance(demoted, Mapping) else None
+        miss_parts = (vanished_rate, errored_rate, top5_demoted)
+        top5_miss = (
+            round(sum(float(part) for part in miss_parts), 4)
+            if all(isinstance(part, (int, float)) for part in miss_parts)
+            else None
+        )
         add(
             f"{target} ms conditional Top-5 retention",
             lang,
@@ -359,9 +470,9 @@ def evaluate_promotion_gate(
             float(gate["conditionalTop3RetentionMin"]),
         )
         add(
-            f"{target} ms conditional Top-5 drop rate",
+            f"{target} ms Top-5 miss rate (vanished + errored + demoted below 5)",
             lang,
-            top5_drop,
+            top5_miss,
             "<=",
             float(gate["maxConditionalTop5DropRate"]),
         )
@@ -418,6 +529,7 @@ def evaluate_promotion_gate(
 
 __all__ = [
     "DEFAULT_GATE",
+    "LANGS",
     "evaluate_promotion_gate",
     "percentile",
     "summarize_replay",

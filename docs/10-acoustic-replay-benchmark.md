@@ -11,7 +11,7 @@ The replay harness treats Russian and Hebrew separately and reports:
 - predictor Top-1/3/5/10/20 recall for the real next source word;
 - acoustic re-ranking at +50/+100/+150/+200/+250 ms from physical word onset;
 - conditional Top-K retention: among examples where the predictor supplied the true word, how often acoustics keeps it inside Top-K;
-- conditional drop rate, the safety-critical inverse of retention;
+- the safety-critical split of that inverse into `vanishedRate` (the pruner answered and its ranking had no rank for the truth word), `demotedBelowRate` per cut K (the word survived but ended below K) and `erroredRate` (the pruner never answered), which together account for `1 - conditionalRetention[K]` exactly;
 - end-to-end Top-K recall including predictor misses;
 - rank movement from linguistic rank to acoustic rank;
 - predictor and pruner round-trip latency plus model-side inference latency;
@@ -80,7 +80,7 @@ The tracked defaults are intentionally conservative and live in `gpu/acoustic_ga
 - predictor Top-20 recall >= 95%;
 - at 150 ms, conditional Top-5 retention >= 95%;
 - at 150 ms, conditional Top-3 retention >= 88%;
-- at 150 ms, Top-5 drop rate <= 5%;
+- at 150 ms, Top-5 miss rate <= 5% — the sum of `vanishedRate`, `erroredRate` and `demotedBelowRate.top5`, still carried by the `maxConditionalTop5DropRate` gate key;
 - positive cold-parallel lead on >= 75% of labelled examples;
 - p50 cold-parallel lead >= 150 ms;
 - pruner p95 round trip <= 220 ms.

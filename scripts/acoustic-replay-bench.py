@@ -51,6 +51,7 @@ if str(AGENT_SRC) not in sys.path:
 
 from speakeasy_agent.benchmark_gate import (  # noqa: E402
     DEFAULT_GATE,
+    LANGS,
     evaluate_promotion_gate,
     summarize_replay,
 )
@@ -118,6 +119,26 @@ def _load_manifest(path: Path) -> list[dict[str, Any]]:
         ready = item.get("predictorReadyMsFromWordOnset")
         if ready is not None and not isinstance(ready, (int, float)):
             raise SystemExit(f"{sample_id}: predictorReadyMsFromWordOnset must be numeric")
+        # contextTerms is a SCORE BOOST, not a topic label: collapse_candidates in
+        # gpu/predictor/text.py adds context_boost to any candidate whose normalized
+        # form appears here. Putting the truth word in it lifts the truth before any
+        # acoustics run -- conditionalRetention.top3 goes to 1.0 and demotedBelowRate
+        # to 0 whatever the pruner did, so conditionalTop3RetentionMin passes
+        # vacuously and a "trap" sample stops being a trap. The rule was documented
+        # in eval/corpus/he-recording-script.md but nothing enforced it, which is the
+        # same silent-vacuity failure this benchmark exists to avoid.
+        terms = item.get("contextTerms")
+        if terms is not None:
+            if not isinstance(terms, list) or not all(isinstance(t, str) for t in terms):
+                raise SystemExit(f"{sample_id}: contextTerms must be a list of strings")
+            truth_key = str(item["truth"]).strip().casefold()
+            clash = [t for t in terms if t.strip().casefold() == truth_key]
+            if clash:
+                raise SystemExit(
+                    f"{sample_id}: contextTerms must not contain the truth word "
+                    f"({clash[0]!r}); it would boost the answer before acoustics and "
+                    f"make the retention gate vacuous"
+                )
         item["id"] = sample_id
         rows.append(item)
     if not rows:
@@ -142,6 +163,10 @@ def _load_pcm(path: Path) -> bytes:
 
 def _word_key(value: str) -> str:
     return value.strip().casefold()
+
+
+def _opt_float(value: Any) -> float | None:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 def _truth_rank(items: Any, truth: str) -> int | None:
@@ -369,11 +394,19 @@ def _run_sample(
 
         ranked = pruned.get("ranked") if isinstance(pruned.get("ranked"), list) else []
         truth_rank = _truth_rank(ranked, truth)
-        inference_ms = (
-            float(pruned["inference_ms"])
-            if isinstance(pruned.get("inference_ms"), (int, float))
-            else None
-        )
+        # `model_forward_ms` is the forward-only number this column has always
+        # carried. The service still publishes `inference_ms`, but widened it to
+        # the whole section held under the GPU semaphore, so reading that key
+        # here would change what `inferenceMs` means without changing its name
+        # and make new artifacts look comparable to old ones. Older servers send
+        # only `inference_ms`; the fallback keeps them readable.
+        inference_ms = _opt_float(pruned.get("model_forward_ms"))
+        if inference_ms is None:
+            inference_ms = _opt_float(pruned.get("inference_ms"))
+        # The queue/model split, recorded per window. A service that computes it
+        # and an artifact that drops it leave the gate exactly where it was.
+        queue_wait_ms = _opt_float(pruned.get("queue_wait_ms"))
+        service_total_ms = _opt_float(pruned.get("total_ms"))
         component_ready_ms = window_ms + pruner_rtt
         cold_parallel_ready_ms = max(float(window_ms), predictor_rtt) + pruner_rtt
         observed_ready_ms = None
@@ -387,6 +420,10 @@ def _run_sample(
                 "evidence": pruned.get("evidence"),
                 "rawEvidence": pruned.get("raw_evidence"),
                 "inferenceMs": round(inference_ms, 1) if inference_ms is not None else None,
+                "queueWaitMs": round(queue_wait_ms, 1) if queue_wait_ms is not None else None,
+                "serviceTotalMs": (
+                    round(service_total_ms, 1) if service_total_ms is not None else None
+                ),
                 "roundTripMs": round(pruner_rtt, 1),
                 "componentReadyAfterWordOnsetMs": round(component_ready_ms, 1),
                 "coldParallelReadyAfterWordOnsetMs": round(cold_parallel_ready_ms, 1),
@@ -416,9 +453,55 @@ def _run_sample(
     return result
 
 
+def _fmt_rate(value: Any) -> str:
+    return "—" if not isinstance(value, (int, float)) else f"{float(value) * 100:.1f}%"
+
+
+def _fmt_ms(value: Any) -> str:
+    return "—" if not isinstance(value, (int, float)) else f"{float(value):.1f} ms"
+
+
+def _fmt_int(value: Any) -> str:
+    return "—" if not isinstance(value, (int, float)) else str(int(value))
+
+
+def _sub(node: Any, key: str) -> dict[str, Any]:
+    if isinstance(node, dict):
+        value = node.get(key)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
 def _markdown(report: dict[str, Any]) -> str:
     summary = report["summary"]
     gate = report["gate"]
+    prediction = _sub(_sub(summary, "prediction"), "byLanguage")
+    acoustic = _sub(_sub(summary, "acousticPruning"), "byLanguage")
+    target = str(gate["targetWindowMs"])
+    min_samples = _sub(gate, "thresholds").get("minSamplesPerLanguage")
+
+    # Both gated languages always get a row even with zero data, and any extra
+    # label present in the data is appended instead of being silently dropped.
+    extra = sorted((set(prediction) | set(acoustic)) - set(LANGS))
+    langs = list(LANGS) + extra
+
+    # Every window in the data, ascending. The earlier report printed only the
+    # gate's target window, which hid the +50…+250 ms curve the whole experiment
+    # exists to measure.
+    window_keys: set[str] = set(_sub(_sub(summary, "acousticPruning"), "byWindowMs"))
+    for lang_windows in acoustic.values():
+        if isinstance(lang_windows, dict):
+            window_keys.update(lang_windows)
+
+    def window_order(key: str) -> tuple[int, float | str]:
+        try:
+            return (0, float(key))
+        except ValueError:
+            return (1, key)
+
+    windows = sorted(window_keys, key=window_order)
+
     lines = [
         "# SameVoice predictor + acoustic replay benchmark",
         "",
@@ -426,26 +509,98 @@ def _markdown(report: dict[str, Any]) -> str:
         "",
         f"Samples: **{summary.get('samples', 0)}**. Target gate window: **{gate['targetWindowMs']} ms**.",
         "",
-        "## By language",
+        "## Predictor (linguistic stage only)",
         "",
-        "| Lang | Predictor Top-20 | Window | Top-5 retention | Top-3 retention | p50 cold lead | p95 pruner RTT |",
+        "| Lang | n | Top-20 | Top-10 | Top-5 | Top-3 | Top-1 |",
         "|---|---:|---:|---:|---:|---:|---:|",
     ]
-    prediction = summary.get("prediction", {}).get("byLanguage", {})
-    acoustic = summary.get("acousticPruning", {}).get("byLanguage", {})
-    target = str(gate["targetWindowMs"])
-    for lang in ("ru", "he"):
-        pred = prediction.get(lang, {})
-        metrics = acoustic.get(lang, {}).get(target, {})
-        recall = pred.get("recall", {}).get("top20")
-        top5 = metrics.get("conditionalRetention", {}).get("top5")
-        top3 = metrics.get("conditionalRetention", {}).get("top3")
-        lead = metrics.get("coldParallelLeadVsSttMs", {}).get("p50")
-        rtt = metrics.get("roundTripMs", {}).get("p95")
-        fmt_rate = lambda value: "—" if value is None else f"{float(value) * 100:.1f}%"
-        fmt_ms = lambda value: "—" if value is None else f"{float(value):.1f} ms"
+    for lang in langs:
+        pred = prediction.get(lang) if isinstance(prediction.get(lang), dict) else {}
+        recall = _sub(pred, "recall")
         lines.append(
-            f"| {lang} | {fmt_rate(recall)} | {target} ms | {fmt_rate(top5)} | {fmt_rate(top3)} | {fmt_ms(lead)} | {fmt_ms(rtt)} |"
+            f"| {lang} | {_fmt_int(pred.get('samples'))} | "
+            + " | ".join(_fmt_rate(recall.get(f"top{k}")) for k in (20, 10, 5, 3, 1))
+            + " |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Acoustic pruning — every language × window",
+            "",
+            "| Lang | Window | Top-10 | Top-5 | Top-3 | Top-1 | vanished | errored | harmed | "
+            "Lead vs STT p50 | Queue p95 | Pruner RTT p95 | n (eligible/all) |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for lang in langs:
+        lang_windows = acoustic.get(lang) if isinstance(acoustic.get(lang), dict) else {}
+        for window in windows:
+            metrics = lang_windows.get(window) if isinstance(lang_windows.get(window), dict) else {}
+            retention = _sub(metrics, "conditionalRetention")
+            delta = _sub(metrics, "rankDelta")
+            lead = _sub(metrics, "coldParallelLeadVsSttMs")
+            rtt = _sub(metrics, "roundTripMs")
+            queue = _sub(metrics, "queueWaitMs")
+            eligible = metrics.get("predictorEligibleSamples")
+            harmed = _fmt_rate(delta.get("harmedRate"))
+            if isinstance(delta.get("samples"), int) and delta.get("samples"):
+                # Harmed shares a denominator with improved/unchanged, not with
+                # vanished; printing it inline stops the two being compared as if
+                # they were the same population.
+                harmed = f"{harmed} (n={delta['samples']})"
+            n_cell = (
+                f"{_fmt_int(eligible)}/{_fmt_int(metrics.get('samples'))}" if metrics else "—"
+            )
+            if (
+                isinstance(min_samples, (int, float))
+                and isinstance(eligible, (int, float))
+                and eligible < min_samples
+            ):
+                n_cell += " *"
+            marker = " **(gate window)**" if window == target else ""
+            lines.append(
+                f"| {lang} | {window} ms{marker} | "
+                + " | ".join(_fmt_rate(retention.get(f"top{k}")) for k in (10, 5, 3, 1))
+                + f" | {_fmt_rate(metrics.get('vanishedRate'))}"
+                f" | {_fmt_rate(metrics.get('erroredRate'))} | {harmed} | "
+                f"{_fmt_ms(lead.get('p50'))} | {_fmt_ms(queue.get('p95'))} | "
+                f"{_fmt_ms(rtt.get('p95'))} | {n_cell} |"
+            )
+
+    if not windows:
+        lines.append("| — | — | — | — | — | — | — | — | — | — | — | — | — |")
+
+    lines.extend(
+        [
+            "",
+            "Every rate in this table is conditional on the predictor having supplied the truth "
+            "word; predictor misses are counted in the predictor table above, never charged to "
+            "acoustics.",
+            "",
+            "- **Top-K** — conditional retention: truth word still inside Top-K after acoustics.",
+            "- **vanished** — the pruner answered and its ranking had no rank for the truth word.",
+            "- **errored** — the pruner never answered for this window: HTTP failure, timeout, or "
+            "a clip too short for the window. Nothing is known about the scorer here, so this is "
+            "**not** damage; it is reported separately precisely because an errored row looks "
+            "identical to a vanished one in the raw artifact.",
+            "- **harmed** — acoustics made the rank worse than the predictor's; denominator is "
+            "only the samples where the truth word survived, printed as `n=` in the cell.",
+            "- **Lead vs STT p50** — cold-parallel lead, i.e. the predictor is pessimistically "
+            "assumed to start at word onset.",
+            "- **Queue p95** — time a prune request spent waiting for the card before any model "
+            "ran. `—` means the pruner did not publish `queue_wait_ms`, which is not the same "
+            "claim as zero.",
+            "- **n** — predictor-eligible samples / all replayed samples for that language and window.",
+        ]
+    )
+    if isinstance(min_samples, (int, float)):
+        lines.append(
+            f"- `*` — fewer than {int(min_samples)} predictor-eligible samples. The gate "
+            f"applies `minSamplesPerLanguage` to the replayed and round-trip counts, not to "
+            f"this one, so a row can carry the marker and still be inside the gate: it means "
+            f"the rates in it rest on too little data to read, not that the gate failed. "
+            "The row is printed rather than hidden, but its rates decide nothing."
         )
     lines.extend(["", "## Gate checks", ""])
     for check in gate.get("checks", []):
