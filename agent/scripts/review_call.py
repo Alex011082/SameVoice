@@ -53,15 +53,33 @@ DEFAULT_DIR = _default_dir()
 RTL_LANGS = frozenset({"he"})
 LRI, RLI, PDI = "⁦", "⁧", "⁩"
 
-STAGES: tuple[tuple[str, str], ...] = (
-    ("speech_start_to_first_partial_ms", "speech start -> first partial"),
-    ("first_partial_to_commit_ms", "first partial -> commit"),
-    ("commit_to_mt_done_ms", "commit -> MT done"),
-    ("mt_provider_latency_ms", "  of which MT provider"),
-    ("mt_done_to_first_audio_ms", "MT done -> first audio"),
-    ("tts_audio_ms", "synthesized audio length"),
+# A log line is one committed CHUNK. One utterance produces several of them - on
+# the Omri-Maya call (27.08.2026) the median committed unit was ONE WORD, the
+# measurement kept at chunker.py:60 - so the basis of every percentile has to be
+# stated per stage. The commit policy has tightened since that call and nothing
+# has re-measured the ratio, so the basis is stated whatever it turns out to be.
+#
+#   UTTERANCE  the metric is anchored on a timestamp that belongs to the whole
+#              utterance (speech start, first partial), so it says what its name
+#              says only on the FIRST chunk. On the 2nd chunk
+#              speech_start_to_first_audio_ms measures "how long until the 2nd
+#              chunk was spoken", a different question that must never share a
+#              percentile with the first. Aggregated over first-chunk rows only:
+#              one sample per utterance.
+#   CHUNK      the metric measures work done for this chunk alone (one MT call,
+#              one synthesis). One sample per chunk, as before.
+UTTERANCE, CHUNK = "utterance", "chunk"
+
+STAGES: tuple[tuple[str, str, str], ...] = (
+    ("speech_start_to_first_partial_ms", "speech start -> first partial", UTTERANCE),
+    ("first_partial_to_commit_ms", "first partial -> commit", UTTERANCE),
+    ("commit_to_mt_done_ms", "commit -> MT done", CHUNK),
+    ("mt_provider_latency_ms", "  of which MT provider", CHUNK),
+    ("mt_done_to_first_audio_ms", "MT done -> first audio", CHUNK),
+    ("tts_audio_ms", "synthesized audio length", CHUNK),
 )
 E2E_KEY = "speech_start_to_first_audio_ms"
+E2E_BASIS = UTTERANCE
 
 
 # ------------------------------------------------------------------ formatting
@@ -113,6 +131,85 @@ def pct(values: Sequence[float], q: float) -> float | None:
 
 def fmt_ms(value: float | None) -> str:
     return "  -  " if value is None else f"{value:7.0f}"
+
+
+# ------------------------------------------------------------------- grouping
+
+
+def utt_key(row: dict[str, Any]) -> str:
+    """Which utterance this chunk belongs to.
+
+    Logs written before `utteranceKey` existed - every call recorded so far,
+    including 27.08.2026 - fall back to the per-chunk id, which is the only thing
+    those files can support: one utterance per row, exactly as they were read
+    before. Nothing is silently regrouped."""
+    return str(row.get("utteranceKey") or row.get("utteranceId") or "")
+
+
+def is_first_chunk(row: dict[str, Any]) -> bool:
+    value = row.get("isFirstChunk")
+    if value is None:
+        # Pre-key log: every row was already counted as a whole utterance.
+        return True
+    return bool(value)
+
+
+def group_by_utterance(rows: Sequence[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """These chunk rows, bucketed per utterance, in first-seen order. A row
+    carrying no id at all gets a bucket of its own rather than being merged with
+    every other id-less row."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for index, row in enumerate(rows):
+        groups.setdefault(utt_key(row) or f"#{index}", []).append(row)
+    return groups
+
+
+def count_utterances(rows: Sequence[dict[str, Any]]) -> int:
+    """Distinct utterances among these chunk rows."""
+    return len(group_by_utterance(rows))
+
+
+def grouping_anomalies(rows: Sequence[dict[str, Any]]) -> tuple[int, int]:
+    """(utterances with NO first chunk here, utterances with MORE THAN ONE).
+
+    Neither is hypothetical, and neither is visible in the numbers themselves -
+    which is why they are counted and printed rather than assumed away.
+
+    No first chunk: the row that carried `isFirstChunk` was cancelled by a
+    barge-in, failed at the provider, or never reached the log at all (a
+    barge-in also drops units still sitting in the direction's queue, and those
+    are never written). The utterance is still delivered and still counted, but
+    it contributes ZERO samples to every utterance-basis stage. Without this
+    count a reader sees `n` fall short of the utterance count and concludes the
+    log is missing the metric.
+
+    More than one: a log written before the utterance key was made unique per
+    utterance, where two utterances whose speech starts fell in the same
+    millisecond shared a key. Such a pair is ONE line in the counts and TWO
+    samples in the percentiles."""
+    missing = excess = 0
+    for group in group_by_utterance(rows).values():
+        firsts = sum(1 for row in group if is_first_chunk(row))
+        if firsts == 0:
+            missing += 1
+        elif firsts > 1:
+            excess += 1
+    return missing, excess
+
+
+def has_utterance_keys(rows: Iterable[dict[str, Any]]) -> bool:
+    return any(r.get("utteranceKey") for r in rows)
+
+
+def samples(rows: Sequence[dict[str, Any]], key: str, basis: str) -> list[float]:
+    """The values that go into one percentile. `basis` decides which rows are
+    even eligible - that choice is the whole point of this file's fix."""
+    eligible = [r for r in rows if is_first_chunk(r)] if basis == UTTERANCE else list(rows)
+    return [
+        float(r["latency"][key])
+        for r in eligible
+        if isinstance((r.get("latency") or {}).get(key), (int, float))
+    ]
 
 
 # ----------------------------------------------------------------------- input
@@ -184,7 +281,9 @@ def print_utterances(
     isolate: bool,
     only_flagged: bool,
 ) -> None:
-    print(style.bold("\n--- utterances ---"))
+    # One line per committed CHUNK, which is what a log line is. The header of
+    # each line says which chunk of which utterance it is.
+    print(style.bold("\n--- utterances, one line per committed chunk ---"))
     shown = 0
     for index, u in enumerate(utterances, start=1):
         utt_id = str(u.get("utteranceId") or "")
@@ -198,15 +297,24 @@ def print_utterances(
         dst_lang = str(u.get("dstLang") or "?")
         e2e = (u.get("latency") or {}).get(E2E_KEY)
         marker = style.red("FLAGGED WRONG") if wrong else ("ok" if verdicts else "")
+        # On a later chunk this number is "speech start -> THIS chunk's audio",
+        # not the delay the listener perceived, so it is not called e2e there.
+        timing = "e2e" if is_first_chunk(u) else "speech->this chunk"
         head = (
             f"[{index:03d}] {u.get('tStart', 0):7.2f}s  "
             f"{src_lang}->{dst_lang}  {u.get('speakerId', '?')}"
             f"({u.get('speakerGender', '?')}) -> {u.get('listenerId', '?')}"
             f"({u.get('listenerGender', '?')})  tone={u.get('tone', '?')}"
-            f"  e2e={fmt_ms(e2e).strip()}ms"
+            f"  {timing}={fmt_ms(e2e).strip()}ms"
         )
         print(f"\n{style.bold(head)}  {marker}".rstrip())
-        print(style.dim(f"      id={utt_id}  trigger={u.get('trigger', '?')} words={u.get('words', 0)}"))
+        print(
+            style.dim(
+                f"      id={utt_id}  utterance={utt_key(u)}"
+                f"{' (first chunk)' if is_first_chunk(u) else ''}"
+                f"  trigger={u.get('trigger', '?')} words={u.get('words', 0)}"
+            )
+        )
         print(f"  {src_lang} SRC : {bidi(str(u.get('srcText') or ''), src_lang, isolate)}")
         dst_text = str(u.get("dstText") or "")
         if dst_text:
@@ -234,30 +342,77 @@ def print_latency(style: Style, utterances: list[dict[str, Any]]) -> None:
     # Percentiles are computed over units that actually reached the listener.
     # Mixing in cancelled and errored units would flatter every number.
     spoken = [u for u in utterances if not u.get("cancelled") and not u.get("error") and u.get("dstText")]
-    print(style.bold(f"\n--- latency over {len(spoken)} delivered utterance(s) ---"))
-    if not spoken:
-        print(style.dim("  (no delivered utterances to measure)"))
-        return
-    print(f"  {'stage':<32}{'p50':>9}{'p90':>9}{'n':>6}")
-    for key, label in STAGES:
-        values = [
-            float(u["latency"][key])
-            for u in spoken
-            if isinstance((u.get("latency") or {}).get(key), (int, float))
-        ]
-        print(f"  {label:<32}{fmt_ms(pct(values, 0.5)):>9}{fmt_ms(pct(values, 0.9)):>9}{len(values):>6}")
-    e2e = [
-        float(u["latency"][E2E_KEY])
-        for u in spoken
-        if isinstance((u.get("latency") or {}).get(E2E_KEY), (int, float))
-    ]
     print(
         style.bold(
-            f"  {'END-TO-END perceived delay':<32}{fmt_ms(pct(e2e, 0.5)):>9}"
+            f"\n--- latency over {count_utterances(spoken)} delivered utterance(s) "
+            f"in {len(spoken)} delivered chunk(s) ---"
+        )
+    )
+    if not spoken:
+        print(style.dim("  (no delivered chunks to measure)"))
+        return
+    print(f"  {'stage':<32}{'basis':<11}{'p50':>9}{'p90':>9}{'n':>6}")
+    for key, label, basis in STAGES:
+        values = samples(spoken, key, basis)
+        print(
+            f"  {label:<32}{basis:<11}{fmt_ms(pct(values, 0.5)):>9}"
+            f"{fmt_ms(pct(values, 0.9)):>9}{len(values):>6}"
+        )
+    e2e = samples(spoken, E2E_KEY, E2E_BASIS)
+    print(
+        style.bold(
+            f"  {'END-TO-END perceived delay':<32}{E2E_BASIS:<11}{fmt_ms(pct(e2e, 0.5)):>9}"
             f"{fmt_ms(pct(e2e, 0.9)):>9}{len(e2e):>6}"
         )
     )
-    print(style.dim("  all values in milliseconds; percentiles are nearest-rank"))
+    print(style.dim("  all values in milliseconds; percentiles are nearest-rank; n is the sample count"))
+    print(
+        style.dim(f"  basis={UTTERANCE}: ONE sample per utterance, from its FIRST committed chunk only -")
+    )
+    print(
+        style.dim(
+            "             these stages are anchored on speech start, so on a later chunk they "
+            "measure something else"
+        )
+    )
+    print(style.dim(f"  basis={CHUNK}: one sample per committed chunk (one MT call, one synthesis)"))
+    missing, excess = grouping_anomalies(spoken)
+    if missing:
+        # Say it here, beside the n it explains. A reader who sees an
+        # utterance-basis n below the utterance count has to be told that the
+        # sample was cancelled, not that the writer never emitted the metric.
+        print(
+            style.yellow(
+                f"  NOTE: {missing} of {count_utterances(spoken)} delivered utterance(s) have no "
+                "first chunk among the delivered rows - a barge-in or a provider error took it -"
+            )
+        )
+        print(
+            style.yellow(
+                f"        so they contribute NOTHING to the {UTTERANCE}-basis rows above. That is "
+                "why those n can be lower than the utterance count."
+            )
+        )
+    if excess:
+        print(
+            style.yellow(
+                f"  NOTE: {excess} utteranceKey(s) carry MORE THAN ONE first chunk. This log was "
+                "written before the key was unique per utterance:"
+            )
+        )
+        print(
+            style.yellow(
+                "        two utterances whose speech starts fell in the same millisecond share one "
+                f"key, so they are 1 utterance in the counts and 2 samples in the {UTTERANCE} rows."
+            )
+        )
+    if not has_utterance_keys(utterances):
+        print(
+            style.yellow(
+                "  NOTE: this log has no utteranceKey - it predates the per-utterance key, so "
+                "every chunk is counted as its own utterance, exactly as this tool always did."
+            )
+        )
 
 
 def print_counts(
@@ -274,11 +429,15 @@ def print_counts(
     orphans = [v for v in verdicts if not v.get("resolved")]
 
     print(style.bold("\n--- counts ---"))
-    print(f"  utterances committed : {len(utterances)}")
-    print(f"  delivered            : {len(delivered)}")
+    # Both numbers, always: a chunk count read as an utterance count is what
+    # made every percentile in this repo wrong in the first place.
+    print(f"  utterances           : {count_utterances(utterances)}")
+    print(f"  chunks committed     : {len(utterances)}")
+    print(f"  delivered chunks     : {len(delivered)}")
     print(f"  cancelled (barge-in) : {len(cancelled)}")
     print(f"  provider errors      : {len(errored)}")
-    print(f"  verdicts recorded    : {len(verdicts)} on {len(judged_ids)} utterance(s)")
+    # A verdict is attached to one chunk id, so this is a chunk count too.
+    print(f"  verdicts recorded    : {len(verdicts)} on {len(judged_ids)} chunk(s)")
     print(f"  flagged WRONG        : {len(wrong_ids)}")
     if judged_ids:
         rate = 100.0 * len(wrong_ids) / len(judged_ids)
@@ -287,7 +446,7 @@ def print_counts(
         print(style.dim("  flag rate            : n/a - nothing was judged"))
     if delivered:
         coverage = 100.0 * len(judged_ids) / len(delivered)
-        print(f"  judged coverage      : {coverage:.0f}% of delivered utterances")
+        print(f"  judged coverage      : {coverage:.0f}% of delivered chunks")
     if orphans:
         print(
             style.yellow(
@@ -303,7 +462,10 @@ def print_counts(
     for direction, group in sorted(by_direction.items()):
         w = sum(1 for u in group if str(u.get("utteranceId")) in wrong_ids)
         j = sum(1 for u in group if str(u.get("utteranceId")) in judged_ids)
-        print(f"    {direction:<10} {len(group):>3} utterance(s), {j} judged, {w} wrong")
+        print(
+            f"    {direction:<10} {count_utterances(group):>3} utterance(s) in "
+            f"{len(group):>3} chunk(s), {j} judged, {w} wrong"
+        )
 
 
 # ------------------------------------------------------------------------- CLI
@@ -331,15 +493,15 @@ def build_parser() -> argparse.ArgumentParser:
 def summary_json(
     header: dict[str, Any], utterances: list[dict[str, Any]], verdicts: list[dict[str, Any]]
 ) -> dict[str, Any]:
+    """Machine-readable summary. Every count except `utterances` counts CHUNKS,
+    and every latency entry names the basis its `n` was drawn from."""
     spoken = [u for u in utterances if not u.get("cancelled") and not u.get("error") and u.get("dstText")]
 
-    def stage(key: str) -> dict[str, float | None]:
-        values = [
-            float(u["latency"][key])
-            for u in spoken
-            if isinstance((u.get("latency") or {}).get(key), (int, float))
-        ]
-        return {"p50": pct(values, 0.5), "p90": pct(values, 0.9), "n": len(values)}
+    def stage(key: str, basis: str) -> dict[str, Any]:
+        values = samples(spoken, key, basis)
+        # `basis` travels with the numbers: a run diffed against another run has
+        # to show what a sample was, not only how many there were.
+        return {"p50": pct(values, 0.5), "p90": pct(values, 0.9), "n": len(values), "basis": basis}
 
     judged = {v.get("utteranceId") for v in verdicts if v.get("utteranceId")}
     wrong = {v.get("utteranceId") for v in verdicts if v.get("verdict") == "wrong"}
@@ -347,7 +509,14 @@ def summary_json(
         "callId": header.get("callId"),
         "providers": header.get("providers"),
         "counts": {
-            "utterances": len(utterances),
+            "utterances": count_utterances(utterances),
+            "chunks": len(utterances),
+            # Delivered utterances that contribute no sample to any
+            # utterance-basis percentile, and keys that contribute two. See
+            # `grouping_anomalies`: without these two numbers an `n` that
+            # disagrees with `utterances` is unexplainable from the JSON alone.
+            "deliveredUtterancesWithoutFirstChunk": grouping_anomalies(spoken)[0],
+            "utterancesWithDuplicateFirstChunk": grouping_anomalies(utterances)[1],
             "delivered": len(spoken),
             "cancelled": sum(1 for u in utterances if u.get("cancelled")),
             "errors": sum(1 for u in utterances if u.get("error")),
@@ -356,7 +525,8 @@ def summary_json(
             "wrong": len(wrong),
         },
         "flagRate": (len(wrong) / len(judged)) if judged else None,
-        "latency": {key: stage(key) for key, _ in STAGES} | {E2E_KEY: stage(E2E_KEY)},
+        "latency": {key: stage(key, basis) for key, _, basis in STAGES}
+        | {E2E_KEY: stage(E2E_KEY, E2E_BASIS)},
     }
 
 

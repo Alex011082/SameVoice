@@ -20,6 +20,7 @@ set -euo pipefail
 #   scripts/runpod-warmup.sh         health wait + explicit weight loading
 #   scripts/runpod-stage1-bench.py   predictor + local MT loopback latency
 #   scripts/acoustic-pruning-bench.py Stage-2 next-word window benchmark
+#   agent/scripts/summarize_prediction_shadow.py  shadow records -> p50/p90/p95
 #   scripts/runpod-export.sh         copy the evidence off the Pod
 # What is added here is only the assertions none of those make, the ordering,
 # and the guarantee that the export step runs even when a step above fails.
@@ -37,8 +38,10 @@ PREFLIGHT_SCRIPT="$SCRIPT_DIR/runpod-preflight.sh"
 WARMUP_SCRIPT="$SCRIPT_DIR/runpod-warmup.sh"
 STAGE1_BENCH="$SCRIPT_DIR/runpod-stage1-bench.py"
 PRUNING_BENCH="$SCRIPT_DIR/acoustic-pruning-bench.py"
+SCORER_COST_BENCH="$SCRIPT_DIR/scorer-cost-bench.py"
 EXPORT_SCRIPT="$SCRIPT_DIR/runpod-export.sh"
 AGENT_DIR="$REPO_ROOT/agent"
+SUMMARIZE_SHADOW="$AGENT_DIR/scripts/summarize_prediction_shadow.py"
 
 WORKSPACE="${WORKSPACE_ROOT:-/workspace}"
 EXPECTED_GPU_COUNT="${EXPECTED_GPU_COUNT:-2}"
@@ -53,19 +56,33 @@ ITERATIONS="${SESSION_BENCH_ITERATIONS:-7}"
 TIMEOUT_PREFLIGHT="${SESSION_TIMEOUT_PREFLIGHT:-300}"
 TIMEOUT_WARMUP="${SESSION_TIMEOUT_WARMUP:-3600}"
 TIMEOUT_CALLTEST="${SESSION_TIMEOUT_CALLTEST:-600}"
+TIMEOUT_SHADOW="${SESSION_TIMEOUT_SHADOW:-900}"
 TIMEOUT_BENCH="${SESSION_TIMEOUT_BENCH:-1800}"
 TIMEOUT_PRUNING="${SESSION_TIMEOUT_PRUNING:-1800}"
+TIMEOUT_SCORER="${SESSION_TIMEOUT_SCORER:-1800}"
 TIMEOUT_EXPORT="${SESSION_TIMEOUT_EXPORT:-900}"
 
-STAGES="preflight workspace engines warmup placement calltest bench pruning"
+STAGES="preflight workspace engines warmup placement calltest bench pruning shadow scorer"
 SKIPPED=""
 DRY_RUN=0
 ALLOW_HEAVY=0
 ALLOW_EPHEMERAL_WORKSPACE=0
 ALLOW_UNVERIFIED_PLACEMENT=0
 
+# The shadow call test is the only step here that makes the agent itself talk to
+# a GPU service, so it is opt-in by name rather than on by default: it is also
+# the only step whose failure means the predictor was rented for nothing.
+case "${SESSION_SHADOW_CALL_TEST:-0}" in
+  1 | true | yes | on) SHADOW_CALL_TEST=1 ;;
+  *) SHADOW_CALL_TEST=0 ;;
+esac
+
 CALL_TEST_CMD="${SESSION_CALL_TEST_CMD:-}"
 PRUNING_WAV="${SESSION_PRUNING_WAV:-}"
+# Реальная речь лучше синтетического тона, а другой записи в репозитории нет:
+# eval/voice-refs/ единственное живое, и оно вне git (биометрия).
+SCORER_LANG="${SESSION_SCORER_LANG:-ru}"
+SCORER_WAV="${SESSION_SCORER_WAV:-}"
 PRUNING_CANDIDATES="${SESSION_PRUNING_CANDIDATES:-}"
 PRUNING_TRUTH="${SESSION_PRUNING_TRUTH:-}"
 PRUNING_LANG="${SESSION_PRUNING_LANG:-}"
@@ -89,6 +106,7 @@ EXPORT_STATE="pending"
 ENABLED_ENGINES=""
 EXPECTED_GPUS=""
 PLACEMENT_VERDICT="not run"
+SHADOW_VERDICT="not run"
 PYTHON_CMD=""
 TIMEOUT_BIN=""
 
@@ -103,7 +121,9 @@ Step numbers below are that document's, which is the contract:
   3 preflight + both GPUs    scripts/runpod-preflight.sh
   4 /workspace is a volume   mount assertion + write test + free-space floor
   5 warmup and placement     scripts/runpod-warmup.sh + per-GPU memory around it
-  6 call test + benchmarks   mock pipeline, scripts/runpod-stage1-bench.py [+ pruning]
+  6 call test + benchmarks   mock pipeline (every shadow off), then
+                             scripts/runpod-stage1-bench.py [+ pruning bench],
+                             then the shadow call test if it was asked for
   7 export the evidence      scripts/runpod-export.sh -- ALWAYS runs
   8 stop the Pod             yours to do; the last thing printed says so
 
@@ -111,7 +131,7 @@ Options:
   --dry-run                 validate the plan and exit; touches no GPU, loads no
                             model, starts no request, writes nothing
   --skip <a,b,...>          skip stages: preflight workspace engines warmup
-                            placement calltest bench pruning
+                            placement calltest bench pruning scorer shadow
   --skip-<stage>            same, one stage per flag (e.g. --skip-calltest)
   --iterations <n>          iterations for runpod-stage1-bench.py (default 7)
   --allow-heavy-engines     proceed although engines outside the smallest set
@@ -122,6 +142,14 @@ Options:
   --allow-unverified-placement
                             proceed although no per-GPU evidence was obtainable
   --call-test-cmd <cmd>     shell command for step 6 instead of the mock demo
+  --shadow-call-test        run the pipeline a SECOND time with predictor shadow
+                            mode on, against the local services (:8101, plus
+                            :8105 when ACOUSTIC_PRUNER_CMD is set), then write
+                            the prediction_shadow records and their summary into
+                            the session directory. Refuses to run when those
+                            services are unconfigured, dead or still cold.
+                            Without it this session records nothing at all about
+                            the predictor as the agent actually calls it.
   --pruning-wav <path>      Stage-2 corpus: 16 kHz mono s16 WAV
   --pruning-candidates <path>  Stage-2 corpus: candidate JSON
   --pruning-truth <word>    Stage-2: expected next word
@@ -129,8 +157,8 @@ Options:
   -h, --help                this text
 
 Every option also has an env form (SESSION_BENCH_ITERATIONS, SESSION_CALL_TEST_CMD,
-SESSION_PRUNING_WAV, SESSION_MIN_FREE_GB, SESSION_TIMEOUT_*, WORKSPACE_ROOT,
-EXPECTED_GPU_COUNT).
+SESSION_SHADOW_CALL_TEST, SESSION_PRUNING_WAV, SESSION_MIN_FREE_GB,
+SESSION_TIMEOUT_*, WORKSPACE_ROOT, EXPECTED_GPU_COUNT).
 
 Worth exporting before a paid run: SAMEVOICE_IMAGE_TAG. Nothing in this
 repository sets it, and inside a Pod the git SHA is unknowable (.dockerignore
@@ -337,6 +365,7 @@ while (($# > 0)); do
       shift
       ;;
     --allow-heavy-engines) ALLOW_HEAVY=1 ;;
+    --shadow-call-test) SHADOW_CALL_TEST=1 ;;
     --allow-ephemeral-workspace) ALLOW_EPHEMERAL_WORKSPACE=1 ;;
     --allow-unverified-placement) ALLOW_UNVERIFIED_PLACEMENT=1 ;;
     --call-test-cmd)
@@ -440,6 +469,7 @@ write_manifest() {
   "enabled_engines": "$(json_str "$ENABLED_ENGINES")",
   "expected_gpu_indices": "$(json_str "$EXPECTED_GPUS")",
   "placement_verdict": "$(json_str "$PLACEMENT_VERDICT")",
+  "shadow_call_test": "$(json_str "$SHADOW_VERDICT")",
   "skipped_stages": "$(json_str "${SKIPPED# }")",
   "bench_iterations": $ITERATIONS,
   "known_missing_instrumentation": "per-stage GPU queue wait and t0..t9 are NOT in any artifact of this run; the readiness blocker 'Add per-stage queue-wait and t0..t9 instrumentation to the benchmark record' is still open"
@@ -622,6 +652,11 @@ if ((DRY_RUN == 1)); then
   check_file "$WARMUP_SCRIPT" "step 5 warmup"
   check_file "$STAGE1_BENCH" "step 6 stage-1 bench"
   check_file "$PRUNING_BENCH" "step 6 pruning bench"
+  # Not a step this runner executes -- it is checked here because the operator
+  # runs it by hand during the same paid hour, and a missing file discovered
+  # then costs card time that this free validation already had the chance to
+  # spend instead.
+  check_file "$SCORER_COST_BENCH" "step 6 scorer cost bench"
   if [[ -f "$EXPORT_SCRIPT" ]]; then
     ok "step 7 export: $EXPORT_SCRIPT"
   else
@@ -666,7 +701,7 @@ if ((DRY_RUN == 1)); then
   emit "  commands this run would execute:"
   skipped preflight || plan "bash $PREFLIGHT_SCRIPT"
   skipped warmup || plan "bash $WARMUP_SCRIPT"
-  skipped calltest || plan "${CALL_TEST_CMD:-STT_PROVIDER=mock MT_PROVIDER=mock TTS_PROVIDER=mock; cd $AGENT_DIR && uv run python scripts/mock_pipeline_demo.py}"
+  skipped calltest || plan "${CALL_TEST_CMD:-STT_PROVIDER=mock MT_PROVIDER=mock TTS_PROVIDER=mock PREDICTOR_SHADOW_ENABLED=0 ACOUSTIC_PRUNER_SHADOW_ENABLED=0; cd $AGENT_DIR && uv run python scripts/mock_pipeline_demo.py}"
   if ! skipped bench; then
     plan "${PYTHON_CMD:-<python>} $STAGE1_BENCH --iterations $ITERATIONS"
     for pair in "PREDICTOR_CMD:$(engine_cmd predictor)" "LOCAL_MT_CMD:$(engine_cmd local-mt)"; do
@@ -696,6 +731,53 @@ if ((DRY_RUN == 1)); then
     plan "${PYTHON_CMD:-<python>} $PRUNING_BENCH --wav $PRUNING_WAV --candidates $PRUNING_CANDIDATES --truth $PRUNING_TRUTH --lang $PRUNING_LANG --output <session>/acoustic-pruning.json"
   else
     plan "(pruning bench not scheduled: no --pruning-wav given; the corpus it needs is not in this repo)"
+  fi
+  if skipped scorer; then
+    plan "(scorer cost bench skipped by --skip scorer)"
+  elif [[ -z "$(engine_cmd predictor)" || -z "$(engine_cmd acoustic-pruner)" ]]; then
+    plan "!!  scorer cost bench needs BOTH predictor and acoustic-pruner enabled; with one of them empty it would answer half the question"
+  else
+    plan "${PYTHON_CMD:-<python>} $SCORER_COST_BENCH --lang $SCORER_LANG --predictor-url <predictor> --pruner-url <pruner> --output <session>/scorer-cost.json"
+  fi
+  if ((SHADOW_CALL_TEST == 1)) && ! skipped shadow; then
+    check_file "$SUMMARIZE_SHADOW" "step 6 shadow summary"
+    if [[ -z "$(engine_cmd predictor)" ]]; then
+      warn "the shadow call test needs the predictor, but PREDICTOR_CMD is empty: nothing is listening on :8101 and the step would refuse"
+      plan_errors=$((plan_errors + 1))
+    fi
+    if ! command -v uv >/dev/null 2>&1; then
+      warn "the shadow call test drives the agent itself, and uv is not on PATH: there would be nothing to run"
+      plan_errors=$((plan_errors + 1))
+    fi
+    if [[ ! -d "$AGENT_DIR" ]]; then
+      warn "the shadow call test needs the agent, and $AGENT_DIR does not exist"
+      plan_errors=$((plan_errors + 1))
+    fi
+    # The real step refuses without curl. Free validation has to cover every
+    # refusal the paid run can hit, not most of them: a refusal discovered down
+    # there is discovered while the cards bill.
+    if ! command -v curl >/dev/null 2>&1; then
+      warn "the shadow call test verifies service health with curl, and curl is not on PATH: the step would refuse before running anything"
+      plan_errors=$((plan_errors + 1))
+    fi
+    # Not a plan error: a Pod that was warmed by an earlier run of this script
+    # still reports loaded=true, and refusing the plan for that case would push
+    # the operator into --skip-shadow, which is the outcome to avoid.
+    if skipped warmup; then
+      warn "warmup is skipped: the predictor loads its weights inside the first request, so the shadow step will refuse unless something else already warmed :8101"
+    fi
+    shadow_pruner_plan=""
+    if [[ -n "$(engine_cmd acoustic-pruner)" ]]; then
+      shadow_pruner_plan=" ACOUSTIC_PRUNER_SHADOW_ENABLED=1 ACOUSTIC_PRUNER_URL=$(engine_url acoustic-pruner) ACOUSTIC_PRUNER_SHADOW_EVERY_N=1"
+    else
+      info "ACOUSTIC_PRUNER_CMD is empty: the shadow step would record linguistic prediction only, no acoustic_pruning_shadow rows"
+    fi
+    plan "STT_PROVIDER=mock MT_PROVIDER=mock TTS_PROVIDER=mock PREDICTOR_SHADOW_ENABLED=1 PREDICTOR_URL=$(engine_url predictor)${shadow_pruner_plan} EVAL_LOG_ENABLED=1 EVAL_LOG_DIR=<session>/prediction-shadow/eval-log; cd $AGENT_DIR && uv run python scripts/mock_pipeline_demo.py"
+    plan "${PYTHON_CMD:-<python>} $SUMMARIZE_SHADOW <session>/prediction-shadow/eval-log/<callId>.jsonl > <session>/prediction-shadow/summary-<callId>.json"
+  elif skipped shadow; then
+    plan "(shadow call test skipped by --skip shadow: this run would write ZERO prediction_shadow records)"
+  else
+    plan "(shadow call test not scheduled: this run would write ZERO prediction_shadow records and answer nothing about the predictor as the agent calls it -- add --shadow-call-test)"
   fi
   plan "bash $EXPORT_SCRIPT   [always, including on failure]"
 
@@ -1051,7 +1133,12 @@ else
       fail "the call test command failed (or timed out after ${TIMEOUT_CALLTEST}s)" "read its output above"
     fi
   else
-    [[ -d "$AGENT_DIR" ]] || fail "$AGENT_DIR is missing" "check out the full repo at $REPO_ROOT"
+    # write_manifest runs from the EXIT trap, so setting this before each refusal
+  # is what makes the manifest say WHY the step did not happen. Left at "not
+  # run" a refusal reads like nobody asked for the step, which is the opposite
+  # of what happened.
+  SHADOW_VERDICT="refused: repo or tooling incomplete"
+  [[ -d "$AGENT_DIR" ]] || fail "$AGENT_DIR is missing" "check out the full repo at $REPO_ROOT"
     command -v uv >/dev/null 2>&1 || fail "uv is not on PATH, so the agent's mock pipeline cannot run" \
       "pass --call-test-cmd with the invocation that works on this image, or --skip-calltest"
     info "running the agent mock pipeline (npm run demo:pipeline)"
@@ -1064,9 +1151,22 @@ else
     # "mock" step at the live services -- or worse, at Deepgram, Gemini and
     # Cartesia, spending vendor money inside a step whose own screen text
     # promises "no GPU involved". Pinning makes the claim printed below true.
-    info "providers pinned to mock for this step (the Pod config's own STT/MT/TTS_PROVIDER are ignored here)"
+    #
+    # The three provider variables were not enough. build_stt() wraps whatever
+    # recognizer it just built with the predictor shadow whenever
+    # PREDICTOR_SHADOW_ENABLED=1 and PREDICTOR_URL are in the environment
+    # (agent/src/speakeasy_agent/providers/__init__.py:78 ->
+    # speculation_provider.py:202), and docker/runpod-gpu.env.example:41 sets
+    # exactly that. Measured off-Pod against a stub predictor: the same demo
+    # command with those two variables left alone issues real /v1/predict calls
+    # and drops 6 prediction_shadow records into EVAL_LOG_DIR that nothing in
+    # this session reads, under a line promising no GPU. Both shadows are
+    # pinned off here so the line printed below is true; producing those records
+    # on purpose, and then checking them, is the shadow call test's job.
+    info "providers pinned to mock and both shadows pinned off for this step (the Pod config's own STT/MT/TTS_PROVIDER and PREDICTOR_SHADOW_ENABLED are ignored here)"
     if ! run_child "$TIMEOUT_CALLTEST" env \
       STT_PROVIDER=mock MT_PROVIDER=mock TTS_PROVIDER=mock \
+      PREDICTOR_SHADOW_ENABLED=0 ACOUSTIC_PRUNER_SHADOW_ENABLED=0 \
       bash -lc "cd '$AGENT_DIR' && uv run python scripts/mock_pipeline_demo.py"; then
       fail "the mock pipeline demo failed (or timed out after ${TIMEOUT_CALLTEST}s)" \
         "the agent cannot complete a call with MOCK providers, so the break is in the agent or its install, not in the GPU services"
@@ -1142,12 +1242,228 @@ else
     ok "stage-2 artifact written to $SESSION_DIR/acoustic-pruning.json"
   fi
 
+  # ГЛАВНЫЙ артефакт первой платной сессии, и потому он запускается САМ, а не
+  # "руками". Первая сессия отвечает на вопрос, стоит ли механизм угадывания
+  # дороже, чем экономит; корпуса для этого не нужно, и оставлять такой замер на
+  # память оператора — это ровно тот способ потерять его, от которого мы уже
+  # лечили summarize_prediction_shadow.py (печатал только в stdout).
+  if ! skipped scorer; then
+    if [[ -z "$(engine_cmd predictor)" || -z "$(engine_cmd acoustic-pruner)" ]]; then
+      warn "scorer cost bench skipped: it needs BOTH the predictor and the pruner running. Half of it would answer half the question, and a half-answer about latency is worse than none."
+    else
+      info "scorer-cost-bench.py (${SCORER_LANG}) -- сколько стоит сама машинка угадывания"
+      # shellcheck disable=SC2086
+      if ! run_child "$TIMEOUT_SCORER" $PYTHON_CMD "$SCORER_COST_BENCH" \
+        --lang "$SCORER_LANG" \
+        --predictor-url "$(engine_url predictor)" \
+        --pruner-url "$(engine_url acoustic-pruner)" \
+        ${SCORER_WAV:+--wav "$SCORER_WAV"} \
+        --output "$SESSION_DIR/scorer-cost.json"; then
+        fail "scorer-cost-bench.py failed (or timed out after ${TIMEOUT_SCORER}s)" "read its output above"
+      fi
+      ok "cost-only artifact written to $SESSION_DIR/scorer-cost.json"
+    fi
+  fi
+
   nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu --format=csv \
     >"$SESSION_DIR/gpu-after-bench.csv" 2>/dev/null || true
   ok "GPU memory after the benchmark saved to $SESSION_DIR/gpu-after-bench.csv"
 
   # State the gap instead of letting a reader assume the artifact is complete.
   warn "this artifact contains loopback and server-reported latency only. Per-stage GPU queue wait and the t0..t9 timestamps of docs/RUNPOD_RND.md are NOT in it: the readiness blocker 'Add per-stage queue-wait and t0..t9 instrumentation to the benchmark record' is still open. Do not present these numbers as end-to-end."
+fi
+
+# ACCEPTANCE STEP 6 -- shadow call test against the local GPU services =======
+
+# WHY this sits AFTER the measurements instead of next to the mock call test:
+# runpod-stage1-bench.py drives :8101 directly and is the artifact this session
+# is rented to produce, while this step depends on the whole agent chain
+# (Config.from_env -> build_stt -> maybe_wrap_stt -> CallEvalLog). A break
+# anywhere in that chain must not cost the run its predictor latency JSON.
+
+SHADOW_DIR="$SESSION_DIR/prediction-shadow"
+SHADOW_LOG_DIR="$SHADOW_DIR/eval-log"
+
+if ((SHADOW_CALL_TEST == 0)) || skipped shadow; then
+  step 6 "Shadow call test against the local GPU services -- NOT RUN"
+  if skipped shadow; then
+    SHADOW_VERDICT="skipped by --skip shadow"
+    warn "asked for and then skipped with --skip shadow."
+  else
+    SHADOW_VERDICT="not requested"
+    warn "not requested. Pass --shadow-call-test (or SESSION_SHADOW_CALL_TEST=1)."
+  fi
+  warn "Nothing in this session asks the predictor for a prediction the way a call does: the call test above pins the shadow off, and the stage-1 bench, when it runs, talks to :8101 over loopback without the agent."
+  warn "Consequence: zero prediction_shadow records, so no artifact of this run says whether the prediction machinery produces a usable record at all -- on a Pod that billed for the predictor the whole time."
+else
+  step 6 "Shadow call test against the local GPU services"
+  why "the predictor's numbers with the agent in the path exist in exactly one place: the prediction_shadow rows of logs/calls/<callId>.jsonl, which agent/scripts/summarize_prediction_shadow.py turns into RTT and STT-lead p50/p90/p95 -- per docs/12-latency-timestamps.md:186 the only complete p95 set this repository can compute today. No corpus and no labels are needed to learn whether those rows appear at all, and that is the whole question here: a session that ends with none of them has paid for a predictor nobody asked anything."
+
+  [[ -d "$AGENT_DIR" ]] || fail "$AGENT_DIR is missing" "check out the full repo at $REPO_ROOT"
+  [[ -f "$SUMMARIZE_SHADOW" ]] || fail "$SUMMARIZE_SHADOW is missing" "check out the full repo at $REPO_ROOT"
+  command -v uv >/dev/null 2>&1 || fail "uv is not on PATH, so the agent's pipeline cannot be started" \
+    "this step drives the agent, not a service: pass the invocation that works on this image via --call-test-cmd for the step above and re-run without --shadow-call-test if uv cannot be fixed"
+  command -v curl >/dev/null 2>&1 || fail "curl is missing, so no service health can be verified" \
+    "without it this step would start a run that cannot produce a record and would only be found out afterwards"
+
+  # REFUSALS, not warnings. Everything below is knowable in seconds and each one
+  # of them turns the run into a demo that writes nothing: the pipeline itself
+  # exits 0 whether or not a single prediction succeeded, because shadow mode is
+  # observational by construction (speculation.py:411-413 swallows its own
+  # errors so a bug there can never damage a call). Measured off-Pod: with the
+  # predictor port closed the demo still exits 0 and writes 6
+  # prediction_shadow_error rows and 0 prediction_shadow rows.
+  SHADOW_VERDICT="refused: PREDICTOR_CMD empty"
+  [[ -n "$(engine_cmd predictor)" ]] || fail "the shadow call test needs the predictor, but PREDICTOR_CMD is empty so nothing is listening on :8101" \
+    "set PREDICTOR_CMD in $CONFIG_FILE and recreate the Pod (docker/entrypoint.sh starts hooks only at container boot), or drop --shadow-call-test"
+
+  SHADOW_PREDICTOR_URL="$(engine_url predictor)"
+  SHADOW_VERDICT="refused: predictor dead or cold"
+  predictor_health="$(curl -fsS --max-time 5 "$SHADOW_PREDICTOR_URL/healthz" 2>/dev/null || true)"
+  [[ -n "$predictor_health" ]] || fail "the predictor does not answer $SHADOW_PREDICTOR_URL/healthz" \
+    "PREDICTOR_CMD is set, so the hook died or never started; the Pod log names it. Do not run this step against a dead service: the pipeline would exit 0 and record only errors"
+  info "predictor /healthz: $predictor_health"
+
+  # gpu/predictor/app.py:196-206 publishes `loaded`, and the weights are pulled
+  # inside the first request (PredictorEngine._load). The agent abandons a
+  # prediction after PREDICTOR_TIMEOUT_MS -- 600 ms by default
+  # (docker/runpod-gpu.env.example:44) -- so against a cold predictor every
+  # attempt becomes a prediction_shadow_error and the step measures the download.
+  if ! printf '%s' "$predictor_health" | grep -Eq '"loaded"[[:space:]]*:[[:space:]]*true'; then
+    fail "the predictor answers, but its /healthz reports loaded=false: the weights are not on the card yet" \
+      "run without --skip-warmup so runpod-warmup.sh POSTs $SHADOW_PREDICTOR_URL/v1/warmup, or warm it by hand and re-run; a cold predictor turns every attempt of this step into a timeout"
+  fi
+  ok "predictor is up and its weights are resident"
+  SHADOW_VERDICT="refused: pruner unhealthy or session directory unwritable"
+
+  # The mock trio stays pinned. Vendor money is one reason; the other is that the
+  # demo feeds a 220 Hz tone (mock_pipeline_demo.py:voiced_frame), so a real
+  # recognizer would return nothing, no partial hypothesis would grow, and the
+  # shadow would issue zero predictions -- the step would fail for a reason that
+  # has nothing to do with the machinery it is testing. The mock recognizer's
+  # word-by-word partials (providers/stt_mock.py:_on_voiced) are exactly the
+  # growing prefixes PredictionShadow needs, and the shadow wraps whichever
+  # recognizer is selected, so the predictor traffic is real either way.
+  shadow_env=(
+    STT_PROVIDER=mock MT_PROVIDER=mock TTS_PROVIDER=mock
+    PREDICTOR_SHADOW_ENABLED=1
+    "PREDICTOR_URL=$SHADOW_PREDICTOR_URL"
+    # Pinned because a Pod profile that turned the eval log off would produce a
+    # green run with an empty directory, which is the failure this step exists
+    # to make impossible. EVAL_LOG_DIR points into the session directory so the
+    # records leave the Pod with everything else runpod-export.sh collects under
+    # BENCHMARK_DIR; the Pod's own logs/calls tree is left alone.
+    EVAL_LOG_ENABLED=1
+    "EVAL_LOG_DIR=$SHADOW_LOG_DIR"
+  )
+
+  if [[ -n "$(engine_cmd acoustic-scout)" ]]; then
+    info "ACOUSTIC_SCOUT_CMD is set, but STT stays mock here: :8102 would be asked to transcribe a synthetic tone and would return no words, so there would be no prefix to predict from"
+  fi
+
+  if [[ -n "$(engine_cmd acoustic-pruner)" ]]; then
+    SHADOW_PRUNER_URL="$(engine_url acoustic-pruner)"
+    pruner_health="$(curl -fsS --max-time 5 "$SHADOW_PRUNER_URL/healthz" 2>/dev/null || true)"
+    [[ -n "$pruner_health" ]] || fail "ACOUSTIC_PRUNER_CMD is set but $SHADOW_PRUNER_URL/healthz does not answer" \
+      "the pruner hook died or never started; the Pod log names it. Blank ACOUSTIC_PRUNER_CMD and recreate the Pod to run the linguistic half alone, or fix the hook"
+    info "acoustic-pruner /healthz: $pruner_health"
+    if ! printf '%s' "$pruner_health" | grep -Eq '"loaded"[[:space:]]*:[[:space:]]*true'; then
+      warn "the pruner reports no loaded CTC engine: its first scoring pays the model load and can exceed ACOUSTIC_PRUNER_TIMEOUT_MS (1500 ms by default). The linguistic records below are unaffected."
+    fi
+    # every_n=1 for this step only. In production every third attempt is sampled
+    # (ACOUSTIC_PRUNER_SHADOW_EVERY_N, docker/runpod-gpu.env.example:64), and
+    # this run produces single-digit attempts in total, so at the production rate
+    # zero acoustic rows would be indistinguishable from a broken pruner path.
+    shadow_env+=(
+      ACOUSTIC_PRUNER_SHADOW_ENABLED=1
+      "ACOUSTIC_PRUNER_URL=$SHADOW_PRUNER_URL"
+      ACOUSTIC_PRUNER_SHADOW_EVERY_N=1
+    )
+    ok "acoustic pruning shadow enabled against $SHADOW_PRUNER_URL"
+  else
+    info "ACOUSTIC_PRUNER_CMD is empty, so :8105 is not running: this step records linguistic prediction only (kind=prediction_shadow)"
+  fi
+
+  mkdir -p "$SHADOW_LOG_DIR" || fail "cannot create $SHADOW_LOG_DIR" \
+    "the session directory is not writable; fix that before spending more GPU time"
+
+  SHADOW_VERDICT="pipeline started, no verdict yet"
+  info "running the agent pipeline with predictor shadow ON (eval log -> $SHADOW_LOG_DIR)"
+  if ! run_child "$TIMEOUT_SHADOW" env "${shadow_env[@]}" \
+    bash -lc "cd '$AGENT_DIR' && uv run python scripts/mock_pipeline_demo.py"; then
+    SHADOW_VERDICT="pipeline failed"
+    fail "the shadow call test failed (or timed out after ${TIMEOUT_SHADOW}s)" \
+      "the same demo ran with every shadow off in the call test above; if that one passed and this one did not, the break is in the shadow path or in the services it calls, not in the agent"
+  fi
+
+  # THE assertion of this step. The demo exits 0 even when every single
+  # prediction failed, so the record count is the only thing that separates
+  # "the machinery works" from "the Pod billed for nothing". The pattern has no
+  # space after the colon because evallog.py's _dumps() writes with the compact
+  # separators (",", ":"), and it cannot match prediction_shadow_error: that
+  # kind has _error before the closing quote.
+  shadow_rows="$(cat "$SHADOW_LOG_DIR"/*.jsonl 2>/dev/null | grep -c '"kind":"prediction_shadow"' || true)"
+  shadow_errors="$(cat "$SHADOW_LOG_DIR"/*.jsonl 2>/dev/null | grep -c '"kind":"prediction_shadow_error"' || true)"
+  acoustic_rows="$(cat "$SHADOW_LOG_DIR"/*.jsonl 2>/dev/null | grep -c '"kind":"acoustic_pruning_shadow"' || true)"
+
+  for shadow_log in "$SHADOW_LOG_DIR"/*.jsonl; do
+    [[ -f "$shadow_log" ]] || continue
+    info "eval log: $shadow_log ($(wc -l <"$shadow_log" | tr -d ' ') lines)"
+  done
+
+  if ((shadow_errors > 0)); then
+    warn "$shadow_errors prediction_shadow_error record(s). The first of them:"
+    grep -h '"kind":"prediction_shadow_error"' "$SHADOW_LOG_DIR"/*.jsonl 2>/dev/null |
+      head -n 3 | while IFS= read -r line; do info "${line:0:400}"; done
+  fi
+
+  if ((shadow_rows == 0)); then
+    SHADOW_VERDICT="0 prediction_shadow records"
+    fail "the pipeline ran but not one prediction_shadow record reached $SHADOW_LOG_DIR" \
+      "the predictor answered /healthz, so the break is between the agent and it. Read the error lines above; with no error lines either, the recognizer was never wrapped (providers/__init__.py:78) or every hypothesis stayed under PREDICTOR_MIN_PREFIX_WORDS"
+  fi
+
+  # The whole reason ACOUSTIC_PRUNER_SHADOW_EVERY_N was pinned to 1 above is that
+  # at the production sampling rate zero acoustic rows would be indistinguishable
+  # from a broken pruner path. With every_n=1 that ambiguity is gone, so zero
+  # rows is a finding and must not slide past inside a verdict string. Measured
+  # off-Pod against a stub pruner: the same demo writes 4 acoustic_pruning_shadow
+  # records. Not a `fail`: the raw prediction records and their summary are still
+  # worth writing, and aborting here would throw them away.
+  if [[ -n "$(engine_cmd acoustic-pruner)" ]] && ((acoustic_rows == 0)); then
+    warn "ACOUSTIC_PRUNER_CMD is set, :8105 answered /healthz and sampling was pinned to every_n=1, yet ZERO acoustic_pruning_shadow records were written."
+    warn "Consequence: this session says nothing about the pruner as the agent calls it. Either no candidate arm ever collected ACOUSTIC_PRUNER_SHADOW_WINDOWS_MS worth of PCM, or the scoring path is broken (acoustic_shadow.py:_maybe_start_scoring / _score)."
+  fi
+
+  SHADOW_VERDICT="$shadow_rows prediction_shadow, $acoustic_rows acoustic_pruning_shadow, $shadow_errors error record(s)"
+  ok "$SHADOW_VERDICT"
+
+  resolve_python || fail "no usable python interpreter to summarize the shadow records" \
+    "the raw records are already in $SHADOW_LOG_DIR; set SESSION_PYTHON and re-run the summary by hand before stopping the Pod"
+
+  # summarize_prediction_shadow.py has NO output flag: its parser takes the JSONL
+  # path and --compact, nothing else (agent/scripts/summarize_prediction_shadow.py:215-217),
+  # and "give it a file destination under $BENCHMARK_DIR" is still an open item
+  # in the export blocker of docs/RUNPOD_READINESS.md. Redirecting its stdout
+  # here is therefore the whole of "the numbers survive the Pod" -- do not
+  # invent a flag, and do not leave the report on a terminal that closes.
+  for shadow_log in "$SHADOW_LOG_DIR"/*.jsonl; do
+    [[ -f "$shadow_log" ]] || continue
+    shadow_summary="$SHADOW_DIR/summary-$(basename "$shadow_log" .jsonl).json"
+    # PYTHON_CMD may be a multi-word uv invocation, so word splitting is intended.
+    # shellcheck disable=SC2086
+    if guard "$TIMEOUT_SHADOW" $PYTHON_CMD "$SUMMARIZE_SHADOW" "$shadow_log" >"$shadow_summary"; then
+      ok "summary written to $shadow_summary"
+      while IFS= read -r line; do emit "    $line"; done <"$shadow_summary"
+    else
+      rm -f "$shadow_summary"
+      warn "summarize_prediction_shadow.py failed on $shadow_log. The raw records survive in $SHADOW_LOG_DIR; summarize them off the Pod."
+    fi
+  done
+
+  # State what these numbers are not, next to them, so nobody has to remember it
+  # later. Round-trip and lead are real; recall is not a measurement at all here.
+  warn "recall in the summary above is meaningless: the mock recognizer invents its transcripts from fixtures (providers/stt_mock.py), so Top-K hits describe fixture text, not prediction quality. What this step establishes is that records appear and what the predictor round trip costs with the agent in the path."
 fi
 
 STATUS="passed"

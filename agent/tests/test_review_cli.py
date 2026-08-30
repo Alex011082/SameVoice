@@ -39,6 +39,10 @@ def unit(uid, src, dst, *, speaker=ALEX, listener=NOA, e2e=1300.0, **kw):
     return utterance_record(
         call_id=CALL_ID,
         utterance_id=uid,
+        # One chunk per utterance in this fixture; the multi-chunk case has its
+        # own file (test_utterance_percentiles.py).
+        utterance_key=kw.pop("utterance_key", uid),
+        is_first_chunk=kw.pop("is_first_chunk", True),
         segment_id=f"seg_{uid}",
         speaker=speaker,
         listener=listener,
@@ -159,8 +163,9 @@ async def test_latency_percentiles_and_counts(session_log, capsys):
     out = capsys.readouterr().out
     assert "END-TO-END perceived delay" in out
     assert "commit -> MT done" in out
-    assert "utterances committed : 4" in out
-    assert "delivered            : 3" in out
+    assert "utterances           : 4" in out
+    assert "chunks committed     : 4" in out
+    assert "delivered chunks     : 3" in out
     assert "provider errors      : 1" in out
     assert "flagged WRONG        : 1" in out
     assert "flag rate (of judged): 50%" in out
@@ -185,6 +190,12 @@ async def test_json_summary_is_machine_readable(session_log, capsys):
     assert data["providers"] == {"stt": "mock", "mt": "mock", "tts": "mock"}
     assert data["counts"] == {
         "utterances": 4,
+        "chunks": 4,
+        # Both zero here on purpose: this fixture is one chunk per utterance and
+        # every chunk is its own first. The cases that make them non-zero live in
+        # test_utterance_percentiles.py.
+        "deliveredUtterancesWithoutFirstChunk": 0,
+        "utterancesWithDuplicateFirstChunk": 0,
         "delivered": 3,
         "cancelled": 0,
         "errors": 1,
@@ -195,6 +206,10 @@ async def test_json_summary_is_machine_readable(session_log, capsys):
     assert data["flagRate"] == 0.5
     assert data["latency"]["speech_start_to_first_audio_ms"]["n"] == 3
     assert data["latency"]["speech_start_to_first_audio_ms"]["p50"] == 1500.0
+    # The basis travels with the numbers, so a diff of two runs cannot silently
+    # compare a per-utterance p50 against a per-chunk one.
+    assert data["latency"]["speech_start_to_first_audio_ms"]["basis"] == "utterance"
+    assert data["latency"]["mt_provider_latency_ms"]["basis"] == "chunk"
 
 
 async def test_a_call_id_resolves_against_the_log_directory(session_log, capsys):
