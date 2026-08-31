@@ -1,0 +1,683 @@
+
+=== 22:21:21 старт train-bootstrap
+
+=== 22:21:21 проверяю GPU
+NVIDIA GeForce RTX 4090, 24564 MiB, 580.126.20
+CUDA ок: NVIDIA GeForce RTX 4090
+
+=== 22:21:24 зависимости (torch из образа не трогаю)
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python3 -m pip install --upgrade pip
+
+=== 22:21:32 код и данные
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+  13919 /workspace/data/train-v2.jsonl
+    733 /workspace/data/val-v2.jsonl
+  14652 total
+
+=== 22:21:38 ОБУЧЕНИЕ: LoRA на Qwen3-0.6B, 3 эпохи, батч 16
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 9953.75it/s]
+устройство: cuda | обучаемых параметров: 10,092,544
+{"step": 25, "of": 2610, "epoch": 0, "loss": 3.0811, "sec": 6.5}
+{"step": 50, "of": 2610, "epoch": 0, "loss": 2.8195, "sec": 11.8}
+{"step": 75, "of": 2610, "epoch": 0, "loss": 2.982, "sec": 17.2}
+Traceback (most recent call last):
+  File "/workspace/code/scripts/predictor-finetune.py", line 197, in <module>
+    main()
+  File "/workspace/code/scripts/predictor-finetune.py", line 163, in main
+    out.loss.backward()
+  File "/usr/local/lib/python3.11/dist-packages/torch/_tensor.py", line 648, in backward
+    torch.autograd.backward(
+  File "/usr/local/lib/python3.11/dist-packages/torch/autograd/__init__.py", line 353, in backward
+    _engine_run_backward(
+  File "/usr/local/lib/python3.11/dist-packages/torch/autograd/graph.py", line 824, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.18 GiB. GPU 0 has a total capacity of 23.52 GiB of which 2.15 GiB is free. Including non-PyTorch memory, this process has 21.36 GiB memory in use. Of the allocated memory 17.92 GiB is allocated by PyTorch, and 2.98 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+FATAL: обучение упало
+
+=== 22:23:55 исполняю патч b950e8b7462ec7d5a6f6bc858872e0d1
+
+=== 22:23:55 ПАТЧ: перезапуск обучения, батч 8 (OOM: длинные примеры v2 на батче 16)
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 9901.91it/s]
+устройство: cuda | обучаемых параметров: 10,092,544
+{"step": 25, "of": 5220, "epoch": 0, "loss": 3.6199, "sec": 3.6}
+{"step": 50, "of": 5220, "epoch": 0, "loss": 3.1929, "sec": 6.7}
+{"step": 75, "of": 5220, "epoch": 0, "loss": 2.8086, "sec": 9.7}
+{"step": 100, "of": 5220, "epoch": 0, "loss": 3.249, "sec": 12.7}
+{"step": 125, "of": 5220, "epoch": 0, "loss": 3.1175, "sec": 15.7}
+{"step": 150, "of": 5220, "epoch": 0, "loss": 2.8682, "sec": 18.7}
+{"step": 175, "of": 5220, "epoch": 0, "loss": 2.7406, "sec": 21.7}
+{"step": 200, "of": 5220, "epoch": 0, "loss": 3.2056, "sec": 24.6}
+{"step": 225, "of": 5220, "epoch": 0, "loss": 2.8096, "sec": 27.5}
+{"step": 250, "of": 5220, "epoch": 0, "loss": 2.8429, "sec": 30.4}
+{"step": 275, "of": 5220, "epoch": 0, "loss": 3.1001, "sec": 33.3}
+{"step": 300, "of": 5220, "epoch": 0, "loss": 3.1215, "sec": 36.2}
+{"step": 325, "of": 5220, "epoch": 0, "loss": 2.9184, "sec": 39.2}
+{"step": 350, "of": 5220, "epoch": 0, "loss": 2.6552, "sec": 42.2}
+{"step": 375, "of": 5220, "epoch": 0, "loss": 3.0137, "sec": 45.1}
+{"step": 400, "of": 5220, "epoch": 0, "loss": 2.2303, "sec": 48.1}
+{"step": 425, "of": 5220, "epoch": 0, "loss": 2.552, "sec": 51.0}
+{"step": 450, "of": 5220, "epoch": 0, "loss": 2.4196, "sec": 53.9}
+{"step": 475, "of": 5220, "epoch": 0, "loss": 2.9958, "sec": 56.9}
+{"step": 500, "of": 5220, "epoch": 0, "loss": 2.5849, "sec": 59.9}
+{"step": 525, "of": 5220, "epoch": 0, "loss": 2.3323, "sec": 62.9}
+{"step": 550, "of": 5220, "epoch": 0, "loss": 2.9037, "sec": 65.9}
+{"step": 575, "of": 5220, "epoch": 0, "loss": 2.6507, "sec": 68.9}
+{"step": 600, "of": 5220, "epoch": 0, "loss": 2.6228, "sec": 72.0}
+{"step": 625, "of": 5220, "epoch": 0, "loss": 2.7843, "sec": 74.9}
+{"step": 650, "of": 5220, "epoch": 0, "loss": 2.8584, "sec": 77.9}
+{"step": 675, "of": 5220, "epoch": 0, "loss": 2.6779, "sec": 80.9}
+{"step": 700, "of": 5220, "epoch": 0, "loss": 2.5761, "sec": 83.8}
+{"step": 725, "of": 5220, "epoch": 0, "loss": 3.0416, "sec": 86.7}
+{"step": 750, "of": 5220, "epoch": 0, "loss": 2.489, "sec": 89.7}
+{"step": 775, "of": 5220, "epoch": 0, "loss": 2.7137, "sec": 92.7}
+{"step": 800, "of": 5220, "epoch": 0, "loss": 2.8969, "sec": 95.7}
+{"step": 825, "of": 5220, "epoch": 0, "loss": 2.6051, "sec": 98.7}
+{"step": 850, "of": 5220, "epoch": 0, "loss": 2.534, "sec": 101.7}
+{"step": 875, "of": 5220, "epoch": 0, "loss": 2.3471, "sec": 104.7}
+{"step": 900, "of": 5220, "epoch": 0, "loss": 2.3945, "sec": 107.7}
+{"step": 925, "of": 5220, "epoch": 0, "loss": 2.6097, "sec": 110.7}
+{"step": 950, "of": 5220, "epoch": 0, "loss": 2.3038, "sec": 113.7}
+{"step": 975, "of": 5220, "epoch": 0, "loss": 2.7754, "sec": 116.8}
+{"step": 1000, "of": 5220, "epoch": 0, "loss": 2.7964, "sec": 119.8}
+{"step": 1025, "of": 5220, "epoch": 0, "loss": 2.3334, "sec": 122.8}
+{"step": 1050, "of": 5220, "epoch": 0, "loss": 2.7353, "sec": 125.8}
+{"step": 1075, "of": 5220, "epoch": 0, "loss": 2.2321, "sec": 129.0}
+{"step": 1100, "of": 5220, "epoch": 0, "loss": 3.0537, "sec": 132.0}
+{"step": 1125, "of": 5220, "epoch": 0, "loss": 2.743, "sec": 135.0}
+{"step": 1150, "of": 5220, "epoch": 0, "loss": 2.9851, "sec": 138.0}
+{"step": 1175, "of": 5220, "epoch": 0, "loss": 2.3165, "sec": 141.1}
+{"step": 1200, "of": 5220, "epoch": 0, "loss": 2.5325, "sec": 144.1}
+{"step": 1225, "of": 5220, "epoch": 0, "loss": 2.1999, "sec": 147.1}
+{"step": 1250, "of": 5220, "epoch": 0, "loss": 2.3931, "sec": 150.0}
+{"step": 1275, "of": 5220, "epoch": 0, "loss": 2.6854, "sec": 153.0}
+{"step": 1300, "of": 5220, "epoch": 0, "loss": 2.3486, "sec": 155.9}
+{"step": 1325, "of": 5220, "epoch": 0, "loss": 2.4726, "sec": 158.8}
+{"step": 1350, "of": 5220, "epoch": 0, "loss": 2.3848, "sec": 161.7}
+{"step": 1375, "of": 5220, "epoch": 0, "loss": 2.8539, "sec": 164.6}
+{"step": 1400, "of": 5220, "epoch": 0, "loss": 2.5931, "sec": 167.6}
+{"step": 1425, "of": 5220, "epoch": 0, "loss": 2.6479, "sec": 170.5}
+{"step": 1450, "of": 5220, "epoch": 0, "loss": 2.5409, "sec": 173.4}
+{"step": 1475, "of": 5220, "epoch": 0, "loss": 2.3664, "sec": 176.4}
+{"step": 1500, "of": 5220, "epoch": 0, "loss": 2.2427, "sec": 179.4}
+{"step": 1525, "of": 5220, "epoch": 0, "loss": 2.5413, "sec": 182.4}
+{"step": 1550, "of": 5220, "epoch": 0, "loss": 2.8973, "sec": 185.4}
+{"step": 1575, "of": 5220, "epoch": 0, "loss": 2.8304, "sec": 188.5}
+{"step": 1600, "of": 5220, "epoch": 0, "loss": 2.4649, "sec": 191.5}
+{"step": 1625, "of": 5220, "epoch": 0, "loss": 2.3641, "sec": 194.5}
+{"step": 1650, "of": 5220, "epoch": 0, "loss": 2.7586, "sec": 197.5}
+{"step": 1675, "of": 5220, "epoch": 0, "loss": 2.4064, "sec": 200.5}
+{"step": 1700, "of": 5220, "epoch": 0, "loss": 2.2148, "sec": 203.6}
+{"step": 1725, "of": 5220, "epoch": 0, "loss": 2.7677, "sec": 206.6}
+{"epoch": 0, "val_loss": 2.5017}
+адаптер сохранён (val_loss 2.5017)
+{"step": 1750, "of": 5220, "epoch": 1, "loss": 2.1384, "sec": 214.1}
+{"step": 1775, "of": 5220, "epoch": 1, "loss": 2.0601, "sec": 217.1}
+{"step": 1800, "of": 5220, "epoch": 1, "loss": 1.8372, "sec": 220.2}
+{"step": 1825, "of": 5220, "epoch": 1, "loss": 2.2348, "sec": 223.3}
+{"step": 1850, "of": 5220, "epoch": 1, "loss": 2.3078, "sec": 226.3}
+{"step": 1875, "of": 5220, "epoch": 1, "loss": 1.8435, "sec": 229.4}
+{"step": 1900, "of": 5220, "epoch": 1, "loss": 1.839, "sec": 232.4}
+{"step": 1925, "of": 5220, "epoch": 1, "loss": 2.1371, "sec": 235.4}
+{"step": 1950, "of": 5220, "epoch": 1, "loss": 1.906, "sec": 238.4}
+{"step": 1975, "of": 5220, "epoch": 1, "loss": 1.8662, "sec": 241.5}
+{"step": 2000, "of": 5220, "epoch": 1, "loss": 1.8892, "sec": 244.5}
+{"step": 2025, "of": 5220, "epoch": 1, "loss": 2.087, "sec": 247.6}
+{"step": 2050, "of": 5220, "epoch": 1, "loss": 1.9891, "sec": 250.6}
+{"step": 2075, "of": 5220, "epoch": 1, "loss": 2.461, "sec": 253.6}
+{"step": 2100, "of": 5220, "epoch": 1, "loss": 1.8147, "sec": 256.6}
+{"step": 2125, "of": 5220, "epoch": 1, "loss": 2.3859, "sec": 259.6}
+{"step": 2150, "of": 5220, "epoch": 1, "loss": 2.2456, "sec": 262.6}
+{"step": 2175, "of": 5220, "epoch": 1, "loss": 2.3964, "sec": 265.7}
+{"step": 2200, "of": 5220, "epoch": 1, "loss": 1.9049, "sec": 268.7}
+{"step": 2225, "of": 5220, "epoch": 1, "loss": 1.8977, "sec": 271.7}
+{"step": 2250, "of": 5220, "epoch": 1, "loss": 2.2593, "sec": 274.7}
+{"step": 2275, "of": 5220, "epoch": 1, "loss": 2.108, "sec": 277.8}
+{"step": 2300, "of": 5220, "epoch": 1, "loss": 2.2763, "sec": 280.8}
+{"step": 2325, "of": 5220, "epoch": 1, "loss": 1.9852, "sec": 283.9}
+{"step": 2350, "of": 5220, "epoch": 1, "loss": 2.2978, "sec": 286.9}
+{"step": 2375, "of": 5220, "epoch": 1, "loss": 2.6104, "sec": 289.9}
+{"step": 2400, "of": 5220, "epoch": 1, "loss": 2.4299, "sec": 293.0}
+{"step": 2425, "of": 5220, "epoch": 1, "loss": 1.9958, "sec": 296.1}
+{"step": 2450, "of": 5220, "epoch": 1, "loss": 2.1327, "sec": 299.1}
+{"step": 2475, "of": 5220, "epoch": 1, "loss": 2.2197, "sec": 302.2}
+{"step": 2500, "of": 5220, "epoch": 1, "loss": 2.1441, "sec": 305.2}
+{"step": 2525, "of": 5220, "epoch": 1, "loss": 2.11, "sec": 308.2}
+{"step": 2550, "of": 5220, "epoch": 1, "loss": 2.0767, "sec": 311.2}
+{"step": 2575, "of": 5220, "epoch": 1, "loss": 2.1687, "sec": 314.1}
+{"step": 2600, "of": 5220, "epoch": 1, "loss": 1.7939, "sec": 317.0}
+{"step": 2625, "of": 5220, "epoch": 1, "loss": 1.6936, "sec": 319.9}
+{"step": 2650, "of": 5220, "epoch": 1, "loss": 2.3301, "sec": 322.8}
+{"step": 2675, "of": 5220, "epoch": 1, "loss": 2.5665, "sec": 325.8}
+{"step": 2700, "of": 5220, "epoch": 1, "loss": 2.4198, "sec": 328.8}
+{"step": 2725, "of": 5220, "epoch": 1, "loss": 2.9413, "sec": 331.7}
+{"step": 2750, "of": 5220, "epoch": 1, "loss": 2.0998, "sec": 334.6}
+{"step": 2775, "of": 5220, "epoch": 1, "loss": 2.4668, "sec": 337.5}
+{"step": 2800, "of": 5220, "epoch": 1, "loss": 1.7917, "sec": 340.5}
+{"step": 2825, "of": 5220, "epoch": 1, "loss": 2.3367, "sec": 343.5}
+{"step": 2850, "of": 5220, "epoch": 1, "loss": 2.0657, "sec": 346.6}
+{"step": 2875, "of": 5220, "epoch": 1, "loss": 2.2932, "sec": 349.6}
+{"step": 2900, "of": 5220, "epoch": 1, "loss": 2.0794, "sec": 352.6}
+{"step": 2925, "of": 5220, "epoch": 1, "loss": 2.037, "sec": 355.6}
+{"step": 2950, "of": 5220, "epoch": 1, "loss": 2.1808, "sec": 358.7}
+{"step": 2975, "of": 5220, "epoch": 1, "loss": 2.1944, "sec": 361.7}
+{"step": 3000, "of": 5220, "epoch": 1, "loss": 2.3911, "sec": 364.8}
+{"step": 3025, "of": 5220, "epoch": 1, "loss": 2.7852, "sec": 367.8}
+{"step": 3050, "of": 5220, "epoch": 1, "loss": 2.1061, "sec": 370.8}
+{"step": 3075, "of": 5220, "epoch": 1, "loss": 2.1151, "sec": 373.9}
+{"step": 3100, "of": 5220, "epoch": 1, "loss": 2.0179, "sec": 376.9}
+{"step": 3125, "of": 5220, "epoch": 1, "loss": 1.9978, "sec": 379.9}
+{"step": 3150, "of": 5220, "epoch": 1, "loss": 2.2192, "sec": 383.1}
+{"step": 3175, "of": 5220, "epoch": 1, "loss": 2.0921, "sec": 386.1}
+{"step": 3200, "of": 5220, "epoch": 1, "loss": 2.6204, "sec": 389.1}
+{"step": 3225, "of": 5220, "epoch": 1, "loss": 2.4078, "sec": 392.2}
+{"step": 3250, "of": 5220, "epoch": 1, "loss": 2.258, "sec": 395.3}
+{"step": 3275, "of": 5220, "epoch": 1, "loss": 1.7709, "sec": 398.3}
+{"step": 3300, "of": 5220, "epoch": 1, "loss": 2.2801, "sec": 401.4}
+{"step": 3325, "of": 5220, "epoch": 1, "loss": 2.2063, "sec": 404.4}
+{"step": 3350, "of": 5220, "epoch": 1, "loss": 2.1932, "sec": 407.4}
+{"step": 3375, "of": 5220, "epoch": 1, "loss": 1.9811, "sec": 410.4}
+{"step": 3400, "of": 5220, "epoch": 1, "loss": 2.2661, "sec": 413.5}
+{"step": 3425, "of": 5220, "epoch": 1, "loss": 2.1508, "sec": 416.5}
+{"step": 3450, "of": 5220, "epoch": 1, "loss": 2.3678, "sec": 419.5}
+{"step": 3475, "of": 5220, "epoch": 1, "loss": 1.9396, "sec": 422.5}
+{"epoch": 1, "val_loss": 2.4269}
+адаптер сохранён (val_loss 2.4269)
+{"step": 3500, "of": 5220, "epoch": 2, "loss": 1.5836, "sec": 429.9}
+{"step": 3525, "of": 5220, "epoch": 2, "loss": 1.526, "sec": 433.0}
+{"step": 3550, "of": 5220, "epoch": 2, "loss": 1.7024, "sec": 436.0}
+{"step": 3575, "of": 5220, "epoch": 2, "loss": 1.6835, "sec": 439.0}
+{"step": 3600, "of": 5220, "epoch": 2, "loss": 1.6166, "sec": 442.0}
+{"step": 3625, "of": 5220, "epoch": 2, "loss": 1.7359, "sec": 445.0}
+{"step": 3650, "of": 5220, "epoch": 2, "loss": 1.6856, "sec": 448.0}
+{"step": 3675, "of": 5220, "epoch": 2, "loss": 1.8875, "sec": 451.0}
+{"step": 3700, "of": 5220, "epoch": 2, "loss": 1.531, "sec": 454.1}
+{"step": 3725, "of": 5220, "epoch": 2, "loss": 1.5553, "sec": 457.1}
+{"step": 3750, "of": 5220, "epoch": 2, "loss": 1.6381, "sec": 460.1}
+{"step": 3775, "of": 5220, "epoch": 2, "loss": 1.4056, "sec": 463.2}
+{"step": 3800, "of": 5220, "epoch": 2, "loss": 1.882, "sec": 466.3}
+{"step": 3825, "of": 5220, "epoch": 2, "loss": 1.2293, "sec": 469.4}
+{"step": 3850, "of": 5220, "epoch": 2, "loss": 1.6847, "sec": 472.4}
+{"step": 3875, "of": 5220, "epoch": 2, "loss": 1.7744, "sec": 475.4}
+{"step": 3900, "of": 5220, "epoch": 2, "loss": 1.6537, "sec": 478.5}
+{"step": 3925, "of": 5220, "epoch": 2, "loss": 1.8804, "sec": 481.5}
+{"step": 3950, "of": 5220, "epoch": 2, "loss": 1.8138, "sec": 484.5}
+{"step": 3975, "of": 5220, "epoch": 2, "loss": 1.4407, "sec": 487.5}
+{"step": 4000, "of": 5220, "epoch": 2, "loss": 1.3815, "sec": 490.6}
+{"step": 4025, "of": 5220, "epoch": 2, "loss": 1.9018, "sec": 493.6}
+{"step": 4050, "of": 5220, "epoch": 2, "loss": 1.2227, "sec": 496.6}
+{"step": 4075, "of": 5220, "epoch": 2, "loss": 2.0899, "sec": 499.6}
+{"step": 4100, "of": 5220, "epoch": 2, "loss": 1.9555, "sec": 502.7}
+{"step": 4125, "of": 5220, "epoch": 2, "loss": 2.1684, "sec": 505.7}
+{"step": 4150, "of": 5220, "epoch": 2, "loss": 1.8535, "sec": 508.7}
+{"step": 4175, "of": 5220, "epoch": 2, "loss": 2.0631, "sec": 511.8}
+{"step": 4200, "of": 5220, "epoch": 2, "loss": 1.8074, "sec": 514.8}
+{"step": 4225, "of": 5220, "epoch": 2, "loss": 1.3578, "sec": 517.8}
+{"step": 4250, "of": 5220, "epoch": 2, "loss": 1.5621, "sec": 520.9}
+{"step": 4275, "of": 5220, "epoch": 2, "loss": 1.9162, "sec": 523.9}
+{"step": 4300, "of": 5220, "epoch": 2, "loss": 1.9473, "sec": 526.9}
+{"step": 4325, "of": 5220, "epoch": 2, "loss": 1.9286, "sec": 529.9}
+{"step": 4350, "of": 5220, "epoch": 2, "loss": 1.6365, "sec": 532.9}
+{"step": 4375, "of": 5220, "epoch": 2, "loss": 2.0603, "sec": 536.0}
+{"step": 4400, "of": 5220, "epoch": 2, "loss": 1.777, "sec": 539.0}
+{"step": 4425, "of": 5220, "epoch": 2, "loss": 1.8191, "sec": 542.1}
+{"step": 4450, "of": 5220, "epoch": 2, "loss": 1.6369, "sec": 545.2}
+{"step": 4475, "of": 5220, "epoch": 2, "loss": 1.8286, "sec": 548.2}
+{"step": 4500, "of": 5220, "epoch": 2, "loss": 1.9853, "sec": 551.4}
+{"step": 4525, "of": 5220, "epoch": 2, "loss": 2.0957, "sec": 554.4}
+{"step": 4550, "of": 5220, "epoch": 2, "loss": 1.7082, "sec": 557.4}
+{"step": 4575, "of": 5220, "epoch": 2, "loss": 1.59, "sec": 560.4}
+{"step": 4600, "of": 5220, "epoch": 2, "loss": 1.6402, "sec": 563.4}
+{"step": 4625, "of": 5220, "epoch": 2, "loss": 1.9037, "sec": 566.5}
+{"step": 4650, "of": 5220, "epoch": 2, "loss": 2.0005, "sec": 569.5}
+{"step": 4675, "of": 5220, "epoch": 2, "loss": 1.9407, "sec": 572.5}
+{"step": 4700, "of": 5220, "epoch": 2, "loss": 1.8525, "sec": 575.5}
+{"step": 4725, "of": 5220, "epoch": 2, "loss": 1.9711, "sec": 578.5}
+{"step": 4750, "of": 5220, "epoch": 2, "loss": 1.8701, "sec": 581.5}
+{"step": 4775, "of": 5220, "epoch": 2, "loss": 2.1187, "sec": 584.4}
+{"step": 4800, "of": 5220, "epoch": 2, "loss": 1.903, "sec": 587.3}
+{"step": 4825, "of": 5220, "epoch": 2, "loss": 1.6968, "sec": 590.2}
+{"step": 4850, "of": 5220, "epoch": 2, "loss": 1.7351, "sec": 593.1}
+{"step": 4875, "of": 5220, "epoch": 2, "loss": 1.7459, "sec": 596.1}
+{"step": 4900, "of": 5220, "epoch": 2, "loss": 1.6354, "sec": 599.0}
+{"step": 4925, "of": 5220, "epoch": 2, "loss": 2.125, "sec": 601.9}
+{"step": 4950, "of": 5220, "epoch": 2, "loss": 1.9155, "sec": 604.8}
+{"step": 4975, "of": 5220, "epoch": 2, "loss": 1.8982, "sec": 607.8}
+{"step": 5000, "of": 5220, "epoch": 2, "loss": 2.1059, "sec": 610.8}
+{"step": 5025, "of": 5220, "epoch": 2, "loss": 1.9834, "sec": 613.9}
+{"step": 5050, "of": 5220, "epoch": 2, "loss": 1.9396, "sec": 616.9}
+{"step": 5075, "of": 5220, "epoch": 2, "loss": 1.5985, "sec": 620.0}
+{"step": 5100, "of": 5220, "epoch": 2, "loss": 2.1055, "sec": 623.0}
+{"step": 5125, "of": 5220, "epoch": 2, "loss": 1.9604, "sec": 626.0}
+{"step": 5150, "of": 5220, "epoch": 2, "loss": 1.763, "sec": 629.0}
+{"step": 5175, "of": 5220, "epoch": 2, "loss": 2.1131, "sec": 632.0}
+{"step": 5200, "of": 5220, "epoch": 2, "loss": 1.7332, "sec": 635.1}
+{"step": 5220, "of": 5220, "epoch": 2, "loss": 1.7321, "sec": 637.6}
+{"epoch": 2, "val_loss": 2.4963}
+готово: /workspace/ft/adapter | шагов 5220 | 642 с
+
+=== 22:34:43 предиктор (base)
+
+=== 22:34:53 recall base / ru-m1
+модель: Qwen/Qwen3-0.6B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    мимо     посмотреть
+  ru-m1-003    мимо     машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    ранг 18  готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    мимо     перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    мимо     приедешь
+  ru-m1-011    мимо     адрес
+  ru-m1-013    мимо     подтвердить
+  ru-m1-014    мимо     освободишься
+  ru-m1-015    мимо     пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    мимо     забыл
+  ru-m1-019    мимо     душа
+  ru-m1-020    мимо     вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    ранг 2   объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    мимо     сегодня
+  ru-m1-027    мимо     пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    мимо     договорились
+  ru-m1-030    мимо     соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    мимо     завтра
+  ru-m1-033    мимо     батарейки
+  ru-m1-034    ранг 8   отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0, "top3": 0.0312, "top5": 0.0312, "top10": 0.0625, "top20": 0.0938, "top50": 0.0938} | попаданий 3/32
+saved: /workspace/out/results/recall-base-ru-m1.json
+
+=== 22:34:59 recall base / ru-m1-mem
+модель: Qwen/Qwen3-0.6B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    мимо     посмотреть
+  ru-m1-003    мимо     машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    ранг 18  готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    мимо     перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    мимо     приедешь
+  ru-m1-011    мимо     адрес
+  ru-m1-013    мимо     подтвердить
+  ru-m1-014    мимо     освободишься
+  ru-m1-015    мимо     пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    ранг 14  забыл
+  ru-m1-019    мимо     душа
+  ru-m1-020    мимо     вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    ранг 7   объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    мимо     сегодня
+  ru-m1-027    ранг 14  пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    мимо     договорились
+  ru-m1-030    ранг 2   соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    ранг 2   завтра
+  ru-m1-033    ранг 1   батарейки
+  ru-m1-034    мимо     отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0312, "top3": 0.0938, "top5": 0.0938, "top10": 0.125, "top20": 0.2188, "top50": 0.2188} | попаданий 7/32
+saved: /workspace/out/results/recall-base-ru-m1-mem.json
+
+=== 22:35:07 предиктор (tuned)
+
+=== 22:35:19 recall tuned / ru-m1
+модель: Qwen/Qwen3-0.6B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    мимо     посмотреть
+  ru-m1-003    мимо     машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    мимо     готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    мимо     перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    ранг 4   приедешь
+  ru-m1-011    мимо     адрес
+  ru-m1-013    мимо     подтвердить
+  ru-m1-014    ранг 3   освободишься
+  ru-m1-015    мимо     пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    ранг 14  забыл
+  ru-m1-019    мимо     душа
+  ru-m1-020    мимо     вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    мимо     объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    мимо     сегодня
+  ru-m1-027    мимо     пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    ранг 3   договорились
+  ru-m1-030    мимо     соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    ранг 2   завтра
+  ru-m1-033    мимо     батарейки
+  ru-m1-034    мимо     отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0, "top3": 0.0938, "top5": 0.125, "top10": 0.125, "top20": 0.1562, "top50": 0.1562} | попаданий 5/32
+saved: /workspace/out/results/recall-tuned-ru-m1.json
+
+=== 22:35:26 recall tuned / ru-m1-mem
+модель: Qwen/Qwen3-0.6B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    мимо     посмотреть
+  ru-m1-003    мимо     машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    мимо     готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    мимо     перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    ранг 8   приедешь
+  ru-m1-011    мимо     адрес
+  ru-m1-013    мимо     подтвердить
+  ru-m1-014    мимо     освободишься
+  ru-m1-015    ранг 8   пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    ранг 12  забыл
+  ru-m1-019    мимо     душа
+  ru-m1-020    мимо     вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    мимо     объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    мимо     сегодня
+  ru-m1-027    мимо     пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    ранг 3   договорились
+  ru-m1-030    мимо     соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    мимо     завтра
+  ru-m1-033    ранг 1   батарейки
+  ru-m1-034    мимо     отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0312, "top3": 0.0625, "top5": 0.0625, "top10": 0.125, "top20": 0.1562, "top50": 0.1562} | попаданий 5/32
+saved: /workspace/out/results/recall-tuned-ru-m1-mem.json
+
+=== 22:35:35 ГОТОВО (после патча)
+
+=== 22:38:49 исполняю патч f8f0c6fc0f3ca1c6eea44b0b10263f0a
+
+=== 22:38:49 ИЗОЛЯЦИЯ: качаю данные v1
+
+=== 22:38:59 ИЗОЛЯЦИЯ: обучение на v1, батч 8 (всё прочее как в v2-прогоне)
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 9352.69it/s]
+устройство: cuda | обучаемых параметров: 10,092,544
+{"step": 25, "of": 2991, "epoch": 0, "loss": 2.8764, "sec": 3.4}
+{"step": 50, "of": 2991, "epoch": 0, "loss": 2.7847, "sec": 6.3}
+{"step": 75, "of": 2991, "epoch": 0, "loss": 3.5893, "sec": 9.2}
+{"step": 100, "of": 2991, "epoch": 0, "loss": 3.161, "sec": 12.1}
+{"step": 125, "of": 2991, "epoch": 0, "loss": 2.7595, "sec": 15.0}
+{"step": 150, "of": 2991, "epoch": 0, "loss": 2.908, "sec": 17.9}
+{"step": 175, "of": 2991, "epoch": 0, "loss": 2.8899, "sec": 20.8}
+{"step": 200, "of": 2991, "epoch": 0, "loss": 2.6198, "sec": 23.7}
+{"step": 225, "of": 2991, "epoch": 0, "loss": 2.6919, "sec": 26.6}
+{"step": 250, "of": 2991, "epoch": 0, "loss": 2.8536, "sec": 29.6}
+{"step": 275, "of": 2991, "epoch": 0, "loss": 3.0729, "sec": 32.4}
+{"step": 300, "of": 2991, "epoch": 0, "loss": 3.3929, "sec": 35.2}
+{"step": 325, "of": 2991, "epoch": 0, "loss": 3.0513, "sec": 37.9}
+{"step": 350, "of": 2991, "epoch": 0, "loss": 2.9151, "sec": 40.8}
+{"step": 375, "of": 2991, "epoch": 0, "loss": 2.9938, "sec": 43.6}
+{"step": 400, "of": 2991, "epoch": 0, "loss": 3.2664, "sec": 46.5}
+{"step": 425, "of": 2991, "epoch": 0, "loss": 2.8746, "sec": 49.4}
+{"step": 450, "of": 2991, "epoch": 0, "loss": 2.5511, "sec": 52.3}
+{"step": 475, "of": 2991, "epoch": 0, "loss": 2.5793, "sec": 55.2}
+{"step": 500, "of": 2991, "epoch": 0, "loss": 2.5373, "sec": 58.1}
+{"step": 525, "of": 2991, "epoch": 0, "loss": 2.7502, "sec": 61.0}
+{"step": 550, "of": 2991, "epoch": 0, "loss": 3.142, "sec": 63.9}
+{"step": 575, "of": 2991, "epoch": 0, "loss": 2.6569, "sec": 66.8}
+{"step": 600, "of": 2991, "epoch": 0, "loss": 3.0319, "sec": 69.7}
+{"step": 625, "of": 2991, "epoch": 0, "loss": 3.0283, "sec": 72.6}
+{"step": 650, "of": 2991, "epoch": 0, "loss": 2.933, "sec": 75.6}
+{"step": 675, "of": 2991, "epoch": 0, "loss": 3.1757, "sec": 78.5}
+{"step": 700, "of": 2991, "epoch": 0, "loss": 2.9239, "sec": 81.4}
+{"step": 725, "of": 2991, "epoch": 0, "loss": 2.7568, "sec": 84.3}
+{"step": 750, "of": 2991, "epoch": 0, "loss": 2.7614, "sec": 87.2}
+{"step": 775, "of": 2991, "epoch": 0, "loss": 3.114, "sec": 90.1}
+{"step": 800, "of": 2991, "epoch": 0, "loss": 2.5686, "sec": 93.0}
+{"step": 825, "of": 2991, "epoch": 0, "loss": 2.6117, "sec": 95.9}
+{"step": 850, "of": 2991, "epoch": 0, "loss": 2.834, "sec": 98.9}
+{"step": 875, "of": 2991, "epoch": 0, "loss": 2.6397, "sec": 101.8}
+{"step": 900, "of": 2991, "epoch": 0, "loss": 2.6899, "sec": 104.7}
+{"step": 925, "of": 2991, "epoch": 0, "loss": 2.4019, "sec": 107.6}
+{"step": 950, "of": 2991, "epoch": 0, "loss": 3.0501, "sec": 110.5}
+{"step": 975, "of": 2991, "epoch": 0, "loss": 3.0231, "sec": 113.4}
+{"epoch": 0, "val_loss": 2.6744}
+адаптер сохранён (val_loss 2.6744)
+{"step": 1000, "of": 2991, "epoch": 1, "loss": 2.4823, "sec": 118.9}
+{"step": 1025, "of": 2991, "epoch": 1, "loss": 2.0863, "sec": 121.8}
+{"step": 1050, "of": 2991, "epoch": 1, "loss": 2.4981, "sec": 124.9}
+{"step": 1075, "of": 2991, "epoch": 1, "loss": 2.7197, "sec": 127.8}
+{"step": 1100, "of": 2991, "epoch": 1, "loss": 2.1121, "sec": 130.7}
+{"step": 1125, "of": 2991, "epoch": 1, "loss": 2.3813, "sec": 133.6}
+{"step": 1150, "of": 2991, "epoch": 1, "loss": 2.5977, "sec": 136.6}
+{"step": 1175, "of": 2991, "epoch": 1, "loss": 2.3124, "sec": 139.5}
+{"step": 1200, "of": 2991, "epoch": 1, "loss": 2.1196, "sec": 142.4}
+{"step": 1225, "of": 2991, "epoch": 1, "loss": 2.3364, "sec": 145.3}
+{"step": 1250, "of": 2991, "epoch": 1, "loss": 1.9881, "sec": 148.2}
+{"step": 1275, "of": 2991, "epoch": 1, "loss": 2.2717, "sec": 151.1}
+{"step": 1300, "of": 2991, "epoch": 1, "loss": 2.3632, "sec": 154.0}
+{"step": 1325, "of": 2991, "epoch": 1, "loss": 2.9605, "sec": 156.9}
+{"step": 1350, "of": 2991, "epoch": 1, "loss": 2.2604, "sec": 159.8}
+{"step": 1375, "of": 2991, "epoch": 1, "loss": 2.3067, "sec": 162.8}
+{"step": 1400, "of": 2991, "epoch": 1, "loss": 2.2998, "sec": 165.7}
+{"step": 1425, "of": 2991, "epoch": 1, "loss": 2.4546, "sec": 168.5}
+{"step": 1450, "of": 2991, "epoch": 1, "loss": 2.5444, "sec": 171.3}
+{"step": 1475, "of": 2991, "epoch": 1, "loss": 2.3375, "sec": 174.1}
+{"step": 1500, "of": 2991, "epoch": 1, "loss": 2.0568, "sec": 176.8}
+{"step": 1525, "of": 2991, "epoch": 1, "loss": 2.1556, "sec": 179.6}
+{"step": 1550, "of": 2991, "epoch": 1, "loss": 2.5122, "sec": 182.4}
+{"step": 1575, "of": 2991, "epoch": 1, "loss": 2.4024, "sec": 185.2}
+{"step": 1600, "of": 2991, "epoch": 1, "loss": 2.4138, "sec": 187.9}
+{"step": 1625, "of": 2991, "epoch": 1, "loss": 2.2997, "sec": 190.7}
+{"step": 1650, "of": 2991, "epoch": 1, "loss": 2.1955, "sec": 193.5}
+{"step": 1675, "of": 2991, "epoch": 1, "loss": 2.4184, "sec": 196.3}
+{"step": 1700, "of": 2991, "epoch": 1, "loss": 2.343, "sec": 199.1}
+{"step": 1725, "of": 2991, "epoch": 1, "loss": 2.3068, "sec": 201.8}
+{"step": 1750, "of": 2991, "epoch": 1, "loss": 2.5757, "sec": 204.9}
+{"step": 1775, "of": 2991, "epoch": 1, "loss": 2.4445, "sec": 207.8}
+{"step": 1800, "of": 2991, "epoch": 1, "loss": 2.1859, "sec": 210.7}
+{"step": 1825, "of": 2991, "epoch": 1, "loss": 2.1969, "sec": 213.5}
+{"step": 1850, "of": 2991, "epoch": 1, "loss": 2.1862, "sec": 216.5}
+{"step": 1875, "of": 2991, "epoch": 1, "loss": 2.4982, "sec": 219.4}
+{"step": 1900, "of": 2991, "epoch": 1, "loss": 2.338, "sec": 222.3}
+{"step": 1925, "of": 2991, "epoch": 1, "loss": 2.7325, "sec": 225.2}
+{"step": 1950, "of": 2991, "epoch": 1, "loss": 1.9007, "sec": 228.1}
+{"step": 1975, "of": 2991, "epoch": 1, "loss": 2.7264, "sec": 231.0}
+{"epoch": 1, "val_loss": 2.647}
+адаптер сохранён (val_loss 2.6470)
+{"step": 2000, "of": 2991, "epoch": 2, "loss": 1.9113, "sec": 236.3}
+{"step": 2025, "of": 2991, "epoch": 2, "loss": 1.4778, "sec": 239.2}
+{"step": 2050, "of": 2991, "epoch": 2, "loss": 1.4442, "sec": 242.1}
+{"step": 2075, "of": 2991, "epoch": 2, "loss": 1.5393, "sec": 245.0}
+{"step": 2100, "of": 2991, "epoch": 2, "loss": 1.6602, "sec": 247.9}
+{"step": 2125, "of": 2991, "epoch": 2, "loss": 2.2927, "sec": 250.8}
+{"step": 2150, "of": 2991, "epoch": 2, "loss": 1.8925, "sec": 253.7}
+{"step": 2175, "of": 2991, "epoch": 2, "loss": 2.3157, "sec": 256.6}
+{"step": 2200, "of": 2991, "epoch": 2, "loss": 1.9986, "sec": 259.5}
+{"step": 2225, "of": 2991, "epoch": 2, "loss": 1.7443, "sec": 262.4}
+{"step": 2250, "of": 2991, "epoch": 2, "loss": 1.7285, "sec": 265.3}
+{"step": 2275, "of": 2991, "epoch": 2, "loss": 1.5796, "sec": 268.1}
+{"step": 2300, "of": 2991, "epoch": 2, "loss": 1.8599, "sec": 270.9}
+{"step": 2325, "of": 2991, "epoch": 2, "loss": 1.5975, "sec": 273.7}
+{"step": 2350, "of": 2991, "epoch": 2, "loss": 1.9269, "sec": 276.5}
+{"step": 2375, "of": 2991, "epoch": 2, "loss": 1.8362, "sec": 279.4}
+{"step": 2400, "of": 2991, "epoch": 2, "loss": 1.8027, "sec": 282.3}
+{"step": 2425, "of": 2991, "epoch": 2, "loss": 1.8148, "sec": 285.2}
+{"step": 2450, "of": 2991, "epoch": 2, "loss": 1.889, "sec": 288.2}
+{"step": 2475, "of": 2991, "epoch": 2, "loss": 1.9382, "sec": 291.1}
+{"step": 2500, "of": 2991, "epoch": 2, "loss": 1.5588, "sec": 294.0}
+{"step": 2525, "of": 2991, "epoch": 2, "loss": 1.7325, "sec": 296.9}
+{"step": 2550, "of": 2991, "epoch": 2, "loss": 1.6083, "sec": 299.8}
+{"step": 2575, "of": 2991, "epoch": 2, "loss": 1.9713, "sec": 302.7}
+{"step": 2600, "of": 2991, "epoch": 2, "loss": 1.8197, "sec": 305.6}
+{"step": 2625, "of": 2991, "epoch": 2, "loss": 2.1888, "sec": 308.5}
+{"step": 2650, "of": 2991, "epoch": 2, "loss": 1.717, "sec": 311.4}
+{"step": 2675, "of": 2991, "epoch": 2, "loss": 1.4809, "sec": 314.3}
+{"step": 2700, "of": 2991, "epoch": 2, "loss": 1.8114, "sec": 317.2}
+{"step": 2725, "of": 2991, "epoch": 2, "loss": 1.7802, "sec": 320.1}
+{"step": 2750, "of": 2991, "epoch": 2, "loss": 1.8855, "sec": 323.1}
+{"step": 2775, "of": 2991, "epoch": 2, "loss": 1.94, "sec": 326.0}
+{"step": 2800, "of": 2991, "epoch": 2, "loss": 1.9122, "sec": 328.9}
+{"step": 2825, "of": 2991, "epoch": 2, "loss": 1.666, "sec": 331.9}
+{"step": 2850, "of": 2991, "epoch": 2, "loss": 1.8058, "sec": 334.8}
+{"step": 2875, "of": 2991, "epoch": 2, "loss": 2.0413, "sec": 337.7}
+{"step": 2900, "of": 2991, "epoch": 2, "loss": 1.592, "sec": 340.6}
+{"step": 2925, "of": 2991, "epoch": 2, "loss": 1.7401, "sec": 343.5}
+{"step": 2950, "of": 2991, "epoch": 2, "loss": 1.8229, "sec": 346.4}
+{"step": 2975, "of": 2991, "epoch": 2, "loss": 1.8343, "sec": 349.3}
+{"step": 2991, "of": 2991, "epoch": 2, "loss": 2.574, "sec": 351.2}
+{"epoch": 2, "val_loss": 2.7534}
+готово: /workspace/ft-v1b8/adapter | шагов 2991 | 353 с
+
+=== 22:44:58 ИЗОЛЯЦИЯ: recall с адаптером v1b8
+модель: Qwen/Qwen3-0.6B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    мимо     посмотреть
+  ru-m1-003    ранг 3   машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    ранг 2   готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    мимо     перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    мимо     приедешь
+  ru-m1-011    мимо     адрес
+  ru-m1-013    мимо     подтвердить
+  ru-m1-014    мимо     освободишься
+  ru-m1-015    ранг 7   пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    ранг 2   забыл
+  ru-m1-019    мимо     душа
+  ru-m1-020    ранг 10  вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    мимо     объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    ранг 6   сегодня
+  ru-m1-027    мимо     пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    ранг 4   договорились
+  ru-m1-030    мимо     соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    ранг 6   завтра
+  ru-m1-033    мимо     батарейки
+  ru-m1-034    мимо     отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0, "top3": 0.0938, "top5": 0.125, "top10": 0.25, "top20": 0.25, "top50": 0.25} | попаданий 8/32
+saved: /workspace/out/results/recall-v1b8-ru-m1.json
+модель: Qwen/Qwen3-0.6B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    мимо     посмотреть
+  ru-m1-003    мимо     машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    ранг 9   готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    мимо     перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    мимо     приедешь
+  ru-m1-011    мимо     адрес
+  ru-m1-013    мимо     подтвердить
+  ru-m1-014    мимо     освободишься
+  ru-m1-015    ранг 3   пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    ранг 3   забыл
+  ru-m1-019    мимо     душа
+  ru-m1-020    ранг 9   вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    мимо     объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    мимо     сегодня
+  ru-m1-027    мимо     пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    ранг 4   договорились
+  ru-m1-030    мимо     соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    ранг 6   завтра
+  ru-m1-033    ранг 4   батарейки
+  ru-m1-034    мимо     отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0, "top3": 0.0625, "top5": 0.125, "top10": 0.2188, "top20": 0.2188, "top50": 0.2188} | попаданий 7/32
+saved: /workspace/out/results/recall-v1b8-ru-m1-mem.json
+
+=== 22:45:26 ИЗОЛЯЦИЯ ГОТОВА
