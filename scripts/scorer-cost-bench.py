@@ -393,6 +393,7 @@ class Bench:
             "prefix": self.prompt["prefix"],
             "lang": self.args.lang,
             "top_k": self.args.top_k,
+            "max_new_tokens": self.args.max_new_tokens,
             "context_terms": self.prompt["context_terms"],
         }
         try:
@@ -762,6 +763,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"predictor top_k, 1..{PREDICT_MAX_TOP_K} (server limit; default 20)",
     )
     parser.add_argument(
+        "--max-new-tokens",
+        type=int,
+        default=6,
+        help="predictor max_new_tokens, 2..12 (server limit; default 6). "
+        "Cost lever independent of --top-k: beam WIDTH scales with top_k, "
+        "but generation runs max_new_tokens sequential forward passes "
+        "regardless of how many candidates are requested.",
+    )
+    parser.add_argument(
         "--candidate-count",
         type=int,
         default=20,
@@ -819,6 +829,8 @@ def main() -> int:
         raise SystemExit("--warmup-iterations must be >= 0")
     if not 1 <= args.candidate_count <= PRUNE_MAX_CANDIDATES:
         raise SystemExit(f"--candidate-count must be 1..{PRUNE_MAX_CANDIDATES} (server limit)")
+    if not 2 <= args.max_new_tokens <= 12:
+        parser.error("--max-new-tokens must be within 2..12 (server limit)")
     if not 1 <= args.top_k <= PREDICT_MAX_TOP_K:
         raise SystemExit(f"--top-k must be 1..{PREDICT_MAX_TOP_K} (server limit)")
     if args.critical_window not in args.windows:
@@ -952,6 +964,7 @@ def main() -> int:
             "windows_ms": list(args.windows),
             "critical_window_ms": args.critical_window,
             "top_k": args.top_k,
+            "max_new_tokens": args.max_new_tokens,
             "candidate_count": args.candidate_count,
             "predictor_url": args.predictor_url,
             "pruner_url": args.pruner_url,
