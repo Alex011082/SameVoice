@@ -65,7 +65,10 @@ class ChatterboxEngine:
                 ) from exc
 
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            model = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model="v3")
+            # Без t3_model="v3": установленный chatterbox-tts 0.1.x такого
+            # аргумента не знает (TypeError на поде b0jxilt07hcur3, 31.08) —
+            # мультиязычная модель в пакете одна, выбирать нечего.
+            model = ChatterboxMultilingualTTS.from_pretrained(device=device)
             self._model = model
             self._device = device
             return (time.perf_counter() - started) * 1000.0
