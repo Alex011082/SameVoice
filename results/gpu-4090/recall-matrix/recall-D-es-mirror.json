@@ -1,0 +1,206 @@
+{
+ "summary": {
+  "n": 12,
+  "hits": 4,
+  "recall": {
+   "top1": 0.0833,
+   "top3": 0.25,
+   "top5": 0.25,
+   "top10": 0.3333,
+   "top20": 0.3333,
+   "top50": 0.3333
+  },
+  "rtt_p50_ms": 151.1,
+  "model": "Qwen/Qwen3-1.7B-Base",
+  "prompt_style": "continuation",
+  "use_context": false,
+  "lines_file": "es-mirror.json"
+ },
+ "rows": [
+  {
+   "id": "es-003",
+   "truth": "coche",
+   "rank": 1,
+   "roundTripMs": 152.3,
+   "candidates": [
+    "coche",
+    "brazo",
+    "auto",
+    "cinturón",
+    "automóvil",
+    "cuello",
+    "hombro"
+   ]
+  },
+  {
+   "id": "es-004",
+   "truth": "acabando",
+   "rank": null,
+   "roundTripMs": 147.6,
+   "candidates": [
+    "pasando",
+    "volviendo",
+    "ocurriendo",
+    "olvidando",
+    "olfateando",
+    "rompiendo"
+   ]
+  },
+  {
+   "id": "es-006",
+   "truth": "listos",
+   "rank": 2,
+   "roundTripMs": 153.6,
+   "candidates": [
+    "en",
+    "listos",
+    "a",
+    "aprobados",
+    "firmados",
+    "preparados"
+   ]
+  },
+  {
+   "id": "es-009",
+   "truth": "mil",
+   "rank": null,
+   "roundTripMs": 147.0,
+   "candidates": [
+    "de",
+    "en",
+    "muy",
+    "alrededor",
+    "a",
+    "al"
+   ]
+  },
+  {
+   "id": "es-014",
+   "truth": "libre",
+   "rank": null,
+   "roundTripMs": 151.1,
+   "candidates": [
+    "listo翻译成中文",
+    "listo",
+    "listo什么意思",
+    "lo",
+    "de",
+    "listo翻译成中文是什么",
+    "seguro",
+    "listo翻译"
+   ]
+  },
+  {
+   "id": "es-017",
+   "truth": "olvidé",
+   "rank": null,
+   "roundTripMs": 151.0,
+   "candidates": [
+    "no",
+    "me",
+    "estás",
+    "lo",
+    "hay",
+    "te",
+    "se"
+   ]
+  },
+  {
+   "id": "es-020",
+   "truth": "martes",
+   "rank": 3,
+   "roundTripMs": 155.4,
+   "candidates": [
+    "viernes",
+    "jueves",
+    "martes",
+    "10",
+    "15",
+    "30",
+    "miércoles",
+    "sábado"
+   ]
+  },
+  {
+   "id": "es-025",
+   "truth": "tráfico",
+   "rank": 10,
+   "roundTripMs": 152.5,
+   "candidates": [
+    "retraso",
+    "parque",
+    "trabajo",
+    "camino",
+    "accidente",
+    "mal",
+    "desplazamiento",
+    "atraso",
+    "viaje",
+    "tráfico",
+    "cambio",
+    "incendio",
+    "cansancio",
+    "exceso"
+   ]
+  },
+  {
+   "id": "es-026",
+   "truth": "hoy",
+   "rank": null,
+   "roundTripMs": 146.2,
+   "candidates": [
+    "lo",
+    "el",
+    "y",
+    "en"
+   ]
+  },
+  {
+   "id": "es-028",
+   "truth": "caro",
+   "rank": null,
+   "roundTripMs": 157.2,
+   "candidates": [
+    "un",
+    "ligeramente",
+    "más",
+    "mucho",
+    "demasiado"
+   ]
+  },
+  {
+   "id": "es-032",
+   "truth": "mañana",
+   "rank": null,
+   "roundTripMs": 145.8,
+   "candidates": [
+    "de",
+    "allí",
+    "en",
+    "estudiando"
+   ]
+  },
+  {
+   "id": "es-034",
+   "truth": "mandé",
+   "rank": null,
+   "roundTripMs": 145.3,
+   "candidates": [
+    "olvidaste",
+    "quedaste",
+    "inscribiste",
+    "acostumbraste",
+    "preguntaste",
+    "estás",
+    "has",
+    "acabas",
+    "gustan",
+    "gustó",
+    "suscribiste",
+    "unido",
+    "preguntabas",
+    "acostumbras"
+   ]
+  }
+ ]
+}

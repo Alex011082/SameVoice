@@ -1,0 +1,576 @@
+{
+ "summary": {
+  "n": 32,
+  "hits": 2,
+  "recall": {
+   "top1": 0.0312,
+   "top3": 0.0625,
+   "top5": 0.0625,
+   "top10": 0.0625,
+   "top20": 0.0625,
+   "top50": 0.0625
+  },
+  "rtt_p50_ms": 150.8,
+  "model": "Qwen/Qwen3-1.7B-Base",
+  "prompt_style": "continuation",
+  "use_context": false,
+  "lines_file": "en-mirror.json"
+ },
+ "rows": [
+  {
+   "id": "en-002",
+   "truth": "check",
+   "rank": null,
+   "roundTripMs": 152.0,
+   "candidates": [
+    "wrap",
+    "catch",
+    "think",
+    "figure",
+    "get",
+    "gather",
+    "make",
+    "understand",
+    "collect"
+   ]
+  },
+  {
+   "id": "en-003",
+   "truth": "car",
+   "rank": null,
+   "roundTripMs": 155.6,
+   "candidates": [
+    "wife",
+    "husband",
+    "sister",
+    "brother",
+    "friend",
+    "partner",
+    "mom",
+    "parents",
+    "dad",
+    "best",
+    "friends",
+    "problem",
+    "family",
+    "apologies",
+    "time",
+    "birthday"
+   ]
+  },
+  {
+   "id": "en-004",
+   "truth": "dying",
+   "rank": null,
+   "roundTripMs": 156.9,
+   "candidates": [
+    "ringing",
+    "ringing什么意思"
+   ]
+  },
+  {
+   "id": "en-005",
+   "truth": "twelfth",
+   "rank": null,
+   "roundTripMs": 150.8,
+   "candidates": [
+    "school",
+    "first",
+    "100",
+    "10",
+    "2010",
+    "2022",
+    "2018",
+    "11",
+    "100th",
+    "2021",
+    "10th",
+    "50th",
+    "2014",
+    "30th",
+    "8",
+    "2019",
+    "2008",
+    "7",
+    "9",
+    "sale"
+   ]
+  },
+  {
+   "id": "en-006",
+   "truth": "ready",
+   "rank": null,
+   "roundTripMs": 157.0,
+   "candidates": [
+    "in",
+    "available",
+    "being",
+    "on"
+   ]
+  },
+  {
+   "id": "en-007",
+   "truth": "bailed",
+   "rank": null,
+   "roundTripMs": 153.8,
+   "candidates": [
+    "forgot",
+    "______",
+    "_________",
+    "________",
+    "____________",
+    "___________",
+    "__________",
+    "didn't",
+    "never",
+    "_______",
+    "_____",
+    "_____________",
+    "was",
+    "____"
+   ]
+  },
+  {
+   "id": "en-008",
+   "truth": "call",
+   "rank": null,
+   "roundTripMs": 151.8,
+   "candidates": [
+    "never",
+    "be",
+    "get",
+    "ask",
+    "need",
+    "spend",
+    "have",
+    "come",
+    "end"
+   ]
+  },
+  {
+   "id": "en-009",
+   "truth": "twelve",
+   "rank": null,
+   "roundTripMs": 150.9,
+   "candidates": [
+    "100",
+    "150",
+    "10",
+    "500",
+    "more",
+    "200",
+    "20",
+    "25",
+    "15",
+    "1",
+    "Rs",
+    "12",
+    "2",
+    "about"
+   ]
+  },
+  {
+   "id": "en-010",
+   "truth": "arrive",
+   "rank": 1,
+   "roundTripMs": 148.6,
+   "candidates": [
+    "arrive",
+    "get"
+   ]
+  },
+  {
+   "id": "en-011",
+   "truth": "address",
+   "rank": null,
+   "roundTripMs": 160.1,
+   "candidates": [
+    "list",
+    "step-by-step",
+    "first",
+    "code",
+    "source",
+    "solution",
+    "step",
+    "1000th",
+    "top",
+    "next",
+    "answer",
+    "email",
+    "2021",
+    "2022",
+    "100th",
+    "HTML",
+    "2023",
+    "output",
+    "2020",
+    "2019"
+   ]
+  },
+  {
+   "id": "en-013",
+   "truth": "confirm",
+   "rank": null,
+   "roundTripMs": 158.4,
+   "candidates": [
+    "create",
+    "write",
+    "solve",
+    "find",
+    "evaluate",
+    "implement",
+    "prove"
+   ]
+  },
+  {
+   "id": "en-014",
+   "truth": "free",
+   "rank": null,
+   "roundTripMs": 156.6,
+   "candidates": [
+    "done",
+    "ready翻译",
+    "done翻译",
+    "ready",
+    "in",
+    "ready翻译成中文",
+    "done翻译成中文",
+    "done翻译成中文是什么意思"
+   ]
+  },
+  {
+   "id": "en-015",
+   "truth": "fifteenth",
+   "rank": null,
+   "roundTripMs": 152.1,
+   "candidates": [
+    "sake",
+    "year",
+    "4th",
+    "100th",
+    "fun",
+    "time",
+    "1st",
+    "1000th",
+    "moment",
+    "20th",
+    "10th",
+    "2000s",
+    "first",
+    "15th",
+    "2020s"
+   ]
+  },
+  {
+   "id": "en-016",
+   "truth": "saved",
+   "rank": null,
+   "roundTripMs": 149.1,
+   "candidates": [
+    "have",
+    "m",
+    "d",
+    "know",
+    "am",
+    "want",
+    "ll",
+    "need",
+    "would",
+    "was"
+   ]
+  },
+  {
+   "id": "en-017",
+   "truth": "forgot",
+   "rank": null,
+   "roundTripMs": 147.2,
+   "candidates": [
+    "might",
+    "made",
+    "misread",
+    "need",
+    "see",
+    "misinterpreted",
+    "misunderstood",
+    "m",
+    "have",
+    "understand",
+    "got",
+    "ve"
+   ]
+  },
+  {
+   "id": "en-019",
+   "truth": "shower",
+   "rank": null,
+   "roundTripMs": 150.8,
+   "candidates": [
+    "office",
+    "car",
+    "hospital",
+    "house",
+    "office什么意思",
+    "office翻译成中文",
+    "office翻译",
+    "airport翻译成中文",
+    "house翻译成中文",
+    "car翻译成中文",
+    "office翻译成中文是什么意思",
+    "meeting"
+   ]
+  },
+  {
+   "id": "en-020",
+   "truth": "Tuesday",
+   "rank": null,
+   "roundTripMs": 146.8,
+   "candidates": [
+    "this",
+    "it",
+    "an",
+    "a",
+    "another",
+    "something",
+    "the"
+   ]
+  },
+  {
+   "id": "en-021",
+   "truth": "five",
+   "rank": null,
+   "roundTripMs": 150.6,
+   "candidates": [
+    "in",
+    "and",
+    "on",
+    "how",
+    "what"
+   ]
+  },
+  {
+   "id": "en-022",
+   "truth": "apologized",
+   "rank": null,
+   "roundTripMs": 150.8,
+   "candidates": [
+    "asked",
+    "said",
+    "left",
+    "told",
+    "I",
+    "wanted"
+   ]
+  },
+  {
+   "id": "en-023",
+   "truth": "explain",
+   "rank": null,
+   "roundTripMs": 147.5,
+   "candidates": [
+    "give",
+    "never",
+    "be",
+    "tell",
+    "do",
+    "provide",
+    "guide",
+    "preface",
+    "keep",
+    "admit",
+    "leave"
+   ]
+  },
+  {
+   "id": "en-024",
+   "truth": "come",
+   "rank": null,
+   "roundTripMs": 145.9,
+   "candidates": [
+    "give",
+    "never",
+    "be",
+    "tell",
+    "do",
+    "provide",
+    "guide",
+    "preface",
+    "keep",
+    "admit",
+    "leave"
+   ]
+  },
+  {
+   "id": "en-025",
+   "truth": "traffic",
+   "rank": null,
+   "roundTripMs": 147.8,
+   "candidates": [
+    "weather",
+    "rain",
+    "bad",
+    "fact",
+    "cold"
+   ]
+  },
+  {
+   "id": "en-026",
+   "truth": "today",
+   "rank": null,
+   "roundTripMs": 146.7,
+   "candidates": [
+    "Does",
+    "for",
+    "by",
+    "什么意思",
+    "as",
+    "in",
+    "at",
+    "语法分析",
+    "he"
+   ]
+  },
+  {
+   "id": "en-027",
+   "truth": "go",
+   "rank": null,
+   "roundTripMs": 147.7,
+   "candidates": [
+    "be",
+    "give",
+    "admit",
+    "take",
+    "try",
+    "get",
+    "start",
+    "do"
+   ]
+  },
+  {
+   "id": "en-028",
+   "truth": "expensive",
+   "rank": 3,
+   "roundTripMs": 151.7,
+   "candidates": [
+    "a",
+    "the",
+    "expensive",
+    "making",
+    "going",
+    "getting",
+    "been",
+    "bothering",
+    "giving"
+   ]
+  },
+  {
+   "id": "en-029",
+   "truth": "agreed",
+   "rank": null,
+   "roundTripMs": 149.3,
+   "candidates": [
+    "are",
+    "define",
+    "build",
+    "have",
+    "want",
+    "can",
+    "use",
+    "distribute",
+    "would",
+    "think",
+    "and",
+    "need",
+    "live"
+   ]
+  },
+  {
+   "id": "en-030",
+   "truth": "neighbor",
+   "rank": null,
+   "roundTripMs": 148.9,
+   "candidates": [
+    "housekeeper",
+    "receptionist",
+    "front",
+    "door",
+    "car",
+    "driver",
+    "taxi"
+   ]
+  },
+  {
+   "id": "en-031",
+   "truth": "better",
+   "rank": null,
+   "roundTripMs": 150.8,
+   "candidates": [
+    "because",
+    "but",
+    "no",
+    "and",
+    "what",
+    "so",
+    "can",
+    "I'm",
+    "I"
+   ]
+  },
+  {
+   "id": "en-032",
+   "truth": "tomorrow",
+   "rank": null,
+   "roundTripMs": 149.2,
+   "candidates": [
+    "Does",
+    "by",
+    "at",
+    "as",
+    "before",
+    "in"
+   ]
+  },
+  {
+   "id": "en-033",
+   "truth": "batteries",
+   "rank": null,
+   "roundTripMs": 150.9,
+   "candidates": [
+    "got",
+    "what",
+    "have",
+    "picked",
+    "a"
+   ]
+  },
+  {
+   "id": "en-034",
+   "truth": "sent",
+   "rank": null,
+   "roundTripMs": 150.8,
+   "candidates": [
+    "know",
+    "solved",
+    "have"
+   ]
+  },
+  {
+   "id": "en-035",
+   "truth": "bring",
+   "rank": null,
+   "roundTripMs": 148.9,
+   "candidates": [
+    "give",
+    "never",
+    "be",
+    "tell",
+    "do",
+    "provide",
+    "guide",
+    "preface",
+    "keep",
+    "admit",
+    "leave"
+   ]
+  }
+ ]
+}

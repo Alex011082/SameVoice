@@ -1,0 +1,235 @@
+{
+ "summary": {
+  "n": 12,
+  "hits": 1,
+  "recall": {
+   "top1": 0.0,
+   "top3": 0.0833,
+   "top5": 0.0833,
+   "top10": 0.0833,
+   "top20": 0.0833,
+   "top50": 0.0833
+  },
+  "rtt_p50_ms": 176.6,
+  "model": "Qwen/Qwen3-0.6B",
+  "prompt_style": "chat",
+  "use_context": false,
+  "lines_file": "es-mirror.json"
+ },
+ "rows": [
+  {
+   "id": "es-003",
+   "truth": "coche",
+   "rank": null,
+   "roundTripMs": 189.0,
+   "candidates": [
+    "brazo",
+    "dedo",
+    "corazón",
+    "cuello",
+    "ojo",
+    "hombro",
+    "oído",
+    "mandíbula"
+   ]
+  },
+  {
+   "id": "es-004",
+   "truth": "acabando",
+   "rank": null,
+   "roundTripMs": 176.0,
+   "candidates": [
+    "pasando",
+    "convirtiendo",
+    "prestando",
+    "preguntando",
+    "acostumando",
+    "viendo",
+    "ayudando",
+    "teniendo",
+    "pidiendo",
+    "lloviendo",
+    "sintiendo"
+   ]
+  },
+  {
+   "id": "es-006",
+   "truth": "listos",
+   "rank": 2,
+   "roundTripMs": 177.9,
+   "candidates": [
+    "preparados",
+    "listos",
+    "en",
+    "registrados",
+    "incluidos",
+    "disponibles"
+   ]
+  },
+  {
+   "id": "es-009",
+   "truth": "mil",
+   "rank": null,
+   "roundTripMs": 176.6,
+   "candidates": [
+    "a",
+    "de",
+    "corriendo",
+    "por"
+   ]
+  },
+  {
+   "id": "es-014",
+   "truth": "libre",
+   "rank": null,
+   "roundTripMs": 176.6,
+   "candidates": [
+    "cansado",
+    "en",
+    "cerca",
+    "aquí",
+    "buscando",
+    "ocupado",
+    "abierta",
+    "interesado",
+    "necesito",
+    "conmigo",
+    "aburrido",
+    "listo",
+    "teniendo"
+   ]
+  },
+  {
+   "id": "es-017",
+   "truth": "olvidé",
+   "rank": null,
+   "roundTripMs": 175.3,
+   "candidates": [
+    "puedo",
+    "la",
+    "necesito",
+    "no",
+    "estás",
+    "te",
+    "ya",
+    "has",
+    "me",
+    "agradeces",
+    "necesitas",
+    "haré"
+   ]
+  },
+  {
+   "id": "es-020",
+   "truth": "martes",
+   "rank": null,
+   "roundTripMs": 172.8,
+   "candidates": [
+    "31",
+    "30",
+    "15",
+    "12",
+    "25",
+    "10",
+    "20",
+    "22",
+    "11",
+    "13",
+    "23",
+    "19",
+    "21",
+    "29",
+    "14",
+    "17",
+    "27",
+    "18",
+    "24",
+    "28"
+   ]
+  },
+  {
+   "id": "es-025",
+   "truth": "tráfico",
+   "rank": null,
+   "roundTripMs": 182.0,
+   "candidates": [
+    "café",
+    "trabajo",
+    "desayuno",
+    "comienzo",
+    "aeropuerto"
+   ]
+  },
+  {
+   "id": "es-026",
+   "truth": "hoy",
+   "rank": null,
+   "roundTripMs": 192.8,
+   "candidates": [
+    "think",
+    "bien",
+    "Sí",
+    "cómo",
+    "correcto",
+    "lo",
+    "Si",
+    "por",
+    "Espero",
+    "Puedo"
+   ]
+  },
+  {
+   "id": "es-028",
+   "truth": "caro",
+   "rank": null,
+   "roundTripMs": 172.9,
+   "candidates": [
+    "un",
+    "importante",
+    "complicado",
+    "más",
+    "el",
+    "urgente",
+    "lento",
+    "temporal",
+    "rápido"
+   ]
+  },
+  {
+   "id": "es-032",
+   "truth": "mañana",
+   "rank": null,
+   "roundTripMs": 169.6,
+   "candidates": [
+    "abierta",
+    "encantado",
+    "en",
+    "disponible",
+    "a",
+    "agradecido",
+    "presente",
+    "agradecida",
+    "lloviendo"
+   ]
+  },
+  {
+   "id": "es-034",
+   "truth": "mandé",
+   "rank": null,
+   "roundTripMs": 171.8,
+   "candidates": [
+    "pregunto",
+    "puedo",
+    "agradeceré",
+    "agradezco",
+    "agradeces",
+    "lo",
+    "saludo",
+    "pido",
+    "agradecerás",
+    "agradecería",
+    "doy"
+   ]
+  }
+ ]
+}

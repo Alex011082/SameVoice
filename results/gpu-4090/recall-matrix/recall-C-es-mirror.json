@@ -1,0 +1,260 @@
+{
+ "summary": {
+  "n": 12,
+  "hits": 2,
+  "recall": {
+   "top1": 0.0,
+   "top3": 0.0,
+   "top5": 0.0833,
+   "top10": 0.0833,
+   "top20": 0.0833,
+   "top50": 0.1667
+  },
+  "rtt_p50_ms": 210.1,
+  "model": "Qwen/Qwen3-0.6B",
+  "prompt_style": "chat",
+  "use_context": true,
+  "lines_file": "es-mirror.json"
+ },
+ "rows": [
+  {
+   "id": "es-003",
+   "truth": "coche",
+   "rank": null,
+   "roundTripMs": 211.5,
+   "candidates": [
+    "oído",
+    "lenguaje",
+    "teléfono",
+    "hombro",
+    "cuello",
+    "brazo",
+    "ojo",
+    "dedo",
+    "corazón",
+    "cerebro",
+    "lomo",
+    "pelo",
+    "pie"
+   ]
+  },
+  {
+   "id": "es-004",
+   "truth": "acabando",
+   "rank": 22,
+   "roundTripMs": 210.4,
+   "candidates": [
+    "cayendo",
+    "pasando",
+    "agotando",
+    "quemando",
+    "parando",
+    "rociando",
+    "apagando",
+    "llenando",
+    "olvidando",
+    "consumiendo",
+    "dañando",
+    "quitando",
+    "saliendo",
+    "sacando",
+    "acelerando",
+    "usando",
+    "arrancando",
+    "pegando",
+    "prendiendo",
+    "empezando"
+   ]
+  },
+  {
+   "id": "es-006",
+   "truth": "listos",
+   "rank": 4,
+   "roundTripMs": 205.6,
+   "candidates": [
+    "en",
+    "organizados",
+    "preparados",
+    "listos",
+    "disponibles",
+    "bien",
+    "incluidos",
+    "ordenados"
+   ]
+  },
+  {
+   "id": "es-009",
+   "truth": "mil",
+   "rank": null,
+   "roundTripMs": 203.5,
+   "candidates": [
+    "bien",
+    "de",
+    "a",
+    "del",
+    "muy",
+    "con",
+    "por"
+   ]
+  },
+  {
+   "id": "es-014",
+   "truth": "libre",
+   "rank": null,
+   "roundTripMs": 211.0,
+   "candidates": [
+    "aquí",
+    "ocupado",
+    "cerca",
+    "cansado",
+    "conmigo",
+    "ocupada",
+    "aqui",
+    "disponible",
+    "en",
+    "tranquilo",
+    "buscando",
+    "abierta"
+   ]
+  },
+  {
+   "id": "es-017",
+   "truth": "olvidé",
+   "rank": null,
+   "roundTripMs": 207.4,
+   "candidates": [
+    "la",
+    "te",
+    "necesito",
+    "el",
+    "no",
+    "hay",
+    "me",
+    "puedo",
+    "has",
+    "he",
+    "ya",
+    "hice"
+   ]
+  },
+  {
+   "id": "es-020",
+   "truth": "martes",
+   "rank": null,
+   "roundTripMs": 207.6,
+   "candidates": [
+    "día",
+    "31",
+    "15",
+    "mismo",
+    "30",
+    "25",
+    "12",
+    "10",
+    "22",
+    "otro",
+    "20",
+    "viernes",
+    "11",
+    "amanecer"
+   ]
+  },
+  {
+   "id": "es-025",
+   "truth": "tráfico",
+   "rank": null,
+   "roundTripMs": 209.5,
+   "candidates": [
+    "retraso",
+    "aviso",
+    "desayuno",
+    "avión",
+    "vuelo",
+    "viaje",
+    "transporte",
+    "tema",
+    "café",
+    "horario",
+    "aeropuerto",
+    "plazo"
+   ]
+  },
+  {
+   "id": "es-026",
+   "truth": "hoy",
+   "rank": null,
+   "roundTripMs": 212.5,
+   "candidates": [
+    "think",
+    "Espero",
+    "Estoy",
+    "el",
+    "Te",
+    "por",
+    "Agradezco",
+    "en",
+    "Gracias",
+    "Vamos",
+    "Me",
+    "Puedo",
+    "Quieres"
+   ]
+  },
+  {
+   "id": "es-028",
+   "truth": "caro",
+   "rank": null,
+   "roundTripMs": 213.4,
+   "candidates": [
+    "un",
+    "importante",
+    "más",
+    "complicado",
+    "think"
+   ]
+  },
+  {
+   "id": "es-032",
+   "truth": "mañana",
+   "rank": null,
+   "roundTripMs": 205.6,
+   "candidates": [
+    "encantado",
+    "ocupado",
+    "encantada",
+    "agradecido",
+    "listo",
+    "muy",
+    "lejos",
+    "en",
+    "estudiando",
+    "disfrutando",
+    "ocupada",
+    "comprometido",
+    "contento",
+    "hablando",
+    "emocionado",
+    "agradecida",
+    "buscando",
+    "abierta",
+    "allí"
+   ]
+  },
+  {
+   "id": "es-034",
+   "truth": "mandé",
+   "rank": null,
+   "roundTripMs": 210.1,
+   "candidates": [
+    "dije",
+    "paso",
+    "lo",
+    "dijiste",
+    "pasé",
+    "agradezco",
+    "he",
+    "devuelvo"
+   ]
+  }
+ ]
+}

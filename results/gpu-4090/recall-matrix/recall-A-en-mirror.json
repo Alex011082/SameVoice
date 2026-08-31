@@ -1,0 +1,526 @@
+{
+ "summary": {
+  "n": 32,
+  "hits": 2,
+  "recall": {
+   "top1": 0.0,
+   "top3": 0.0625,
+   "top5": 0.0625,
+   "top10": 0.0625,
+   "top20": 0.0625,
+   "top50": 0.0625
+  },
+  "rtt_p50_ms": 152.1,
+  "model": "Qwen/Qwen3-0.6B-Base",
+  "prompt_style": "continuation",
+  "use_context": false,
+  "lines_file": "en-mirror.json"
+ },
+ "rows": [
+  {
+   "id": "en-002",
+   "truth": "check",
+   "rank": null,
+   "roundTripMs": 149.0,
+   "candidates": [
+    "figure",
+    "get",
+    "make",
+    "think",
+    "come",
+    "work",
+    "clear"
+   ]
+  },
+  {
+   "id": "en-003",
+   "truth": "car",
+   "rank": 2,
+   "roundTripMs": 144.8,
+   "candidates": [
+    "stomach",
+    "car",
+    "head",
+    "hands",
+    "back",
+    "heart",
+    "wife",
+    "legs",
+    "eyes",
+    "husband"
+   ]
+  },
+  {
+   "id": "en-004",
+   "truth": "dying",
+   "rank": null,
+   "roundTripMs": 144.7,
+   "candidates": [
+    "ringing",
+    "running",
+    "in",
+    "not"
+   ]
+  },
+  {
+   "id": "en-005",
+   "truth": "twelfth",
+   "rank": null,
+   "roundTripMs": 143.6,
+   "candidates": [
+    "1st",
+    "first",
+    "2018",
+    "2017",
+    "2012",
+    "2016",
+    "2014",
+    "2nd",
+    "2019",
+    "2015",
+    "100th",
+    "2011",
+    "2013",
+    "2008",
+    "2010",
+    "10",
+    "50th",
+    "4th",
+    "2009",
+    "2021"
+   ]
+  },
+  {
+   "id": "en-006",
+   "truth": "ready",
+   "rank": null,
+   "roundTripMs": 144.0,
+   "candidates": [
+    "in",
+    "available",
+    "open",
+    "part"
+   ]
+  },
+  {
+   "id": "en-007",
+   "truth": "bailed",
+   "rank": null,
+   "roundTripMs": 143.7,
+   "candidates": [
+    "didn't",
+    "was",
+    "wasn't",
+    "missed",
+    "couldn't",
+    "didn’t",
+    "hadn't"
+   ]
+  },
+  {
+   "id": "en-008",
+   "truth": "call",
+   "rank": null,
+   "roundTripMs": 141.6,
+   "candidates": [
+    "spend",
+    "never",
+    "have",
+    "be",
+    "not",
+    "end"
+   ]
+  },
+  {
+   "id": "en-009",
+   "truth": "twelve",
+   "rank": null,
+   "roundTripMs": 149.6,
+   "candidates": [
+    "10",
+    "100",
+    "1",
+    "20",
+    "30",
+    "50",
+    "150",
+    "60",
+    "200",
+    "15",
+    "40",
+    "120",
+    "12",
+    "300",
+    "25",
+    "2",
+    "250",
+    "500",
+    "more",
+    "400"
+   ]
+  },
+  {
+   "id": "en-010",
+   "truth": "arrive",
+   "rank": 2,
+   "roundTripMs": 148.7,
+   "candidates": [
+    "see",
+    "arrive",
+    "want",
+    "call",
+    "get",
+    "hear",
+    "receive",
+    "meet",
+    "find"
+   ]
+  },
+  {
+   "id": "en-011",
+   "truth": "address",
+   "rank": null,
+   "roundTripMs": 148.2,
+   "candidates": [
+    "results",
+    "step",
+    "list",
+    "first",
+    "answers",
+    "top",
+    "most",
+    "answer",
+    "best",
+    "2019",
+    "2018",
+    "full",
+    "latest",
+    "2017",
+    "2016",
+    "2015",
+    "2014",
+    "2021",
+    "2020",
+    "2013"
+   ]
+  },
+  {
+   "id": "en-013",
+   "truth": "confirm",
+   "rank": null,
+   "roundTripMs": 145.6,
+   "candidates": [
+    "find",
+    "evaluate",
+    "solve",
+    "prove",
+    "write",
+    "simplify",
+    "show"
+   ]
+  },
+  {
+   "id": "en-014",
+   "truth": "free",
+   "rank": null,
+   "roundTripMs": 145.8,
+   "candidates": [
+    "ready",
+    "done",
+    "ready什么意思"
+   ]
+  },
+  {
+   "id": "en-015",
+   "truth": "fifteenth",
+   "rank": null,
+   "roundTripMs": 146.0,
+   "candidates": [
+    "year",
+    "function",
+    "sake",
+    "first",
+    "case",
+    "sum",
+    "1000th",
+    "2023"
+   ]
+  },
+  {
+   "id": "en-016",
+   "truth": "saved",
+   "rank": null,
+   "roundTripMs": 148.9,
+   "candidates": [
+    "m",
+    "know",
+    "have",
+    "want",
+    "am",
+    "ll",
+    "need",
+    "would",
+    "can"
+   ]
+  },
+  {
+   "id": "en-017",
+   "truth": "forgot",
+   "rank": null,
+   "roundTripMs": 169.1,
+   "candidates": [
+    "m",
+    "know",
+    "made",
+    "ve",
+    "might",
+    "may",
+    "see",
+    "need",
+    "understand",
+    "misread"
+   ]
+  },
+  {
+   "id": "en-019",
+   "truth": "shower",
+   "rank": null,
+   "roundTripMs": 154.4,
+   "candidates": [
+    "office",
+    "hospital",
+    "city",
+    "house",
+    "country",
+    "room"
+   ]
+  },
+  {
+   "id": "en-020",
+   "truth": "Tuesday",
+   "rank": null,
+   "roundTripMs": 158.4,
+   "candidates": [
+    "this",
+    "a",
+    "it",
+    "the",
+    "an",
+    "10000",
+    "some"
+   ]
+  },
+  {
+   "id": "en-021",
+   "truth": "five",
+   "rank": null,
+   "roundTripMs": 164.7,
+   "candidates": [
+    "and",
+    "how",
+    "what",
+    "where"
+   ]
+  },
+  {
+   "id": "en-022",
+   "truth": "apologized",
+   "rank": null,
+   "roundTripMs": 160.3,
+   "candidates": [
+    "told",
+    "said",
+    "asked"
+   ]
+  },
+  {
+   "id": "en-023",
+   "truth": "explain",
+   "rank": null,
+   "roundTripMs": 162.7,
+   "candidates": [
+    "give",
+    "provide",
+    "be",
+    "tell",
+    "start",
+    "have"
+   ]
+  },
+  {
+   "id": "en-024",
+   "truth": "come",
+   "rank": null,
+   "roundTripMs": 152.2,
+   "candidates": [
+    "give",
+    "provide",
+    "be",
+    "tell",
+    "start",
+    "have"
+   ]
+  },
+  {
+   "id": "en-025",
+   "truth": "traffic",
+   "rank": null,
+   "roundTripMs": 146.6,
+   "candidates": [
+    "COVID-19",
+    "rain",
+    "weather",
+    "bad",
+    "fact"
+   ]
+  },
+  {
+   "id": "en-026",
+   "truth": "today",
+   "rank": null,
+   "roundTripMs": 145.6,
+   "candidates": [
+    "Does",
+    "by",
+    "for",
+    "I'll",
+    "in",
+    "as",
+    "when",
+    "within",
+    "but"
+   ]
+  },
+  {
+   "id": "en-027",
+   "truth": "go",
+   "rank": null,
+   "roundTripMs": 155.4,
+   "candidates": [
+    "be",
+    "try",
+    "admit",
+    "give",
+    "take",
+    "put",
+    "do"
+   ]
+  },
+  {
+   "id": "en-028",
+   "truth": "expensive",
+   "rank": null,
+   "roundTripMs": 159.9,
+   "candidates": [
+    "a",
+    "not",
+    "going",
+    "out",
+    "an"
+   ]
+  },
+  {
+   "id": "en-029",
+   "truth": "agreed",
+   "rank": null,
+   "roundTripMs": 158.0,
+   "candidates": [
+    "are",
+    "define",
+    "have",
+    "want",
+    "think",
+    "use",
+    "would",
+    "need",
+    "say",
+    "answer"
+   ]
+  },
+  {
+   "id": "en-030",
+   "truth": "neighbor",
+   "rank": null,
+   "roundTripMs": 153.7,
+   "candidates": [
+    "car",
+    "driver's",
+    "front",
+    "wrong",
+    "door",
+    "key"
+   ]
+  },
+  {
+   "id": "en-031",
+   "truth": "better",
+   "rank": null,
+   "roundTripMs": 152.1,
+   "candidates": [
+    "can",
+    "but",
+    "I",
+    "what",
+    "and",
+    "so",
+    "because"
+   ]
+  },
+  {
+   "id": "en-032",
+   "truth": "tomorrow",
+   "rank": null,
+   "roundTripMs": 155.8,
+   "candidates": [
+    "Does",
+    "as",
+    "She",
+    "Translate",
+    "for",
+    "by",
+    "in",
+    "at",
+    "but"
+   ]
+  },
+  {
+   "id": "en-033",
+   "truth": "batteries",
+   "rank": null,
+   "roundTripMs": 155.1,
+   "candidates": [
+    "got",
+    "what",
+    "have",
+    "want",
+    "wanted"
+   ]
+  },
+  {
+   "id": "en-034",
+   "truth": "sent",
+   "rank": null,
+   "roundTripMs": 155.6,
+   "candidates": [
+    "know",
+    "solved",
+    "have",
+    "did"
+   ]
+  },
+  {
+   "id": "en-035",
+   "truth": "bring",
+   "rank": null,
+   "roundTripMs": 165.9,
+   "candidates": [
+    "give",
+    "provide",
+    "be",
+    "tell",
+    "start",
+    "have"
+   ]
+  }
+ ]
+}

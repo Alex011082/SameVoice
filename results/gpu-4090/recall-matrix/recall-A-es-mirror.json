@@ -1,0 +1,209 @@
+{
+ "summary": {
+  "n": 12,
+  "hits": 1,
+  "recall": {
+   "top1": 0.0,
+   "top3": 0.0833,
+   "top5": 0.0833,
+   "top10": 0.0833,
+   "top20": 0.0833,
+   "top50": 0.0833
+  },
+  "rtt_p50_ms": 160.0,
+  "model": "Qwen/Qwen3-0.6B-Base",
+  "prompt_style": "continuation",
+  "use_context": false,
+  "lines_file": "es-mirror.json"
+ },
+ "rows": [
+  {
+   "id": "es-003",
+   "truth": "coche",
+   "rank": null,
+   "roundTripMs": 163.8,
+   "candidates": [
+    "cinturón",
+    "brazo",
+    "cuero",
+    "tobillo",
+    "dedo",
+    "hombro",
+    "cuello",
+    "pantalón"
+   ]
+  },
+  {
+   "id": "es-004",
+   "truth": "acabando",
+   "rank": null,
+   "roundTripMs": 160.0,
+   "candidates": [
+    "empezando",
+    "volviendo",
+    "lloviendo",
+    "poniendo",
+    "poniéndome",
+    "ocurriendo",
+    "acostumbrando",
+    "perdiendo",
+    "doliendo"
+   ]
+  },
+  {
+   "id": "es-006",
+   "truth": "listos",
+   "rank": 2,
+   "roundTripMs": 154.6,
+   "candidates": [
+    "en",
+    "listos",
+    "disponibles",
+    "a",
+    "al",
+    "almacenados",
+    "publicados",
+    "aprobados"
+   ]
+  },
+  {
+   "id": "es-009",
+   "truth": "mil",
+   "rank": null,
+   "roundTripMs": 161.4,
+   "candidates": [
+    "a",
+    "de",
+    "por"
+   ]
+  },
+  {
+   "id": "es-014",
+   "truth": "libre",
+   "rank": null,
+   "roundTripMs": 163.4,
+   "candidates": [
+    "enfadado",
+    "nervioso",
+    "cerca",
+    "tranquilo",
+    "cansado",
+    "en",
+    "a",
+    "despierto",
+    "listo",
+    "aburrido"
+   ]
+  },
+  {
+   "id": "es-017",
+   "truth": "olvidé",
+   "rank": null,
+   "roundTripMs": 157.0,
+   "candidates": [
+    "hay",
+    "es",
+    "esa",
+    "la",
+    "no",
+    "ya"
+   ]
+  },
+  {
+   "id": "es-020",
+   "truth": "martes",
+   "rank": null,
+   "roundTripMs": 172.2,
+   "candidates": [
+    "día",
+    "año",
+    "31",
+    "100",
+    "50",
+    "25",
+    "20",
+    "10000"
+   ]
+  },
+  {
+   "id": "es-025",
+   "truth": "tráfico",
+   "rank": null,
+   "roundTripMs": 177.0,
+   "candidates": [
+    "examen",
+    "almuerzo",
+    "parque",
+    "aeropuerto",
+    "desayuno",
+    "concierto",
+    "comienzo",
+    "alquiler"
+   ]
+  },
+  {
+   "id": "es-026",
+   "truth": "hoy",
+   "rank": null,
+   "roundTripMs": 156.9,
+   "candidates": [
+    "lo"
+   ]
+  },
+  {
+   "id": "es-028",
+   "truth": "caro",
+   "rank": null,
+   "roundTripMs": 155.1,
+   "candidates": [
+    "un",
+    "cuestión",
+    "peor",
+    "el",
+    "malo",
+    "demasiado",
+    "muy",
+    "una",
+    "más",
+    "peligroso"
+   ]
+  },
+  {
+   "id": "es-032",
+   "truth": "mañana",
+   "rank": null,
+   "roundTripMs": 156.7,
+   "candidates": [
+    "en",
+    "enfadado",
+    "muy",
+    "de",
+    "listo",
+    "cerca",
+    "estudiando",
+    "conmigo",
+    "atendiendo",
+    "encantado",
+    "a",
+    "abierta",
+    "lejos"
+   ]
+  },
+  {
+   "id": "es-034",
+   "truth": "mandé",
+   "rank": null,
+   "roundTripMs": 152.4,
+   "candidates": [
+    "invito",
+    "invitamos",
+    "va",
+    "enviamos",
+    "pido",
+    "ha",
+    "preguntan",
+    "pregunto"
+   ]
+  }
+ ]
+}

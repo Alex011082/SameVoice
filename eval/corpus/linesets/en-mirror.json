@@ -1,0 +1,339 @@
+[
+ {
+  "id": "en-002",
+  "lang": "en",
+  "prefix": "Hold on, I need a second to",
+  "truth": "check",
+  "contextTerms": [
+   "schedule"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: schedule."
+ },
+ {
+  "id": "en-003",
+  "lang": "en",
+  "prefix": "I can't make it, my",
+  "truth": "car",
+  "contextTerms": [
+   "breakdown"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: breakdown."
+ },
+ {
+  "id": "en-004",
+  "lang": "en",
+  "prefix": "Listen, my phone is",
+  "truth": "dying",
+  "contextTerms": [
+   "phone",
+   "battery"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: phone, battery."
+ },
+ {
+  "id": "en-005",
+  "lang": "en",
+  "prefix": "The tickets are for the",
+  "truth": "twelfth",
+  "contextTerms": [
+   "tickets",
+   "date"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: tickets, date."
+ },
+ {
+  "id": "en-006",
+  "lang": "en",
+  "prefix": "He said the documents are already",
+  "truth": "ready",
+  "contextTerms": [
+   "documents"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: documents."
+ },
+ {
+  "id": "en-007",
+  "lang": "en",
+  "prefix": "He promised to call, but apparently he",
+  "truth": "bailed",
+  "contextTerms": [
+   "call"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: call."
+ },
+ {
+  "id": "en-008",
+  "lang": "en",
+  "prefix": "I'll probably",
+  "truth": "call",
+  "contextTerms": [
+   "phone"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: phone."
+ },
+ {
+  "id": "en-009",
+  "lang": "en",
+  "prefix": "The total came to",
+  "truth": "twelve",
+  "contextTerms": [
+   "amount",
+   "money"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: amount, money."
+ },
+ {
+  "id": "en-010",
+  "lang": "en",
+  "prefix": "Will you ring me when you",
+  "truth": "arrive",
+  "contextTerms": [
+   "meeting"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: meeting."
+ },
+ {
+  "id": "en-011",
+  "lang": "en",
+  "prefix": "Send me the",
+  "truth": "address",
+  "contextTerms": [
+   "message"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: message."
+ },
+ {
+  "id": "en-013",
+  "lang": "en",
+  "prefix": "I need to",
+  "truth": "confirm",
+  "contextTerms": [
+   "booking"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: booking."
+ },
+ {
+  "id": "en-014",
+  "lang": "en",
+  "prefix": "Call me when you're",
+  "truth": "free",
+  "contextTerms": [
+   "call"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: call."
+ },
+ {
+  "id": "en-015",
+  "lang": "en",
+  "prefix": "Let's set it for the",
+  "truth": "fifteenth",
+  "contextTerms": [
+   "date",
+   "meeting"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: date, meeting."
+ },
+ {
+  "id": "en-016",
+  "lang": "en",
+  "prefix": "I",
+  "truth": "saved",
+  "contextTerms": [
+   "number",
+   "contact"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: number, contact."
+ },
+ {
+  "id": "en-017",
+  "lang": "en",
+  "prefix": "Wait, I think I",
+  "truth": "forgot",
+  "contextTerms": [
+   "keys"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: keys."
+ },
+ {
+  "id": "en-019",
+  "lang": "en",
+  "prefix": "I'll call you back as soon as I'm out of the",
+  "truth": "shower",
+  "contextTerms": [
+   "home"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: home."
+ },
+ {
+  "id": "en-020",
+  "lang": "en",
+  "prefix": "Let's do",
+  "truth": "Tuesday",
+  "contextTerms": [
+   "day",
+   "meeting"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: day, meeting."
+ },
+ {
+  "id": "en-021",
+  "lang": "en",
+  "prefix": "How much is it,",
+  "truth": "five",
+  "contextTerms": [
+   "price"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: price."
+ },
+ {
+  "id": "en-022",
+  "lang": "en",
+  "prefix": "He called yesterday and",
+  "truth": "apologized",
+  "contextTerms": [
+   "call"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: call."
+ },
+ {
+  "id": "en-023",
+  "lang": "en",
+  "prefix": "I'll",
+  "truth": "explain",
+  "contextTerms": [
+   "meeting"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: meeting."
+ },
+ {
+  "id": "en-024",
+  "lang": "en",
+  "prefix": "I'll",
+  "truth": "come",
+  "contextTerms": [
+   "trip",
+   "time"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: trip, time."
+ },
+ {
+  "id": "en-025",
+  "lang": "en",
+  "prefix": "I didn't make it because of the",
+  "truth": "traffic",
+  "contextTerms": [
+   "late",
+   "road"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: late, road."
+ },
+ {
+  "id": "en-026",
+  "lang": "en",
+  "prefix": "I'll get it all done",
+  "truth": "today",
+  "contextTerms": [
+   "tasks",
+   "deadline"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: tasks, deadline."
+ },
+ {
+  "id": "en-027",
+  "lang": "en",
+  "prefix": "Okay, I'll",
+  "truth": "go",
+  "contextTerms": [
+   "leaving"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: leaving."
+ },
+ {
+  "id": "en-028",
+  "lang": "en",
+  "prefix": "The price is fine, it's just the delivery that's",
+  "truth": "expensive",
+  "contextTerms": [
+   "price",
+   "delivery"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: price, delivery."
+ },
+ {
+  "id": "en-029",
+  "lang": "en",
+  "prefix": "We",
+  "truth": "agreed",
+  "contextTerms": [
+   "time",
+   "meeting"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: time, meeting."
+ },
+ {
+  "id": "en-030",
+  "lang": "en",
+  "prefix": "I left the keys with the",
+  "truth": "neighbor",
+  "contextTerms": [
+   "keys",
+   "home"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: keys, home."
+ },
+ {
+  "id": "en-031",
+  "lang": "en",
+  "prefix": "I can't do Thursday at all,",
+  "truth": "better",
+  "contextTerms": [
+   "meeting",
+   "day"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: meeting, day."
+ },
+ {
+  "id": "en-032",
+  "lang": "en",
+  "prefix": "She said she'll be there",
+  "truth": "tomorrow",
+  "contextTerms": [
+   "time",
+   "plans"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: time, plans."
+ },
+ {
+  "id": "en-033",
+  "lang": "en",
+  "prefix": "I'm at the pharmacy, got what you asked for, and also",
+  "truth": "batteries",
+  "contextTerms": [
+   "pharmacy",
+   "shopping"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: pharmacy, shopping."
+ },
+ {
+  "id": "en-034",
+  "lang": "en",
+  "prefix": "I already",
+  "truth": "sent",
+  "contextTerms": [
+   "file",
+   "mail"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: file, mail."
+ },
+ {
+  "id": "en-035",
+  "lang": "en",
+  "prefix": "I'll",
+  "truth": "bring",
+  "contextTerms": [
+   "documents",
+   "time"
+  ],
+  "context_note": "Context: a man on the phone with his wife. Everyday conversation about plans and errands. Topic of this utterance: documents, time."
+ }
+]

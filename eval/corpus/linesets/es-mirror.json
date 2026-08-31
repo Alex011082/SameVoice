@@ -1,0 +1,126 @@
+[
+ {
+  "id": "es-003",
+  "lang": "es",
+  "prefix": "No voy a poder ir, se me rompió el",
+  "truth": "coche",
+  "contextTerms": [
+   "avería"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: avería."
+ },
+ {
+  "id": "es-004",
+  "lang": "es",
+  "prefix": "Oye, se me está",
+  "truth": "acabando",
+  "contextTerms": [
+   "teléfono",
+   "batería"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: teléfono, batería."
+ },
+ {
+  "id": "es-006",
+  "lang": "es",
+  "prefix": "Dijo que los documentos ya están",
+  "truth": "listos",
+  "contextTerms": [
+   "documentos"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: documentos."
+ },
+ {
+  "id": "es-009",
+  "lang": "es",
+  "prefix": "El total salió",
+  "truth": "mil",
+  "contextTerms": [
+   "importe",
+   "dinero"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: importe, dinero."
+ },
+ {
+  "id": "es-014",
+  "lang": "es",
+  "prefix": "Llámame cuando estés",
+  "truth": "libre",
+  "contextTerms": [
+   "llamada"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: llamada."
+ },
+ {
+  "id": "es-017",
+  "lang": "es",
+  "prefix": "Espera, creo que",
+  "truth": "olvidé",
+  "contextTerms": [
+   "llaves"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: llaves."
+ },
+ {
+  "id": "es-020",
+  "lang": "es",
+  "prefix": "Entonces quedamos el",
+  "truth": "martes",
+  "contextTerms": [
+   "día",
+   "cita"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: día, cita."
+ },
+ {
+  "id": "es-025",
+  "lang": "es",
+  "prefix": "No llegué a tiempo por el",
+  "truth": "tráfico",
+  "contextTerms": [
+   "retraso"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: retraso."
+ },
+ {
+  "id": "es-026",
+  "lang": "es",
+  "prefix": "Lo termino todo",
+  "truth": "hoy",
+  "contextTerms": [
+   "tareas"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: tareas."
+ },
+ {
+  "id": "es-028",
+  "lang": "es",
+  "prefix": "El precio está bien, solo el envío es",
+  "truth": "caro",
+  "contextTerms": [
+   "precio",
+   "envío"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: precio, envío."
+ },
+ {
+  "id": "es-032",
+  "lang": "es",
+  "prefix": "Dijo que estará",
+  "truth": "mañana",
+  "contextTerms": [
+   "planes"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: planes."
+ },
+ {
+  "id": "es-034",
+  "lang": "es",
+  "prefix": "Ya te",
+  "truth": "mandé",
+  "contextTerms": [
+   "archivo"
+  ],
+  "context_note": "Contexto: un hombre habla por teléfono con su esposa. Conversación cotidiana sobre planes y recados. Tema de la frase: archivo."
+ }
+]

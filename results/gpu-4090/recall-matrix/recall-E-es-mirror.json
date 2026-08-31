@@ -1,0 +1,201 @@
+{
+ "summary": {
+  "n": 12,
+  "hits": 8,
+  "recall": {
+   "top1": 0.1667,
+   "top3": 0.3333,
+   "top5": 0.5,
+   "top10": 0.6667,
+   "top20": 0.6667,
+   "top50": 0.6667
+  },
+  "rtt_p50_ms": 295.4,
+  "model": "Qwen/Qwen3-1.7B",
+  "prompt_style": "chat",
+  "use_context": true,
+  "lines_file": "es-mirror.json"
+ },
+ "rows": [
+  {
+   "id": "es-003",
+   "truth": "coche",
+   "rank": 1,
+   "roundTripMs": 312.0,
+   "candidates": [
+    "coche",
+    "teléfono",
+    "auto",
+    "motor"
+   ]
+  },
+  {
+   "id": "es-004",
+   "truth": "acabando",
+   "rank": 5,
+   "roundTripMs": 297.2,
+   "candidates": [
+    "olvidando",
+    "quedando",
+    "agotando",
+    "cayendo",
+    "acabando",
+    "ahí",
+    "haciendo",
+    "poniendo",
+    "apagando",
+    "quemando",
+    "volviendo",
+    "caliente",
+    "acortando",
+    "muriendo",
+    "escapando",
+    "fallando",
+    "enfriando",
+    "acercando",
+    "quebrando",
+    "fugando"
+   ]
+  },
+  {
+   "id": "es-006",
+   "truth": "listos",
+   "rank": 1,
+   "roundTripMs": 291.5,
+   "candidates": [
+    "listos",
+    "en",
+    "preparados"
+   ]
+  },
+  {
+   "id": "es-009",
+   "truth": "mil",
+   "rank": null,
+   "roundTripMs": 297.3,
+   "candidates": [
+    "a",
+    "más"
+   ]
+  },
+  {
+   "id": "es-014",
+   "truth": "libre",
+   "rank": 3,
+   "roundTripMs": 295.0,
+   "candidates": [
+    "en",
+    "lista",
+    "libre",
+    "listo",
+    "disponible",
+    "preparada",
+    "cerca"
+   ]
+  },
+  {
+   "id": "es-017",
+   "truth": "olvidé",
+   "rank": 5,
+   "roundTripMs": 293.5,
+   "candidates": [
+    "me",
+    "no",
+    "te",
+    "necesito",
+    "olvidé",
+    "se",
+    "hay"
+   ]
+  },
+  {
+   "id": "es-020",
+   "truth": "martes",
+   "rank": 8,
+   "roundTripMs": 292.1,
+   "candidates": [
+    "día",
+    "viernes",
+    "miércoles",
+    "lunes",
+    "sábado",
+    "jueves",
+    "domingo",
+    "martes"
+   ]
+  },
+  {
+   "id": "es-025",
+   "truth": "tráfico",
+   "rank": 3,
+   "roundTripMs": 295.4,
+   "candidates": [
+    "retraso",
+    "tránsito",
+    "tráfico",
+    "accidente",
+    "tramo",
+    "choque"
+   ]
+  },
+  {
+   "id": "es-026",
+   "truth": "hoy",
+   "rank": 10,
+   "roundTripMs": 295.4,
+   "candidates": [
+    "pero",
+    "ya",
+    "gracias",
+    "no",
+    "Te",
+    "y",
+    "todo",
+    "está",
+    "ahora",
+    "hoy"
+   ]
+  },
+  {
+   "id": "es-028",
+   "truth": "caro",
+   "rank": null,
+   "roundTripMs": 312.3,
+   "candidates": [
+    "un",
+    "una"
+   ]
+  },
+  {
+   "id": "es-032",
+   "truth": "mañana",
+   "rank": null,
+   "roundTripMs": 285.7,
+   "candidates": [
+    "en",
+    "allí",
+    "todo",
+    "ocupado",
+    "aquí"
+   ]
+  },
+  {
+   "id": "es-034",
+   "truth": "mandé",
+   "rank": null,
+   "roundTripMs": 285.1,
+   "candidates": [
+    "lo",
+    "dije",
+    "cuento",
+    "aviso",
+    "digo",
+    "aseguro",
+    "dejo",
+    "avisaré",
+    "he",
+    "deje"
+   ]
+  }
+ ]
+}
