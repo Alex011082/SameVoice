@@ -79,12 +79,22 @@ def main() -> int:
     load_ms = (time.perf_counter() - started) * 1000.0
     print(f"загрузка модели: {load_ms:.0f} ms")
 
+    # API плавает между версиями: voxcpm с пода 24.08 принимал language=,
+    # версия с PyPI 31.08 — нет (TypeError на поде ql8zh8mgtep12z; язык
+    # определяется из текста). Подстраиваемся по сигнатуре, не по надежде.
+    import inspect
+
+    _params = inspect.signature(model._generate).parameters
+    _lang_kw = "language" in _params
+    print(f"generate_streaming принимает language: {_lang_kw}")
+
     def run_once(text: str, lang: str) -> tuple[float, float, float]:
         """(ttfa_ms, total_ms, audio_ms) одного стримингового синтеза."""
         t0 = time.perf_counter()
         first_at = None
         n = 0
-        for piece in model.generate_streaming(text=text, language=lang):
+        kwargs = {"language": lang} if _lang_kw else {}
+        for piece in model.generate_streaming(text=text, **kwargs):
             if first_at is None:
                 first_at = (time.perf_counter() - t0) * 1000.0
             n += len(piece)

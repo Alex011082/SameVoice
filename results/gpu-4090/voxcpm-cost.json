@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-31T14:18:29.421785+00:00",
+  "script": "scripts/voxcpm-cost-bench.py",
+  "engine": "openbmb/VoxCPM2 (streaming, load_denoiser=False)",
+  "sample_rate": 24000,
+  "load_ms": 57077.9,
+  "ttfa_gate": {
+    "threshold_p90_ms": 250.0,
+    "measured_p90_ms": 66.8,
+    "passed": true,
+    "source": "eval/open-hebrew-tts-findings.md"
+  },
+  "not_measured_here": [
+    "blind native-speaker quality test (the other half of the gate)",
+    "voice cloning prompt overhead (builtin voice; no reference WAV shipped to a pod)",
+    "per-chunk prefill tax inside a live incremental pipeline (eval/selfhosted/bench.py measures that shape)"
+  ],
+  "config": {
+    "iterations": 6,
+    "burst_size": 6
+  },
+  "results": {
+    "ru_word": {
+      "text": "выплата",
+      "lang": "ru",
+      "ttfa_ms": {
+        "n": 6,
+        "p50_ms": 62.4,
+        "p90_ms": 65.8,
+        "p95_ms": 66.1,
+        "min_ms": 60.0,
+        "max_ms": 66.1,
+        "mean_ms": 63.6
+      },
+      "total_ms": {
+        "n": 6,
+        "p50_ms": 478.4,
+        "p90_ms": 619.4,
+        "p95_ms": 619.9,
+        "min_ms": 465.3,
+        "max_ms": 619.9,
+        "mean_ms": 544.7
+      },
+      "audio_duration_ms_p50": 1120.0,
+      "rtf_p50": 0.427
+    },
+    "he_word": {
+      "text": "תשלום",
+      "lang": "he",
+      "ttfa_ms": {
+        "n": 6,
+        "p50_ms": 64.2,
+        "p90_ms": 66.8,
+        "p95_ms": 70.8,
+        "min_ms": 59.1,
+        "max_ms": 70.8,
+        "mean_ms": 64.8
+      },
+      "total_ms": {
+        "n": 6,
+        "p50_ms": 541.1,
+        "p90_ms": 670.2,
+        "p95_ms": 676.1,
+        "min_ms": 472.3,
+        "max_ms": 676.1,
+        "mean_ms": 574.7
+      },
+      "audio_duration_ms_p50": 1280.0,
+      "rtf_p50": 0.423
+    },
+    "ru_phrase": {
+      "text": "Я хочу узнать, когда поступит следующая выплата.",
+      "lang": "ru",
+      "ttfa_ms": {
+        "n": 6,
+        "p50_ms": 62.7,
+        "p90_ms": 66.2,
+        "p95_ms": 68.6,
+        "min_ms": 60.5,
+        "max_ms": 68.6,
+        "mean_ms": 64.3
+      },
+      "total_ms": {
+        "n": 6,
+        "p50_ms": 1003.2,
+        "p90_ms": 1082.4,
+        "p95_ms": 1099.8,
+        "min_ms": 871.9,
+        "max_ms": 1099.8,
+        "mean_ms": 1011.8
+      },
+      "audio_duration_ms_p50": 2400.0,
+      "rtf_p50": 0.418
+    },
+    "he_phrase": {
+      "text": "אני רוצה לדעת מתי ייכנס התשלום הבא.",
+      "lang": "he",
+      "ttfa_ms": {
+        "n": 6,
+        "p50_ms": 61.9,
+        "p90_ms": 64.2,
+        "p95_ms": 65.4,
+        "min_ms": 58.8,
+        "max_ms": 65.4,
+        "mean_ms": 62.2
+      },
+      "total_ms": {
+        "n": 6,
+        "p50_ms": 1008.6,
+        "p90_ms": 1157.6,
+        "p95_ms": 1491.6,
+        "min_ms": 741.1,
+        "max_ms": 1491.6,
+        "mean_ms": 1059.3
+      },
+      "audio_duration_ms_p50": 2400.0,
+      "rtf_p50": 0.42
+    },
+    "ru_burst6": {
+      "words": [
+        "выплата",
+        "платёж",
+        "пенсия",
+        "пособие",
+        "зарплата",
+        "перевод"
+      ],
+      "sequential_total_ms": {
+        "n": 3,
+        "p50_ms": 3071.8,
+        "p90_ms": 3156.2,
+        "p95_ms": 3156.2,
+        "min_ms": 2998.8,
+        "max_ms": 3156.2,
+        "mean_ms": 3075.6
+      },
+      "overlap2_total_ms": {
+        "n": 3,
+        "p50_ms": 3072.8,
+        "p90_ms": 3163.0,
+        "p95_ms": 3163.0,
+        "min_ms": 2943.2,
+        "max_ms": 3163.0,
+        "mean_ms": 3059.6
+      }
+    },
+    "he_burst6": {
+      "words": [
+        "תשלום",
+        "קצבה",
+        "משכורת",
+        "העברה",
+        "פנסיה",
+        "חשבון"
+      ],
+      "sequential_total_ms": {
+        "n": 3,
+        "p50_ms": 3089.6,
+        "p90_ms": 3401.3,
+        "p95_ms": 3401.3,
+        "min_ms": 2958.0,
+        "max_ms": 3401.3,
+        "mean_ms": 3149.6
+      },
+      "overlap2_total_ms": {
+        "n": 3,
+        "p50_ms": 2968.0,
+        "p90_ms": 3238.7,
+        "p95_ms": 3238.7,
+        "min_ms": 2875.9,
+        "max_ms": 3238.7,
+        "mean_ms": 3027.5
+      }
+    }
+  }
+}
