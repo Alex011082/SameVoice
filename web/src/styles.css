@@ -3,8 +3,11 @@
  * Правила, которым подчинён этот файл:
  *   1. Экран принадлежит человеку, с которым говоришь, а не приложению.
  *      Отсюда крупные имена, большие круглые кнопки и почти невидимая шапка.
- *   2. Ничего технического на виду. Режим звонка, задержка, идентификаторы —
- *      всё это диагностика; она существует, но живёт под `body[data-debug]`.
+ *   2. Почти ничего технического на виду. Задержка, идентификаторы, адреса
+ *      провайдеров — диагностика, она живёт под `body[data-debug]`.
+ *      ИСКЛЮЧЕНИЕ, сделанное 31.08.2026: направление перевода и род контакта
+ *      показываются ВСЕГДА. Без них четыре тестовых аккаунта неотличимы друг
+ *      от друга, и выбрать нужное направление перевода невозможно.
  *   3. Пальцем, а не мышью: минимальная цель нажатия — 44 px, safe-area
  *      учитывается снизу и сверху (iPhone с вырезом).
  */
@@ -154,14 +157,115 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
 
 /* ---------------------------------------------------------------- заставка */
 
-.intro { text-align: center; padding: 26px 0 30px; }
+.intro { text-align: center; padding: 18px 0 24px; }
 .intro-mark {
-  width: 62px; height: 62px;
-  margin: 0 auto 18px;
+  width: 56px; height: 56px;
+  margin: 0 auto 14px;
   color: var(--accent);
   opacity: 0.9;
 }
 .intro-mark svg { width: 100%; height: 100%; }
+
+/* ------------------------------------------------ подтверждение телефона */
+
+.phone-auth { display: flex; flex-direction: column; }
+.phone-auth[hidden] { display: none; }
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 18px;
+  background: var(--bg-lift);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.auth-card[hidden] { display: none; }
+.auth-card label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.auth-card input {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 20px;
+  letter-spacing: 0.025em;
+}
+.auth-card input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* Шесть цифр — единственное, что есть на этом шаге, поэтому они и выглядят
+   как код из SMS, а не как обычное поле ввода. text-indent гасит хвостовой
+   трекинг последней цифры, иначе строка визуально уезжает влево. */
+.code-input {
+  text-align: center;
+  min-height: 64px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  font-variant-numeric: tabular-nums;
+}
+.auth-card select {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+}
+.auth-card select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.profile-grid > label { display: block; }
+.field-note, .verified-destination {
+  margin: -4px 0 2px;
+  color: var(--fg-dim);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.verified-destination strong { color: var(--fg); }
+
+.dev-code {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px dashed rgba(79, 157, 255, 0.45);
+  border-radius: 14px;
+  background: rgba(79, 157, 255, 0.09);
+  text-align: center;
+}
+.dev-code span {
+  color: var(--fg-faint);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.dev-code small { color: var(--fg-dim); font-size: 12.5px; }
+.dev-code strong {
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ниже 340 px две колонки профиля перестают вмещать подписи; на 375 (iPhone
+   mini/SE в портрете) они помещаются, и одна колонка только удлиняла форму. */
+@media (max-width: 340px) {
+  .profile-grid { grid-template-columns: 1fr; }
+}
 
 /* ------------------------------------------------------- список людей */
 
@@ -222,7 +326,8 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
 .presence[data-state='offline'] { background: var(--fg-faint); }
 .presence[data-state='unknown'] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--fg-faint); }
 
-.lang-chip {
+.lang-chip,
+.gender-chip {
   font-size: 12.5px;
   color: var(--fg-dim);
   background: rgba(255, 255, 255, 0.06);
@@ -230,8 +335,8 @@ h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
   padding: 1px 8px;
 }
 
-/* Технические метки: режим звонка, override, переключатель принудительного
-   перевода. Пользователю не показываются — включаются только в отладке. */
+/* Технические метки: идентификаторы, тон, override, переключатель
+   принудительного перевода. Пользователю не показываются — только в отладке. */
 .card-meta .badge,
 .card-meta code,
 .card-toggle { display: none; }
@@ -240,9 +345,79 @@ body[data-debug] .card-meta .badge,
 body[data-debug] .card-meta code,
 body[data-debug] .card-toggle { display: inline-flex; align-items: center; gap: 5px; }
 
+/* Карточка контакта — две строки: человек сверху, направление перевода снизу.
+   Направление получает всю ширину карточки: на 375 px оно не влезало рядом с
+   аватаром и кнопкой, а именно оно объясняет, зачем этот контакт нужен. */
+#contact-list .card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 11px;
+  padding: 14px;
+}
+.card-top { display: flex; align-items: center; gap: 14px; }
+
+.card-dir {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.dir-mode {
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(79, 157, 255, 0.18);
+  color: #a9ccff;
+}
+.card-dir[data-translated='false'] .dir-mode {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--fg-dim);
+}
+.dir-route { display: inline-flex; align-items: baseline; gap: 6px; color: var(--fg); font-weight: 550; }
+.dir-note { color: var(--fg-faint); }
+
+/* Пустой список говорит, почему он пуст. Молчащий пустой экран — это то, из-за
+   чего сломанные контакты жили незамеченными несколько дней. */
+.empty-state {
+  padding: 24px 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+}
+.empty-state strong { display: block; font-size: 17px; margin-bottom: 7px; }
+.empty-state p { margin: 0; color: var(--fg-dim); font-size: 14.5px; line-height: 1.45; }
+
+.contacts-note { margin: -4px 0 14px; color: var(--fg-dim); font-size: 14px; }
+.contacts-note[hidden] { display: none; }
+
+/* Метка постоянного тестового аккаунта. Нужна ровно потому, что список
+   тестового аккаунта НЕ состоит из одних тестовых: каждый, кто завёл профиль
+   по номеру, попадает в списки всех четырёх (см. STAGE0_AUTO_JOIN_TEST_IDENTITIES
+   в backend/src/store.ts). Без метки строка-пояснение над списком обещает
+   «сетку направлений» и показывает вперемешку сетку и посторонних. */
+.test-chip {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #9ad6a8;
+  background: rgba(60, 200, 110, 0.14);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+/* Ошибка над списком, а не под ним: см. комментарий в index.html. */
+.error-top { margin: 0 0 14px; }
+
 /* Кнопка звонка — зелёный круг. Только в списке контактов: в отладочном
    списке профилей та же разметка означает «Это я», а не «позвонить». */
-#contact-list .card > .btn {
+#contact-list .card-top > .btn {
   flex: 0 0 auto;
   width: 52px; height: 52px;
   border-radius: 50%;
@@ -255,14 +430,14 @@ body[data-debug] .card-toggle { display: inline-flex; align-items: center; gap: 
   box-shadow: 0 4px 14px rgba(52, 199, 89, 0.3);
   transition: transform 0.12s ease, filter 0.12s ease;
 }
-#contact-list .card > .btn::after {
+#contact-list .card-top > .btn::after {
   content: '';
   width: 23px; height: 23px;
   background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z'/%3E%3C/svg%3E") center/contain no-repeat;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z'/%3E%3C/svg%3E") center/contain no-repeat;
 }
-#contact-list .card > .btn:active { transform: scale(0.93); filter: brightness(1.08); }
+#contact-list .card-top > .btn:active { transform: scale(0.93); filter: brightness(1.08); }
 
 /* --------------------------------------------------------- исходящий вызов */
 
@@ -346,6 +521,21 @@ input[type='text']:focus { outline: 2px solid var(--accent); outline-offset: -1p
 .btn:active { filter: brightness(1.15); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn-ghost { background: transparent; }
+
+/* Главная кнопка шага: одна на экране, поэтому во всю ширину и крупная.
+   Стоит после `.btn` намеренно — специфичность у них одинаковая, и раньше
+   базовый серый фон побеждал акцентный. */
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06172b;
+  min-height: 54px;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 650;
+  margin-top: 2px;
+}
+.btn-primary:active { transform: scale(0.99); filter: brightness(1.06); }
 .btn-danger { background: var(--end); border-color: var(--end); color: #fff; }
 .btn-accept { background: var(--accept); border-color: var(--accept); color: #04240f; }
 
@@ -612,6 +802,7 @@ body:not([data-debug]) .incoming-explainer { display: none; }
 /* ------------------------------------------------- выбор роли (пол, язык) */
 
 .steps { display: flex; flex-direction: column; }
+.steps[hidden] { display: none; }
 .step[hidden] { display: none; }
 
 .step-q {

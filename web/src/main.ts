@@ -5,8 +5,14 @@ import { api, ApiRequestError, BACKEND_URL } from './api';
 import { startRingingAttention, stopRingingAttention } from './attention';
 import { AutoJoinGate } from './autojoin';
 import { CallSession, micFailureText, type CallMetrics, type MicFailureKind } from './call';
+import { contactsModel } from './contact-directory';
+import { authErrorText, callErrorText, contactsErrorText } from './errors';
 import { FlagLog, type FlagTarget } from './flags';
+import { phoneAuthInitial, reducePhoneAuth, type PhoneAuthState } from './phone-auth';
+import { profileUrl } from './profile-navigation';
+import { byGender } from './russian';
 import { RingPoller } from './ringpoll';
+import { selectSeededIdentities } from './seeded-identities';
 import type { RingState } from './ring';
 import { diagnoseCurrentOrigin, insecureContextMessage } from './secure';
 import { SubtitleModel } from './subtitles';
@@ -74,6 +80,8 @@ const state: AppState = {
   ringEpitaphTimer: null,
 };
 
+let phoneAuth: PhoneAuthState = phoneAuthInitial();
+
 // --- url helpers ----------------------------------------------------------
 
 function param(name: string): string | null {
@@ -82,9 +90,16 @@ function param(name: string): string | null {
 
 /**
  * `?debug=1` возвращает на экран диагностику, спрятанную от обычного глаза:
- * режим звонка, состояние соединения, замеры задержки по стадиям, адреса
- * провайдеров в подвале, пол/тон контакта и переключатель принудительного
- * перевода.
+ * состояние соединения, замеры задержки по стадиям, адреса провайдеров в
+ * подвале, переключатель принудительного перевода и панель самоконтроля.
+ *
+ * ЧТО ИЗ ЭТОГО СПИСКА УШЛО НАРУЖУ 31.08.2026 и почему. Режим звонка и пол
+ * контакта раньше прятались здесь же — и оказалось, что без них карточка
+ * четырёх тестовых аккаунтов вырождается в четыре одинаковых имени. Основатель
+ * не мог понять, кому звонить, чтобы проверить русский→иврит с женским родом,
+ * то есть диагностика прятала ровно ту вещь, ради которой эти аккаунты и
+ * существуют. Теперь направление перевода и род видны всегда; под флагом
+ * осталось то, что действительно нужно только при разборе поломки.
  *
  * Спрятано, а не удалено, намеренно. Продукт должен выглядеть как телефон, но
  * именно по этим числам ловятся настоящие поломки — три сорванных звонка
@@ -212,7 +227,7 @@ function paintRing(ringState: RingState): void {
         break;
       case 'exhausted':
         ui.setContactsError(
-          'Could not join the answered call after several attempts. Reload the page and call again.',
+          'Не удалось войти в отвеченный звонок за несколько попыток. Обновите страницу и позвоните снова.',
         );
         ringer.dispatch({ type: 'outgoing_abandon' });
         break;
@@ -305,7 +320,7 @@ async function joinAnswered(): Promise<void> {
     ringer.dispatch({ type: 'joined' });
   } catch (err) {
     ringer.dispatch({ type: 'join_failed', message: describeError(err) });
-    ui.setContactsError(`Could not join the answered call: ${describeError(err)}`);
+    ui.setContactsError(`Не удалось войти в отвеченный звонок: ${describeError(err)}`);
   }
 }
 
@@ -320,8 +335,10 @@ async function boot(): Promise<void> {
     cfg = await api.config();
   } catch (err) {
     ui.showScreen('identity');
-    ui.setBanner(describeError(err), 'error');
-    ui.setIdentityError('The backend must be running before the client can do anything.');
+    // Без /api/config клиент не знает ни адреса медиасервера, ни провайдеров:
+    // звонить физически нечем, поэтому это не предупреждение, а диагноз.
+    ui.setBanner(authErrorText('phone', err), 'error');
+    ui.setIdentityError(`Технические подробности: ${describeError(err)}`);
     return;
   }
   state.config = cfg;
@@ -342,7 +359,7 @@ async function boot(): Promise<void> {
     state.me = await api.getUser(meId);
   } catch (err) {
     await showIdentityPicker();
-    ui.setIdentityError(`Unknown user "${meId}": ${describeError(err)}`);
+    ui.setIdentityError(`Профиль «${meId}» сервер не знает: ${describeError(err)}`);
     return;
   }
 
@@ -375,8 +392,32 @@ async function boot(): Promise<void> {
 async function showIdentityPicker(): Promise<void> {
   ui.showScreen('identity');
   ui.renderWhoami(null, () => undefined);
+  if (param('debug') === '1') {
+    ui.showSeededIdentitySetup();
+    await renderSeededIdentities();
+    return;
+  }
+  ui.renderPhoneAuth(phoneAuth, {
+    onStart: (phone) => {
+      void startPhoneConfirmation(phone);
+    },
+    onVerify: (code) => {
+      void verifyPhoneConfirmation(code);
+    },
+    onRestart: () => {
+      phoneAuth = reducePhoneAuth(phoneAuth, { type: 'restart' });
+      void showIdentityPicker();
+    },
+  });
+  if (phoneAuth.phase !== 'verified') return;
+  ui.renderProfileRegistration((profile) => {
+    void registerProfile(profile);
+  });
+}
+
+async function renderSeededIdentities(): Promise<void> {
   try {
-    const users = await api.listUsers();
+    const users = selectSeededIdentities(await api.listUsers());
     const pick = (userId: string): void => {
       setParams({ me: userId });
       window.location.reload();
@@ -391,41 +432,115 @@ async function showIdentityPicker(): Promise<void> {
   }
 }
 
+async function startPhoneConfirmation(phone: string): Promise<void> {
+  try {
+    const challenge = await api.startPhoneVerification(phone);
+    phoneAuth = reducePhoneAuth(phoneAuth, {
+      type: 'code_sent',
+      challengeId: challenge.challengeId,
+      phone: challenge.phone,
+      devCode: challenge.devCode,
+    });
+  } catch (err) {
+    phoneAuth = reducePhoneAuth(phoneAuth, { type: 'failed', message: authErrorText('phone', err) });
+  }
+  await showIdentityPicker();
+}
+
+async function verifyPhoneConfirmation(code: string): Promise<void> {
+  if (phoneAuth.phase !== 'code') return;
+  try {
+    const verified = await api.verifyPhone(phoneAuth.challengeId, code);
+    if (verified.existingUser) {
+      window.location.assign(profileUrl(window.location.href, verified.existingUser.id));
+      return;
+    }
+    phoneAuth = reducePhoneAuth(phoneAuth, {
+      type: 'verified',
+      registrationToken: verified.registrationToken,
+    });
+  } catch (err) {
+    phoneAuth = reducePhoneAuth(phoneAuth, { type: 'failed', message: authErrorText('code', err) });
+  }
+  await showIdentityPicker();
+}
+
+async function registerProfile(profile: ui.ProfileRegistrationInput): Promise<void> {
+  if (phoneAuth.phase !== 'verified') return;
+  try {
+    const registered = await api.registerProfile(phoneAuth.registrationToken, profile);
+    window.location.assign(profileUrl(window.location.href, registered.user.id));
+  } catch (err) {
+    phoneAuth = reducePhoneAuth(phoneAuth, {
+      type: 'failed',
+      message: authErrorText('profile', err),
+    });
+    await showIdentityPicker();
+  }
+}
+
+/**
+ * Экран контактов.
+ *
+ * Оба запроса уходят вместе и падают порознь. Список пользователей нужен не для
+ * красоты: пока `GET /api/users` отвечает, четыре тестовых аккаунта остаются на
+ * экране и звонить есть куда — даже если контакты этого пользователя сервер не
+ * отдал. Жалоба основателя, ради которой это написано: после подтверждения
+ * номера контактов не было вовсе, и позвонить было НЕКУДА.
+ */
 async function showContacts(): Promise<void> {
   const me = state.me;
   if (!me) return;
   ui.showScreen('contacts');
   clearBanner();
   ui.setContactsError(null);
-  try {
-    const contacts = await api.listContacts(me.id);
-    ui.renderContacts(
-      me,
-      contacts,
-      {
-        onCall: (contact) => {
-          void startCall(contact);
-        },
-        onToggleForce: (contact, force) => {
-          void (async () => {
-            try {
-              await api.updateContact(me.id, contact.userId, { forceTranslate: force });
-              await showContacts();
-            } catch (err) {
-              ui.setContactsError(describeError(err));
-            }
-          })();
-        },
+
+  const [contactsResult, usersResult] = await Promise.allSettled([
+    api.listContacts(me.id),
+    api.listUsers(),
+  ]);
+
+  const contacts = contactsResult.status === 'fulfilled' ? contactsResult.value : null;
+  const users = usersResult.status === 'fulfilled' ? usersResult.value : null;
+  const failure =
+    contactsResult.status === 'rejected'
+      ? contactsErrorText(contactsResult.reason)
+      : usersResult.status === 'rejected'
+        ? contactsErrorText(usersResult.reason)
+        : null;
+
+  const model = contactsModel({ me, contacts, users, failure });
+
+  ui.renderContacts(
+    me,
+    model,
+    {
+      onCall: (contact) => {
+        void startCall(contact);
       },
-      ringer.current.peers,
-    );
-    // The list was just rebuilt, so re-attach whatever the ring state knows.
-    ui.renderOutgoing(ringer.current, () => {
-      void cancelOutgoing();
-    });
-  } catch (err) {
-    ui.setContactsError(describeError(err));
-  }
+      onToggleForce: (contact, force) => {
+        void (async () => {
+          try {
+            await api.updateContact(me.id, contact.userId, { forceTranslate: force });
+            await showContacts();
+          } catch (err) {
+            ui.setContactsError(contactsErrorText(err));
+          }
+        })();
+      },
+    },
+    ringer.current.peers,
+  );
+
+  // Когда список всё-таки есть, отказ показывается отдельной строкой: список
+  // неполон, и молчать об этом нельзя. Когда списка нет, тот же текст уже стоит
+  // на месте пустого экрана, и повторять его второй раз незачем.
+  ui.setContactsError(failure !== null && model.kind === 'list' ? failure : null);
+
+  // The list was just rebuilt, so re-attach whatever the ring state knows.
+  ui.renderOutgoing(ringer.current, () => {
+    void cancelOutgoing();
+  });
 }
 
 // --- call lifecycle -------------------------------------------------------
@@ -446,8 +561,8 @@ async function startCall(contact: ContactCard): Promise<void> {
     autoJoin.place(call.id);
     if (call.agent.required && !call.agent.dispatched) {
       ui.setBanner(
-        `Translation is needed but the agent did not accept the job (${call.agent.error ?? 'no reason given'}). ` +
-          'The call will connect without translation.',
+        `Перевод нужен, но агент не взял задачу (${call.agent.error ?? 'причина не названа'}). ` +
+          'Звонок соединится без перевода.',
         'error',
       );
     }
@@ -460,8 +575,7 @@ async function startCall(contact: ContactCard): Promise<void> {
       ringer.wake();
       if (ringer.current.peers[contact.userId] === false) {
         ui.setBanner(
-          `${contact.displayName} does not look connected right now — the phone will ring, but ` +
-            'nobody may be there to answer.',
+          `${contact.displayName} сейчас не в сети — звонок пойдёт, но отвечать может быть некому.`,
         );
       }
       return;
@@ -470,14 +584,14 @@ async function startCall(contact: ContactCard): Promise<void> {
     setParams({ call: call.id });
     await enterCall(call.id, true);
   } catch (err) {
-    ui.setContactsError(describeError(err));
+    ui.setContactsError(callErrorText(err));
   }
 }
 
 async function joinExistingCall(rawRef: string): Promise<void> {
   const callId = parseCallRef(rawRef);
   if (!callId) {
-    ui.setContactsError(`"${rawRef}" is not a call id or an invite link.`);
+    ui.setContactsError(`«${rawRef}» — это не код звонка и не ссылка-приглашение.`);
     await showContacts();
     return;
   }
@@ -486,7 +600,7 @@ async function joinExistingCall(rawRef: string): Promise<void> {
   // said that call is over, asking again is not going to help.
   if (autoJoin.isAbandoned(callId)) {
     setParams({ call: null });
-    ui.setContactsError(`Call ${callId} is over. Start a new one.`);
+    ui.setContactsError(`Звонок ${callId} уже завершён. Начните новый.`);
     await showContacts();
     return;
   }
@@ -532,7 +646,7 @@ async function enterCall(
     }
     ui.setCallError(describeError(err));
     ui.setConnectionState(ConnectionState.Disconnected);
-    ui.setBanner('Could not join that call.', 'error');
+    ui.setBanner('Не удалось войти в этот звонок.', 'error');
     setParams({ call: null });
     await showContacts();
     return;
@@ -578,7 +692,9 @@ async function enterCall(
         if (present) {
           clearBanner();
         } else {
-          ui.setBanner(`${join.peer.displayName} left the call.`);
+          ui.setBanner(
+            `${join.peer.displayName} ${byGender(join.peer.gender, 'вышел', 'вышла')} из звонка.`,
+          );
         }
       },
       onAgentPresence: (present) => {
@@ -641,7 +757,7 @@ async function enterCall(
     }
     state.session = null;
     ui.setCallError(describeError(err));
-    ui.setBanner('Could not connect to the media server.', 'error');
+    ui.setBanner('Не удалось соединиться с медиасервером.', 'error');
     ui.setConnectionState(ConnectionState.Disconnected);
     // We are not actually in a call, so presence must not stay suspended —
     // otherwise one failed connect silently makes this tester unreachable for
@@ -666,15 +782,15 @@ function handleAgentState(msg: StateMessage): void {
       state.agentReady = false;
       clearAgentReadyTimer();
       ui.setBanner(
-        `Translation is degraded: ${msg.detail || 'the relay agent reported an error'}. ` +
-          'You will not hear the other side until it recovers.',
+        `Перевод сломался: ${msg.detail || 'агент-передатчик сообщил об ошибке'}. ` +
+          'Пока он не восстановится, вы не услышите собеседника.',
         'error',
       );
       break;
     case 'agent_left':
       state.agentReady = false;
       state.agentPresent = false;
-      ui.setBanner('The relay agent left the call. Translation has stopped.', 'error');
+      ui.setBanner('Агент-передатчик вышел из звонка. Перевод остановлен.', 'error');
       break;
   }
 }
@@ -689,8 +805,8 @@ function startAgentReadyTimer(): void {
   state.agentReadyTimer = window.setTimeout(() => {
     if (state.agentReady || state.agentPresent) return;
     ui.setBanner(
-      'The relay agent has not joined. This call needs translation, so you will hear nothing ' +
-        'until it does — check that the agent process is running.',
+      'Агент-передатчик так и не подключился. Этому звонку нужен перевод, поэтому без агента ' +
+        'вы ничего не услышите — проверьте, запущен ли процесс агента.',
       'error',
     );
   }, AGENT_READY_TIMEOUT_MS);
@@ -876,16 +992,18 @@ function handleEnded(
 
   switch (reason) {
     case 'local':
-      ui.setBanner('Call ended.');
+      ui.setBanner('Звонок завершён.');
       break;
     case 'peer_left':
-      ui.setBanner(`${join.peer.displayName} hung up.`);
+      ui.setBanner(
+        `${join.peer.displayName} ${byGender(join.peer.gender, 'положил', 'положила')} трубку.`,
+      );
       break;
     case 'connection_lost':
-      ui.setBanner('Connection lost.', 'error');
+      ui.setBanner('Связь потеряна.', 'error');
       break;
     case 'server':
-      ui.setBanner('The call was closed by the server.');
+      ui.setBanner('Звонок закрыт сервером.');
       break;
   }
 

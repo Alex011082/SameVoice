@@ -24,6 +24,15 @@ let agentServer: Server;
 let app: FastifyInstance;
 /** Finished calls are written to disk; nothing here may touch the real logs/. */
 let archiveDir: string;
+/**
+ * The real Stage-0 test-identity list, read from the store the seed fills.
+ * Recognising them by the SHAPE of their id ("looks hand-written") was a third
+ * source of truth for the very fact this suite exists to keep single: a phone
+ * user's id is `u_` + 16 hex characters, and hex is spelled with letters too,
+ * so `u_deadbeefdecaface` reads as "seeded" to any such heuristic and the test
+ * then quietly asserts the wrong invariant. Asking the store costs nothing.
+ */
+let seededIds: readonly string[];
 
 /** Flipped by the verdict tests to make the stand-in agent reject a verdict. */
 let verdictStatus = 200;
@@ -107,8 +116,9 @@ before(async () => {
 
   const { loadConfig } = await import("../src/config.js");
   const { buildApp } = await import("../src/index.js");
-  const { resetStore } = await import("../src/store.js");
+  const { resetStore, stage0TestIdentityIdList } = await import("../src/store.js");
   resetStore();
+  seededIds = stage0TestIdentityIdList();
   app = await buildApp(loadConfig());
   await app.ready();
 });
@@ -148,6 +158,330 @@ describe("health and config", () => {
   it("echoes a request id header", async () => {
     const res = await app.inject({ method: "GET", url: "/healthz" });
     assert.ok(res.headers["x-request-id"], "x-request-id must be present");
+  });
+});
+
+describe("development phone verification", () => {
+  it("normalizes an Israeli mobile number and returns a six-digit code for the web prototype", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "050-123-4567" },
+    });
+
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.json().phone, "+972501234567");
+    assert.match(res.json().challengeId, /^pv_[0-9a-f]{24}$/);
+    assert.match(res.json().devCode, /^\d{6}$/);
+    assert.equal(res.json().expiresInSeconds, 300);
+  });
+
+  it("rejects a wrong code, accepts the displayed code once, and rejects replay", async () => {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "+972 52 765 4321" },
+    });
+    const challenge = started.json();
+    const wrongCode = challenge.devCode === "000000" ? "999999" : "000000";
+
+    const wrong = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: wrongCode },
+    });
+    assert.equal(wrong.statusCode, 400);
+    assert.equal(wrong.json().error.code, "invalid_code");
+
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    assert.equal(verified.statusCode, 200);
+    assert.equal(verified.json().verified, true);
+    assert.equal(verified.json().phone, "+972527654321");
+    assert.match(verified.json().registrationToken, /^vr_[0-9a-f]{48}$/);
+    assert.equal(verified.json().existingUser, null);
+
+    const replay = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    assert.equal(replay.statusCode, 400);
+    assert.equal(replay.json().error.code, "invalid_challenge");
+  });
+
+  it("creates a real profile from a verified number and recognizes it on the next verification", async () => {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "054-222-3344" },
+    });
+    const challenge = started.json();
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    const registrationToken = verified.json().registrationToken as string;
+
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        registrationToken,
+        displayName: "Давид",
+        lang: "ru",
+        gender: "m",
+      },
+    });
+    assert.equal(registered.statusCode, 201);
+    assert.equal(registered.json().created, true);
+    assert.match(registered.json().user.id, /^u_[0-9a-f]{16}$/);
+    assert.deepEqual(
+      {
+        displayName: registered.json().user.displayName,
+        lang: registered.json().user.lang,
+        gender: registered.json().user.gender,
+        tone: registered.json().user.tone,
+      },
+      { displayName: "Давид", lang: "ru", gender: "m", tone: "friendly" },
+    );
+
+    const replay = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { registrationToken, displayName: "Другой", lang: "he", gender: "f" },
+    });
+    assert.equal(replay.statusCode, 400);
+    assert.equal(replay.json().error.code, "invalid_verification");
+
+    const startedAgain = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "+972542223344" },
+    });
+    const againChallenge = startedAgain.json();
+    const verifiedAgain = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: againChallenge.challengeId, code: againChallenge.devCode },
+    });
+    assert.equal(verifiedAgain.statusCode, 200);
+    assert.equal(verifiedAgain.json().existingUser.id, registered.json().user.id);
+    assert.equal(verifiedAgain.json().existingUser.displayName, "Давид");
+  });
+
+  it("rejects phone input that cannot be normalized", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "123" },
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.json().error.code, "bad_request");
+  });
+});
+
+/**
+ * Stage-0 auto-join. The founder verified his number against the live server,
+ * got a profile, and his contact list came back empty — no test call, no
+ * recording, nothing to translate. These tests pin the whole reason the four
+ * test identities are handed out, and they die together with the constant
+ * STAGE0_AUTO_JOIN_TEST_IDENTITIES once invites exist.
+ */
+describe("Stage-0 auto-join: a phone user can actually call someone", () => {
+  /** The grid a new user must land in, sorted the way contactIdsOf() sorts. */
+  const SEEDED_IDS = ["u_alex", "u_maya", "u_noa", "u_omri"];
+
+  /** The three real steps a phone user goes through: start -> verify -> register. */
+  async function registerByPhone(
+    phone: string,
+    profile: { displayName: string; lang: "ru" | "he"; gender: "m" | "f" | "u" },
+  ): Promise<{ statusCode: number; created: boolean; userId: string }> {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone },
+    });
+    assert.equal(started.statusCode, 201);
+    const challenge = started.json();
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    assert.equal(verified.statusCode, 200);
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { registrationToken: verified.json().registrationToken, ...profile },
+    });
+    return {
+      statusCode: registered.statusCode,
+      created: registered.json().created as boolean,
+      userId: registered.json().user.id as string,
+    };
+  }
+
+  /** Reads the list through the very route that answered `[]` on the live server. */
+  async function contactIdsOf(userId: string): Promise<string[]> {
+    const res = await app.inject({ method: "GET", url: `/api/users/${userId}/contacts` });
+    assert.equal(res.statusCode, 200);
+    return (res.json().contacts as Array<{ userId: string }>).map((c) => c.userId).sort();
+  }
+
+  it("gives a freshly created phone user exactly the four seeded accounts, and never himself", async () => {
+    const { statusCode, created, userId } = await registerByPhone("053-111-2233", {
+      displayName: "Женя",
+      lang: "ru",
+      gender: "m",
+    });
+    assert.equal(statusCode, 201);
+    assert.equal(created, true);
+
+    // Exactly the grid: all four directions reachable, no self-row, and no
+    // other phone user swept in — those are strangers, not test identities.
+    assert.deepEqual(await contactIdsOf(userId), SEEDED_IDS);
+  });
+
+  it("puts the new user into every seeded account's list, so the call works both ways", async () => {
+    const { userId } = await registerByPhone("058-777-8899", {
+      displayName: "Дина",
+      lang: "he",
+      gender: "f",
+    });
+
+    // A one-way list would let him dial out and never receive: the seeded
+    // tester would have nobody to call back and would not see him in presence.
+    for (const seededId of SEEDED_IDS) {
+      assert.ok(
+        (await contactIdsOf(seededId)).includes(userId),
+        `${seededId} must be able to call the new user back`,
+      );
+    }
+
+    // And the card carries the profile the MT prompt inflects Hebrew on.
+    const res = await app.inject({ method: "GET", url: "/api/users/u_alex/contacts" });
+    const card = (res.json().contacts as Array<Record<string, unknown>>).find(
+      (c) => c.userId === userId,
+    )!;
+    assert.equal(card.displayName, "Дина");
+    assert.equal(card.lang, "he");
+    assert.equal(card.gender, "f");
+    assert.equal(card.forceTranslate, false);
+    assert.deepEqual(card.overrides, {});
+  });
+
+  it("does not duplicate contacts when the same phone registers again", async () => {
+    const phone = "052-000-1122";
+    const first = await registerByPhone(phone, { displayName: "Игорь", lang: "ru", gender: "m" });
+    assert.equal(first.created, true);
+
+    const alexBefore = await contactIdsOf("u_alex");
+    const ownBefore = await contactIdsOf(first.userId);
+    // Pin the starting point, otherwise "unchanged" would also hold for the
+    // empty list this whole fix exists to prevent.
+    assert.deepEqual(ownBefore, SEEDED_IDS);
+
+    const second = await registerByPhone(phone, { displayName: "Игорь", lang: "he", gender: "f" });
+    assert.equal(second.created, false);
+    assert.equal(second.userId, first.userId, "the number identifies the person, not the attempt");
+
+    assert.deepEqual(await contactIdsOf(first.userId), ownBefore);
+    assert.deepEqual(await contactIdsOf("u_alex"), alexBefore);
+  });
+
+  it("hands the phone user a real contact row, not just a name in a list", async () => {
+    const { userId } = await registerByPhone("054-909-0909", {
+      displayName: "Рома",
+      lang: "ru",
+      gender: "m",
+    });
+
+    // Pinning a language on the card is how a tester steers a call, and the
+    // route 404s when the row behind the card does not exist. A call itself
+    // would NOT catch that: the mode decision falls back to the raw profiles
+    // when a card is missing, so it answers TRANSLATED either way.
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/api/users/${userId}/contacts/u_noa`,
+      payload: { lang: "ru" },
+    });
+    assert.equal(patch.statusCode, 200);
+    assert.equal(patch.json().contact.lang, "ru");
+
+    const direct = await app.inject({
+      method: "POST",
+      url: "/api/calls",
+      payload: { callerId: userId, calleeId: "u_noa" },
+    });
+    assert.equal(direct.statusCode, 201);
+    assert.equal(direct.json().call.mode, "DIRECT", "the override on his own card decides the mode");
+    await hangUp(direct.json().call.id, userId);
+
+    // Cleared, the real direction comes back — ru -> he, which is the whole
+    // reason he was given the grid.
+    await app.inject({
+      method: "PATCH",
+      url: `/api/users/${userId}/contacts/u_noa`,
+      payload: { lang: null },
+    });
+    const translated = await app.inject({
+      method: "POST",
+      url: "/api/calls",
+      payload: { callerId: userId, calleeId: "u_noa" },
+    });
+    assert.equal(translated.json().call.mode, "TRANSLATED");
+
+    // Leave nothing live behind: this file shares one store, and an immortal
+    // call is exactly the bug the lifetime tests below exist for.
+    await hangUp(translated.json().call.id, userId);
+  });
+
+  /**
+   * The list of test identities used to be written out by hand next to the seed
+   * that creates them. Two sources of truth for one fact: a fifth seeded profile
+   * that nobody remembered to add to the list was born with an empty contact
+   * list and invisible to everyone else — the exact symptom this whole suite
+   * exists to prevent, reintroduced by the fix for it.
+   *
+   * So the invariant is pinned instead of the literal four ids: whatever the
+   * seed creates is fully wired, and it is the same set new phone users join.
+   */
+  it("wires every seeded profile into the grid, whatever the seed happens to contain", async () => {
+    const users = (
+      (await app.inject({ method: "GET", url: "/api/users" })).json().users as Array<{
+        id: string;
+      }>
+    ).map((u) => u.id);
+    const seeded = [...seededIds];
+
+    assert.ok(seeded.length >= 4, "the seed must still hand out the 2x2 grid");
+    assert.deepEqual(
+      seeded.filter((id) => !users.includes(id)),
+      [],
+      "the store lists a test identity that GET /api/users does not serve",
+    );
+
+    for (const id of seeded) {
+      const peers = await contactIdsOf(id);
+      assert.deepEqual(
+        seeded.filter((other) => other !== id && !peers.includes(other)),
+        [],
+        `${id} is missing seeded peers — the seed and the test-identity list have drifted apart`,
+      );
+    }
+
+    // And a new phone user reaches all of them, not a hand-copied subset.
+    const { userId } = await registerByPhone("055-321-6547", {
+      displayName: "Лена",
+      lang: "ru",
+      gender: "f",
+    });
+    assert.deepEqual(await contactIdsOf(userId), [...seeded].sort());
   });
 });
 
@@ -209,7 +543,17 @@ describe("seeded users and contacts", () => {
     const contacts = res.json().contacts as Array<Record<string, unknown>>;
     // Все со всеми: комбинация «пол + язык» из ролевого выбора может дать
     // любую пару, поэтому список контактов не может быть выборочным.
-    assert.equal(contacts.length, 3);
+    // Считаем именно посевных: к этому моменту в списке лежат ещё и профили,
+    // созданные по номеру телефона выше в этом файле, — они теперь тоже
+    // попадают в сетку, иначе новому юзеру звонить некуда.
+    const seededPeers = contacts.filter((c) =>
+      ["u_noa", "u_omri", "u_maya"].includes(c.userId as string),
+    );
+    assert.equal(seededPeers.length, 3);
+    assert.ok(
+      !contacts.some((c) => c.userId === "u_alex"),
+      "владелец списка не может быть собственным контактом",
+    );
     const noaCard = contacts.find((c) => c.userId === "u_noa")!;
     assert.equal(noaCard.lang, "he");
     assert.equal(noaCard.gender, "f");

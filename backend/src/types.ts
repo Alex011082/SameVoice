@@ -184,6 +184,9 @@ export interface ApiError {
 
 export type ApiErrorCode =
   | "bad_request"
+  | "invalid_code"
+  | "invalid_challenge"
+  | "invalid_verification"
   | "not_found"
   | "forbidden"
   | "conflict"

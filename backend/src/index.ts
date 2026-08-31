@@ -6,10 +6,12 @@ import { createCallArchive } from "./archive.js";
 import { loadConfig, type Config, type OriginRule } from "./config.js";
 import { createCallSweeper } from "./ringing.js";
 import { archiveRoutes } from "./routes/archive.js";
+import { authRoutes } from "./routes/auth.js";
 import { callRoutes } from "./routes/calls.js";
 import { healthRoutes, VERSION } from "./routes/health.js";
 import { presenceRoutes } from "./routes/presence.js";
 import { userRoutes } from "./routes/users.js";
+import { STAGE0_AUTO_JOIN_TEST_IDENTITIES, stage0TestIdentityIdList } from "./store.js";
 import { apiError } from "./types.js";
 
 const LOCAL_ORIGIN_RE =
@@ -83,6 +85,7 @@ export async function buildApp(cfg: Config): Promise<FastifyInstance> {
   app.addHook("onClose", async () => sweeper.stop());
 
   await app.register(healthRoutes(cfg));
+  await app.register(authRoutes);
   await app.register(userRoutes);
   await app.register(archiveRoutes(archive));
   await app.register(presenceRoutes(cfg, sweeper));
@@ -136,6 +139,13 @@ async function start(): Promise<void> {
       ringTimeoutSeconds: cfg.ringTimeoutSeconds,
       presenceTtlSeconds: cfg.presenceTtlSeconds,
       callArchiveDir: cfg.callArchiveDir,
+      // Every other operationally surprising setting is printed here, and this
+      // is the most surprising one: a number that passes verification is joined
+      // to the test identities in BOTH directions. Whoever wonders why
+      // strangers are in u_alex's contact list should find the answer in the
+      // log rather than in a comment in store.ts.
+      stage0AutoJoinTestIdentities: STAGE0_AUTO_JOIN_TEST_IDENTITIES,
+      stage0TestIdentities: stage0TestIdentityIdList(),
     },
     "speakeasy backend ready",
   );

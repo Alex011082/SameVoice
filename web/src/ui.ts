@@ -1,6 +1,9 @@
 import { ConnectionQuality, ConnectionState } from 'livekit-client';
 import type { CallMetrics } from './call';
+import type { ContactsModel, DirectoryEntry } from './contact-directory';
+import { describeDirection, genderLabel } from './direction';
 import { flagPreview, type FlagTarget } from './flags';
+import type { PhoneAuthState } from './phone-auth';
 import { outgoingText, ringClosedText, ringModeText, type RingState } from './ring';
 import { dirForLang, langLabel, type SubtitleLine, type SubtitleView } from './subtitles';
 import type { CallMode, ContactCard, Gender, JoinResponse, Lang, Tone, UserProfile } from './types';
@@ -19,9 +22,25 @@ const el = {
   screenIdentity: () => must<HTMLElement>('screen-identity'),
   identityList: () => must<HTMLUListElement>('identity-list'),
   identityError: () => must<HTMLParagraphElement>('identity-error'),
+  phoneAuth: () => must<HTMLDivElement>('phone-auth'),
+  phoneForm: () => must<HTMLFormElement>('phone-form'),
+  phoneInput: () => must<HTMLInputElement>('phone-input'),
+  phoneCodeForm: () => must<HTMLFormElement>('phone-code-form'),
+  phoneCodeInput: () => must<HTMLInputElement>('phone-code-input'),
+  phoneDestination: () => must<HTMLElement>('phone-destination'),
+  phoneDevCode: () => must<HTMLElement>('phone-dev-code'),
+  phoneChange: () => must<HTMLButtonElement>('phone-change'),
+  phoneAuthError: () => must<HTMLParagraphElement>('phone-auth-error'),
+  profileForm: () => must<HTMLFormElement>('profile-form'),
+  profilePhone: () => must<HTMLElement>('profile-phone'),
+  profileName: () => must<HTMLInputElement>('profile-name'),
+  profileLang: () => must<HTMLSelectElement>('profile-lang'),
+  profileGender: () => must<HTMLSelectElement>('profile-gender'),
+  profileRestart: () => must<HTMLButtonElement>('profile-restart'),
 
   screenContacts: () => must<HTMLElement>('screen-contacts'),
   contactList: () => must<HTMLUListElement>('contact-list'),
+  contactsNote: () => must<HTMLParagraphElement>('contacts-note'),
   contactsError: () => must<HTMLParagraphElement>('contacts-error'),
   joinForm: () => must<HTMLFormElement>('join-form'),
   joinInput: () => must<HTMLInputElement>('join-input'),
@@ -109,6 +128,84 @@ export const setCallError = (text: string | null): void => setError(el.callError
 
 export function setFooter(parts: string[]): void {
   el.footer().textContent = parts.join('  ·  ');
+}
+
+export interface PhoneAuthHandlers {
+  onStart(phone: string): void;
+  onVerify(code: string): void;
+  onRestart(): void;
+}
+
+export function renderPhoneAuth(state: PhoneAuthState, handlers: PhoneAuthHandlers): void {
+  const title = must<HTMLElement>('setup-title');
+  const hint = must<HTMLElement>('setup-hint');
+  const setup = must<HTMLElement>('setup');
+  const phoneForm = el.phoneForm();
+  const codeForm = el.phoneCodeForm();
+
+  el.phoneAuth().hidden = state.phase === 'verified';
+  phoneForm.hidden = state.phase !== 'phone';
+  codeForm.hidden = state.phase !== 'code';
+  setup.hidden = true;
+  el.profileForm().hidden = state.phase !== 'verified';
+  setError(el.phoneAuthError(), state.error);
+
+  phoneForm.onsubmit = (event) => {
+    event.preventDefault();
+    handlers.onStart(el.phoneInput().value);
+  };
+  codeForm.onsubmit = (event) => {
+    event.preventDefault();
+    handlers.onVerify(el.phoneCodeInput().value.trim());
+  };
+  el.phoneChange().onclick = () => handlers.onRestart();
+  // Токен регистрации живёт десять минут. Когда он истекает, форма профиля
+  // перестаёт принимать что-либо, и без этой кнопки выйти из неё было нельзя.
+  el.profileRestart().onclick = () => handlers.onRestart();
+
+  if (state.phase === 'code') {
+    title.textContent = 'Подтвердите номер';
+    hint.textContent = 'Шесть цифр — и номер ваш.';
+    el.phoneDestination().textContent = state.phone;
+    el.phoneDevCode().textContent = state.devCode;
+    queueMicrotask(() => el.phoneCodeInput().focus());
+  } else if (state.phase === 'verified') {
+    title.textContent = 'Создайте профиль';
+    hint.textContent = 'Имя увидят люди, которые добавят вас в контакты.';
+    el.profilePhone().textContent = state.phone;
+  } else {
+    title.textContent = 'Ваш номер';
+    hint.textContent = 'Он станет вашим адресом в SameVoice.';
+  }
+}
+
+export interface ProfileRegistrationInput {
+  displayName: string;
+  lang: Lang;
+  gender: Gender;
+}
+
+export function renderProfileRegistration(
+  onSubmit: (profile: ProfileRegistrationInput) => void,
+): void {
+  const form = el.profileForm();
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    onSubmit({
+      displayName: el.profileName().value.trim(),
+      lang: el.profileLang().value as Lang,
+      gender: el.profileGender().value as Gender,
+    });
+  };
+  queueMicrotask(() => el.profileName().focus());
+}
+
+export function showSeededIdentitySetup(): void {
+  el.phoneAuth().hidden = true;
+  el.profileForm().hidden = true;
+  must<HTMLElement>('setup').hidden = false;
+  must<HTMLElement>('setup-title').textContent = 'Быстрый тест';
+  must<HTMLElement>('setup-hint').textContent = 'Выберите одну из предустановленных личностей.';
 }
 
 /**
@@ -287,11 +384,14 @@ export interface ContactHandlers {
  * userId -> online. Absent means "the backend has not said", which is rendered
  * as unknown rather than offline: claiming someone is offline when we simply do
  * not know would stop a tester from even trying to call.
+ *
+ * The absent case is the normal one for a test account the server keeps no
+ * contact row for — POST /api/presence reports presence only for contacts —
+ * and a hollow dot is the honest answer there.
  */
 export type PresenceMap = Readonly<Record<string, boolean>>;
 
-let lastContacts: { me: UserProfile; contacts: ContactCard[]; handlers: ContactHandlers } | null =
-  null;
+let lastContacts: { me: UserProfile; entries: DirectoryEntry[] } | null = null;
 
 function presenceDot(state: boolean | undefined): HTMLSpanElement {
   const dot = document.createElement('span');
@@ -318,61 +418,105 @@ export function updatePresence(presence: PresenceMap): void {
   }
 }
 
-export function renderContacts(
-  me: UserProfile,
-  contacts: ContactCard[],
-  handlers: ContactHandlers,
-  presence: PresenceMap = {},
-): void {
-  lastContacts = { me, contacts, handlers };
-  const list = el.contactList();
-  list.replaceChildren();
+/** Язык словом, без «таблетки»: в строке направления фон только мешает. */
+function langWord(lang: Lang): HTMLSpanElement {
+  const word = document.createElement('span');
+  word.className = 'dir-lang';
+  word.dir = dirForLang(lang);
+  word.lang = lang;
+  word.textContent = langLabel(lang);
+  return word;
+}
 
-  if (contacts.length === 0) {
-    const li = document.createElement('li');
-    li.className = 'card';
-    li.textContent = 'Пока никого нет.';
-    list.append(li);
-    return;
+/**
+ * Строка направления под именем: что именно проверит звонок этому контакту.
+ *
+ * Режим звонка окончательно решает backend (POST /api/calls), поэтому здесь
+ * предсказание, а не решение. Раньше оно было спрятано под `?debug=1` вместе
+ * с полом — и четыре тестовых аккаунта превращались в четыре одинаковых имени.
+ */
+function directionRow(me: UserProfile, contact: ContactCard): HTMLDivElement {
+  const direction = describeDirection(me, contact, contact.forceTranslate);
+
+  const row = document.createElement('div');
+  row.className = 'card-dir';
+  row.dataset['translated'] = String(direction.translated);
+
+  const mode = document.createElement('span');
+  mode.className = 'dir-mode';
+  mode.textContent = direction.badge;
+
+  const route = document.createElement('span');
+  route.className = 'dir-route';
+  route.append(langWord(direction.from), document.createTextNode('→'), langWord(direction.to));
+
+  const note = document.createElement('span');
+  note.className = 'dir-note';
+  note.textContent = direction.note;
+
+  row.append(mode, route, note);
+  return row;
+}
+
+function contactCard(
+  me: UserProfile,
+  entry: DirectoryEntry,
+  handlers: ContactHandlers,
+  online: boolean | undefined,
+): HTMLLIElement {
+  const contact = entry.contact;
+
+  const li = document.createElement('li');
+  li.className = 'card card-contact';
+  li.dataset['userId'] = contact.userId;
+
+  const top = document.createElement('div');
+  top.className = 'card-top';
+
+  const main = document.createElement('div');
+  main.className = 'card-main';
+
+  const name = document.createElement('span');
+  name.className = 'card-name';
+  name.textContent = contact.displayName;
+
+  const meta = document.createElement('div');
+  meta.className = 'card-meta';
+  meta.append(presenceDot(online));
+  meta.append(langChip(contact.lang));
+  // Пол виден всегда, а не только в отладке: в иврите он задаёт грамматику,
+  // и без него нельзя выбрать, какую пару языков и родов проверяет звонок.
+  const gender = document.createElement('span');
+  gender.className = 'gender-chip';
+  gender.textContent = genderLabel(contact.gender);
+  meta.append(gender);
+
+  // Метка постоянного тестового аккаунта. Список тестового аккаунта состоит НЕ
+  // из одних тестовых: каждый, кто завёл профиль по номеру, попадает в списки
+  // всех четырёх (STAGE0_AUTO_JOIN_TEST_IDENTITIES в backend/src/store.ts). Без
+  // метки строка над списком обещает «сетку направлений», а показывает сетку
+  // вперемешку с посторонними — и отличить одно от другого на экране нечем.
+  if (entry.test) {
+    const test = document.createElement('span');
+    test.className = 'test-chip';
+    test.textContent = 'тест';
+    meta.append(test);
   }
 
-  for (const contact of contacts) {
-    const li = document.createElement('li');
-    li.className = 'card';
-    li.dataset['userId'] = contact.userId;
+  const tone = document.createElement('code');
+  tone.textContent = contact.tone;
+  meta.append(tone);
 
-    const main = document.createElement('div');
-    main.className = 'card-main';
+  if (Object.keys(contact.overrides).length > 0) {
+    const override = document.createElement('code');
+    override.textContent = 'override';
+    meta.append(override);
+  }
 
-    const name = document.createElement('span');
-    name.className = 'card-name';
-    name.textContent = contact.displayName;
-
-    const meta = document.createElement('div');
-    meta.className = 'card-meta';
-    meta.append(presenceDot(presence[contact.userId]));
-    meta.append(langChip(contact.lang));
-    meta.append(document.createTextNode(genderTone(contact.gender, contact.tone)));
-
-    if (Object.keys(contact.overrides).length > 0) {
-      const override = document.createElement('code');
-      override.textContent = 'override';
-      meta.append(override);
-    }
-
-    // Predicted mode. The backend is the only authority (POST /api/calls), so
-    // this is a preview, not a decision.
-    const predicted = document.createElement('span');
-    predicted.className = 'badge';
-    const willTranslate = contact.forceTranslate || contact.lang !== me.lang;
-    predicted.dataset['mode'] = willTranslate
-      ? contact.forceTranslate
-        ? 'FORCED'
-        : 'TRANSLATED'
-      : 'DIRECT';
-    predicted.textContent = willTranslate ? 'с переводом' : 'без перевода';
-    meta.append(predicted);
-
+  // PATCH по контакту, которого нет в базе сервера, отвечает 404, поэтому
+  // переключатель показывается только у сохранённых карточек. На звонок это
+  // не влияет: POST /api/calls требует лишь чтобы оба пользователя были.
+  if (entry.saved) {
     const toggle = document.createElement('label');
     toggle.className = 'card-toggle';
     const checkbox = document.createElement('input');
@@ -381,18 +525,63 @@ export function renderContacts(
     checkbox.addEventListener('change', () => handlers.onToggleForce(contact, checkbox.checked));
     toggle.append(checkbox, document.createTextNode('всегда переводить'));
     meta.append(toggle);
+  }
 
-    main.append(name, meta);
+  main.append(name, meta);
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn';
-    // Подпись читает скринридер; глазами видна иконка трубки из CSS.
-    btn.setAttribute('aria-label', `Позвонить: ${contact.displayName}`);
-    btn.addEventListener('click', () => handlers.onCall(contact));
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn';
+  // Подпись читает скринридер; глазами видна иконка трубки из CSS.
+  btn.setAttribute('aria-label', `Позвонить: ${contact.displayName}`);
+  btn.addEventListener('click', () => handlers.onCall(contact));
 
-    li.append(avatarFor(contact.displayName), main, btn);
-    list.append(li);
+  top.append(avatarFor(contact.displayName), main, btn);
+  li.append(top, directionRow(me, contact));
+  return li;
+}
+
+/**
+ * Пустой список — это всегда объяснённый список. Молчащий пустой экран и есть
+ * причина, по которой сломанные контакты жили незамеченными несколько дней:
+ * приложение выглядело исправным и просто ни на что не отвечало.
+ */
+function emptyStateItem(title: string, detail: string): HTMLLIElement {
+  const li = document.createElement('li');
+  li.className = 'empty-state';
+
+  const heading = document.createElement('strong');
+  heading.textContent = title;
+
+  const text = document.createElement('p');
+  text.textContent = detail;
+
+  li.append(heading, text);
+  return li;
+}
+
+export function renderContacts(
+  me: UserProfile,
+  model: ContactsModel,
+  handlers: ContactHandlers,
+  presence: PresenceMap = {},
+): void {
+  const list = el.contactList();
+  list.replaceChildren();
+  const note = el.contactsNote();
+
+  if (model.kind === 'empty') {
+    lastContacts = null;
+    note.hidden = true;
+    list.append(emptyStateItem(model.title, model.detail));
+    return;
+  }
+
+  lastContacts = { me, entries: model.entries };
+  note.hidden = !model.entries.some((entry) => entry.test);
+
+  for (const entry of model.entries) {
+    list.append(contactCard(me, entry, handlers, presence[entry.contact.userId]));
   }
 }
 
@@ -431,8 +620,8 @@ export function renderCallHeader(join: JoinResponse): void {
   el.modeExplainer().textContent = MODE_EXPLAINER[join.mode];
   el.subtitleEmpty().textContent =
     join.mode === 'DIRECT'
-      ? 'No subtitles in direct mode — nothing is transcribing this call.'
-      : 'Waiting for the first words…';
+      ? 'Один язык — этот звонок никто не расшифровывает.'
+      : 'Ждём первых слов…';
 }
 
 export function setConnectionState(state: ConnectionState): void {
@@ -677,16 +866,16 @@ export function renderIncoming(state: RingState, handlers: IncomingHandlers): vo
   const closed = state.phase === 'closed';
 
   el.incomingEyebrow().textContent = closed
-    ? 'Call'
+    ? 'Звонок'
     : state.phase === 'accepting'
-      ? 'Answering…'
+      ? 'Отвечаем…'
       : state.phase === 'declining'
-        ? 'Declining…'
+        ? 'Отклоняем…'
         : 'Входящий звонок';
 
   el.incomingTitle().textContent = closed
-    ? ringClosedText(state, call.from.displayName)
-    : `${call.from.displayName} is calling`;
+    ? ringClosedText(state, call.from)
+    : `${call.from.displayName} звонит`;
 
   const meta = el.incomingMeta();
   meta.replaceChildren();
@@ -713,7 +902,13 @@ export function renderIncoming(state: RingState, handlers: IncomingHandlers): vo
   el.incomingActions().hidden = closed;
   el.incomingAccept().disabled = busy;
   el.incomingDecline().disabled = busy;
-  el.incomingAccept().textContent = state.phase === 'accepting' ? 'Answering…' : 'Accept';
+  // Подпись меняется в её собственном span'е. Присваивание в textContent самой
+  // кнопки стирало её содержимое целиком — вместе с иконкой трубки: на экране
+  // входящего оставался зелёный круг со словом «Accept» вместо трубки.
+  const acceptLabel = el.incomingAccept().querySelector('.round-label');
+  if (acceptLabel) {
+    acceptLabel.textContent = state.phase === 'accepting' ? 'Отвечаем…' : 'Ответить';
+  }
 
   const dismiss = el.incomingDismiss();
   dismiss.hidden = !closed;
