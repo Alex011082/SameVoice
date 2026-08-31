@@ -64,10 +64,15 @@ wc -l /workspace/data/*.jsonl
 export HF_HOME=/workspace/hf
 export PYTHONPATH=/workspace/code
 
-step "ОБУЧЕНИЕ: LoRA на Qwen3-0.6B, 3 эпохи, батч 16"
+# Батч 8, не 16: на данных v2 (память + длинные диалоги) батч 16 дал CUDA OOM
+# на 4090 — логиты 151-тысячного словаря на длинных примерах не влезают
+# (под xvnhclbwj2tpcl, 01.09, чинилось живым патчем). expandable_segments —
+# против фрагментации. Имена файлов данных подставляет sed при выкладке.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+step "ОБУЧЕНИЕ: LoRA на Qwen3-0.6B, 3 эпохи, батч 8"
 $PY scripts/predictor-finetune.py \
   --train /workspace/data/train-v1.jsonl --val /workspace/data/val-v1.jsonl \
-  --out /workspace/ft --model Qwen/Qwen3-0.6B --epochs 3 --batch 16 \
+  --out /workspace/ft --model Qwen/Qwen3-0.6B --epochs 3 --batch 8 \
   || fail "обучение упало"
 [ -f /workspace/ft/adapter/adapter_model.safetensors ] || fail "адаптер не сохранился"
 ( cd /workspace/ft && tar czf /workspace/out/adapter.tgz adapter train-log.jsonl )
