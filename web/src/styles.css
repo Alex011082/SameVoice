@@ -491,7 +491,17 @@ body[data-debug] .card-toggle { display: inline-flex; align-items: center; gap: 
 .joinbox-row { display: flex; gap: 8px; padding: 14px; }
 .joinbox-row input { flex: 1; min-width: 0; }
 
-input[type='text'] {
+/* «Добавить по номеру». Подпись под полем несёт смысл, а не оформление: она
+   говорит, что экран не сообщает, есть ли у номера профиль. Поэтому она стоит
+   всегда, а не всплывает как подсказка. */
+.addbox-note { margin: -6px 14px 14px; color: var(--fg-dim); font-size: 13.5px; line-height: 1.45; }
+.addbox-status { margin: -4px 14px 14px; font-size: 14px; line-height: 1.45; }
+.addbox-status[hidden] { display: none; }
+.addbox-status[data-tone='ok'] { color: var(--fg-dim); }
+.addbox-status[data-tone='error'] { color: #ff9b93; }
+
+input[type='text'],
+.joinbox input[type='tel'] {
   background: var(--bg);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
@@ -502,7 +512,8 @@ input[type='text'] {
   min-height: 44px;
   width: 100%;
 }
-input[type='text']:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+input[type='text']:focus,
+.joinbox input[type='tel']:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 /* ---------------------------------------------------------------- кнопки */
 

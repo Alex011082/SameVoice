@@ -149,6 +149,10 @@ ${C_CYAN}==>${C_RESET} SpeakEasy dev stack  ${C_BOLD}profile=${PROFILE}${C_RESET
 ${ORIGIN_NOTE}
   you (u_alex)   ${C_BOLD}${WEB_BASE}/?me=u_alex${C_RESET}     (ru, male,   neutral)
   her (u_noa)    ${C_BOLD}${WEB_BASE}/?me=u_noa${C_RESET}      (he, female, friendly)
+
+  These two need ${C_BOLD}AUTH_SEEDED_LOGIN=true${C_RESET} in .env: ?me= names a seeded
+  test profile, it no longer signs you in by itself. Without the flag, the
+  page shows the phone login instead (docs/04-runbook.md).
 EOF
 
 if [ "$PROFILE" = "cloud" ]; then

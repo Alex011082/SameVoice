@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import type { FastifyInstance } from "fastify";
+// Statically imported where config.ts is not: session.ts reads no environment
+// variable, so importing it before `before()` sets them changes nothing.
+import { issueSession } from "../src/session.js";
 
 /**
  * Offline smoke test: no LiveKit, no network, no credentials.
@@ -91,6 +94,29 @@ function startFakeAgent(): Promise<number> {
   });
 }
 
+/**
+ * A fixed key so `as()` below and the app under test agree on what a signature
+ * means. loadConfig() would otherwise invent a random one per boot, and every
+ * token this file mints would be a forgery.
+ */
+const TEST_SESSION_SECRET = "test-session-secret-0123456789abcdef0123456789";
+
+/**
+ * A real, signed session for `userId`, as a bearer header.
+ *
+ * Every route that acts on behalf of a user now needs one, so a test that is
+ * not ABOUT authorization still has to say whose session it is acting under.
+ * It mints the token with the production function and the production secret:
+ * there is no test-only bypass in the backend, because a bypass is exactly the
+ * hole this whole change closes.
+ *
+ * The bearer header rather than the cookie because both are accepted and this
+ * one needs no cookie jar; the cookie has its own tests.
+ */
+function as(userId: string): Record<string, string> {
+  return { authorization: `Bearer ${issueSession(TEST_SESSION_SECRET, userId, 3600).token}` };
+}
+
 function decodeJwtPayload(token: string): Record<string, unknown> {
   const parts = token.split(".");
   assert.equal(parts.length, 3, "token must be a 3-segment JWT");
@@ -119,13 +145,30 @@ before(async () => {
   process.env.CALL_ARCHIVE_DIR = archiveDir;
   identityDir = mkdtempSync(join(tmpdir(), "speakeasy-identity-"));
   process.env.IDENTITY_DIR = identityDir;
+  process.env.SESSION_SECRET = TEST_SESSION_SECRET;
+  // The phone tests below read the confirmation code out of the response, which
+  // is exactly what this switch turns on. Its OFF state — the default — has its
+  // own app and its own tests further down, because "the code is NOT in the
+  // response" cannot be asserted against a server that puts it there.
+  process.env.AUTH_DEV_CODE_IN_RESPONSE = "true";
+  // Left at their defaults on purpose: an empty allowlist and no seeded login is
+  // what a fresh checkout does, and each is exercised against its own app.
+  delete process.env.AUTH_PHONE_ALLOWLIST;
+  delete process.env.AUTH_SEEDED_LOGIN;
+  delete process.env.SESSION_TTL_SECONDS;
+  delete process.env.SESSION_COOKIE_SECURE;
   delete process.env.WEB_ORIGINS;
   delete process.env.ALLOW_LOCAL_ORIGINS;
 
   const { loadConfig } = await import("../src/config.js");
   const { buildApp } = await import("../src/index.js");
   const { resetStore, stage0TestIdentityIdList } = await import("../src/store.js");
+  const { resetPhoneVerification } = await import("../src/phoneVerification.js");
   resetStore();
+  // Challenges, verified-phone proofs and the per-number guess budget all live
+  // in module state for the life of the process, so a suite that reuses this
+  // process inherits whatever a previous run spent.
+  resetPhoneVerification();
   seededIds = stage0TestIdentityIdList();
   app = await buildApp(loadConfig());
   await app.ready();
@@ -337,7 +380,7 @@ describe("Stage-0 auto-join: a phone user can actually call someone", () => {
 
   /** Reads the list through the very route that answered `[]` on the live server. */
   async function contactIdsOf(userId: string): Promise<string[]> {
-    const res = await app.inject({ method: "GET", url: `/api/users/${userId}/contacts` });
+    const res = await app.inject({ headers: as(userId), method: "GET", url: `/api/users/${userId}/contacts` });
     assert.equal(res.statusCode, 200);
     return (res.json().contacts as Array<{ userId: string }>).map((c) => c.userId).sort();
   }
@@ -373,7 +416,7 @@ describe("Stage-0 auto-join: a phone user can actually call someone", () => {
     }
 
     // And the card carries the profile the MT prompt inflects Hebrew on.
-    const res = await app.inject({ method: "GET", url: "/api/users/u_alex/contacts" });
+    const res = await app.inject({ headers: as("u_alex"), method: "GET", url: "/api/users/u_alex/contacts" });
     const card = (res.json().contacts as Array<Record<string, unknown>>).find(
       (c) => c.userId === userId,
     )!;
@@ -415,6 +458,7 @@ describe("Stage-0 auto-join: a phone user can actually call someone", () => {
     // would NOT catch that: the mode decision falls back to the raw profiles
     // when a card is missing, so it answers TRANSLATED either way.
     const patch = await app.inject({
+      headers: as(userId),
       method: "PATCH",
       url: `/api/users/${userId}/contacts/u_noa`,
       payload: { lang: "ru" },
@@ -423,6 +467,7 @@ describe("Stage-0 auto-join: a phone user can actually call someone", () => {
     assert.equal(patch.json().contact.lang, "ru");
 
     const direct = await app.inject({
+      headers: as(userId),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: userId, calleeId: "u_noa" },
@@ -434,11 +479,13 @@ describe("Stage-0 auto-join: a phone user can actually call someone", () => {
     // Cleared, the real direction comes back — ru -> he, which is the whole
     // reason he was given the grid.
     await app.inject({
+      headers: as(userId),
       method: "PATCH",
       url: `/api/users/${userId}/contacts/u_noa`,
       payload: { lang: null },
     });
     const translated = await app.inject({
+      headers: as(userId),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: userId, calleeId: "u_noa" },
@@ -546,8 +593,81 @@ describe("seeded users and contacts", () => {
     );
   });
 
+  /**
+   * THE GRID, AND NOBODY ELSE — the one route left without a session.
+   *
+   * It stays open because the identity picker reads it before anyone has a
+   * session. What it must not stay is `listUsers()`: that answered with the
+   * display name, language and gender of every phone-registered person, to
+   * anyone who could reach the port. Reproduced on 31.08.2026 against a running
+   * backend — `curl -s http://host/api/users` came back naming both registered
+   * testers — which is the membership oracle POST /api/contacts/by-phone goes
+   * to such trouble to avoid one path segment away, on data that now survives
+   * restarts and only grows.
+   *
+   * Registering here rather than trusting the users other tests left behind:
+   * this must fail if the route ever widens again, not depend on execution
+   * order to have somebody to leak.
+   */
+  it("hands an anonymous caller the seeded grid and no phone-registered person", async () => {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "058-700-0001" },
+    });
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: started.json().challengeId, code: started.json().devCode },
+    });
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        registrationToken: verified.json().registrationToken,
+        displayName: "Незаметная",
+        lang: "he",
+        gender: "f",
+      },
+    });
+    assert.equal(registered.statusCode, 201);
+    const hiddenId = registered.json().user.id as string;
+
+    const anon = await app.inject({ method: "GET", url: "/api/users" });
+    assert.equal(anon.statusCode, 200);
+    const body = JSON.stringify(anon.json());
+    assert.deepEqual(
+      (anon.json().users as Array<{ id: string }>).map((u) => u.id).sort(),
+      [...seededIds].sort(),
+      "an unauthenticated caller must see the four test identities and no one else",
+    );
+    assert.ok(!body.includes(hiddenId), "a phone user's id must not be in the public list");
+    assert.ok(!body.includes("Незаметная"), "nor their name");
+
+    // And a session does not widen it either: contacts is the route that names
+    // real people, and it has an owner check on it.
+    const withSession = await app.inject({
+      headers: { authorization: `Bearer ${registered.json().session.token}` },
+      method: "GET",
+      url: "/api/users",
+    });
+    assert.deepEqual(
+      (withSession.json().users as Array<{ id: string }>).map((u) => u.id).sort(),
+      [...seededIds].sort(),
+    );
+
+    // The client is unaffected: both of its call sites feed this straight into
+    // selectSeededIdentities() (web/src/seeded-identities.ts), so the grid is
+    // all it has ever read out of this answer.
+    assert.ok((await app.inject({
+      headers: { authorization: `Bearer ${registered.json().session.token}` },
+      method: "GET",
+      url: `/api/users/${hiddenId}/contacts`,
+    })).statusCode === 200, "real peers still arrive on the route that has a session behind it");
+  });
+
   it("returns the peer's effective language on the contact card", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/users/u_alex/contacts" });
+    const res = await app.inject({ headers: as("u_alex"), method: "GET", url: "/api/users/u_alex/contacts" });
     assert.equal(res.statusCode, 200);
     const contacts = res.json().contacts as Array<Record<string, unknown>>;
     // Все со всеми: комбинация «пол + язык» из ролевого выбора может дать
@@ -575,14 +695,17 @@ describe("seeded users and contacts", () => {
     assert.equal(omriCard.gender, "m");
   });
 
-  it("rejects an unknown user with a typed 404", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/users/u_zzz" });
-    assert.equal(res.statusCode, 404);
-    assert.equal(res.json().error.code, "not_found");
+  it("answers 403 for an id that is not the session's, existing or not", async () => {
+    // Deliberately NOT the 404 this used to be. The ownership check runs before
+    // the lookup, so "u_zzz does not exist" and "u_zzz is somebody else" produce
+    // the same status — the code stops being an existence oracle for user ids.
+    const res = await app.inject({ headers: as("u_alex"), method: "GET", url: "/api/users/u_zzz" });
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.json().error.code, "forbidden");
   });
 
   it("rejects a malformed userId with a typed 400", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/users/NOPE" });
+    const res = await app.inject({ headers: as("u_alex"), method: "GET", url: "/api/users/NOPE" });
     assert.equal(res.statusCode, 400);
     assert.equal(res.json().error.code, "bad_request");
   });
@@ -592,6 +715,7 @@ describe("call creation and the mode decision", () => {
   it("ru + he yields TRANSLATED and dispatches the agent exactly once", async () => {
     const before = agentHits.length;
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa", force: false },
@@ -640,6 +764,7 @@ describe("call creation and the mode decision", () => {
 
   it("force:true yields FORCED even when the languages differ", async () => {
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa", force: true },
@@ -651,6 +776,7 @@ describe("call creation and the mode decision", () => {
 
   it("rejects a self-call with 409 self_call", async () => {
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_alex" },
@@ -661,6 +787,7 @@ describe("call creation and the mode decision", () => {
 
   it("rejects an unknown participant with 404", async () => {
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_ghost" },
@@ -671,6 +798,7 @@ describe("call creation and the mode decision", () => {
 
   it("ru + ru yields DIRECT and makes NO outbound agent call at all", async () => {
     const patch = await app.inject({
+      headers: as("u_noa"),
       method: "PATCH",
       url: "/api/users/u_noa",
       payload: { lang: "ru" },
@@ -680,6 +808,7 @@ describe("call creation and the mode decision", () => {
 
     const before = agentHits.length;
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa", force: false },
@@ -697,11 +826,12 @@ describe("call creation and the mode decision", () => {
     assert.equal(agentHits.length, before, "DIRECT must not contact the agent");
 
     // restore the seeded Hebrew profile for the remaining tests
-    await app.inject({ method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
+    await app.inject({ headers: as("u_noa"), method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
   });
 
   it("a contact-level forceTranslate override alone produces FORCED", async () => {
     const patch = await app.inject({
+      headers: as("u_noa"),
       method: "PATCH",
       url: "/api/users/u_noa/contacts/u_alex",
       payload: { forceTranslate: true },
@@ -710,6 +840,7 @@ describe("call creation and the mode decision", () => {
     assert.equal(patch.json().contact.forceTranslate, true);
 
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -717,6 +848,7 @@ describe("call creation and the mode decision", () => {
     assert.equal(res.json().call.mode, "FORCED");
 
     await app.inject({
+      headers: as("u_noa"),
       method: "PATCH",
       url: "/api/users/u_noa/contacts/u_alex",
       payload: { forceTranslate: false },
@@ -727,6 +859,7 @@ describe("call creation and the mode decision", () => {
 describe("join", () => {
   it("mints a decodable JWT scoped to the call room", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -734,6 +867,7 @@ describe("join", () => {
     const call = created.json().call;
 
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${call.id}/join`,
       payload: { userId: "u_alex" },
@@ -783,14 +917,16 @@ describe("join", () => {
   });
 
   it("a DIRECT join advertises no agent", async () => {
-    await app.inject({ method: "PATCH", url: "/api/users/u_noa", payload: { lang: "ru" } });
+    await app.inject({ headers: as("u_noa"), method: "PATCH", url: "/api/users/u_noa", payload: { lang: "ru" } });
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
     });
     const call = created.json().call;
     const res = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${call.id}/join`,
       payload: { userId: "u_noa" },
@@ -799,20 +935,25 @@ describe("join", () => {
     assert.equal(res.json().mode, "DIRECT");
     assert.equal(res.json().agentIdentity, null);
     assert.equal(res.json().expectedAgentTrackName, null);
-    await app.inject({ method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
+    await app.inject({ headers: as("u_noa"), method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
   });
 
   it("refuses a non-participant with 403", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
     });
     const call = created.json().call;
+    // Maya is a real user with a real session who is simply not on this call.
+    // "u_someone" used to stand here, and it stopped being a useful stranger the
+    // moment a session had to name a user the store actually has.
     const res = await app.inject({
+      headers: as("u_maya"),
       method: "POST",
       url: `/api/calls/${call.id}/join`,
-      payload: { userId: "u_someone" },
+      payload: { userId: "u_maya" },
     });
     assert.equal(res.statusCode, 403);
     assert.equal(res.json().error.code, "forbidden");
@@ -820,6 +961,7 @@ describe("join", () => {
 
   it("returns 404 for an unknown call", async () => {
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls/c_000000000000/join",
       payload: { userId: "u_alex" },
@@ -832,6 +974,7 @@ describe("join", () => {
 describe("mode change and end", () => {
   it("returns 409 mode_locked once someone has joined", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -839,6 +982,7 @@ describe("mode change and end", () => {
     const call = created.json().call;
 
     const beforeJoin = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${call.id}/mode`,
       payload: { userId: "u_alex", force: true },
@@ -847,12 +991,14 @@ describe("mode change and end", () => {
     assert.equal(beforeJoin.json().call.mode, "FORCED");
 
     await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${call.id}/join`,
       payload: { userId: "u_alex" },
     });
 
     const afterJoin = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${call.id}/mode`,
       payload: { userId: "u_alex", force: false },
@@ -863,6 +1009,7 @@ describe("mode change and end", () => {
 
   it("ends a call, stops the agent and then refuses further joins", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -871,6 +1018,7 @@ describe("mode change and end", () => {
     const before = agentHits.length;
 
     const ended = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${call.id}/end`,
       payload: { userId: "u_alex" },
@@ -883,6 +1031,7 @@ describe("mode change and end", () => {
     assert.equal(agentHits.at(-1)!.url, `/jobs/${call.id}/stop`);
 
     const rejoin = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${call.id}/join`,
       payload: { userId: "u_alex" },
@@ -902,6 +1051,7 @@ async function ringCall(
   extra: Record<string, unknown> = {},
 ): Promise<{ id: string; ring: Record<string, unknown> }> {
   const res = await app.inject({
+    headers: as("u_alex"),
     method: "POST",
     url: "/api/calls",
     payload: { callerId: "u_alex", calleeId: "u_noa", ring: true, ...extra },
@@ -911,14 +1061,14 @@ async function ringCall(
 }
 
 async function poll(userId: string): Promise<Record<string, any>> {
-  const res = await app.inject({ method: "POST", url: "/api/presence", payload: { userId } });
+  const res = await app.inject({ headers: as(userId), method: "POST", url: "/api/presence", payload: { userId } });
   assert.equal(res.statusCode, 200, JSON.stringify(res.json()));
   return res.json();
 }
 
 /** Leaves no live ring behind, so the next test's busy check starts clean. */
 async function hangUp(callId: string, userId = "u_alex"): Promise<void> {
-  await app.inject({ method: "POST", url: `/api/calls/${callId}/end`, payload: { userId } });
+  await app.inject({ headers: as(userId), method: "POST", url: `/api/calls/${callId}/end`, payload: { userId } });
 }
 
 describe("presence", () => {
@@ -942,6 +1092,7 @@ describe("presence", () => {
   it("online:false is an explicit goodbye", async () => {
     await poll("u_noa");
     const bye = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: "/api/presence",
       payload: { userId: "u_noa", online: false },
@@ -952,20 +1103,29 @@ describe("presence", () => {
   });
 
   it("GET /api/ring/:userId returns the same shape without heartbeating", async () => {
-    await app.inject({ method: "POST", url: "/api/presence", payload: { userId: "u_alex", online: false } });
-    const res = await app.inject({ method: "GET", url: "/api/ring/u_alex" });
+    await app.inject({ headers: as("u_alex"), method: "POST", url: "/api/presence", payload: { userId: "u_alex", online: false } });
+    const res = await app.inject({ headers: as("u_alex"), method: "GET", url: "/api/ring/u_alex" });
     assert.equal(res.statusCode, 200);
     assert.equal(res.json().self.online, false, "a read must not mark the user online");
     assert.equal(res.json().incoming, null);
     assert.equal(res.json().outgoing, null);
   });
 
-  it("rejects an unknown user and a malformed body", async () => {
-    const unknown = await app.inject({ method: "POST", url: "/api/presence", payload: { userId: "u_ghost" } });
-    assert.equal(unknown.statusCode, 404);
-    assert.equal(unknown.json().error.code, "not_found");
+  it("refuses somebody else's userId and a malformed body", async () => {
+    // This request is both the heartbeat and the ring poll, so an unchecked
+    // userId here handed a stranger the callee's incoming calls — the caller's
+    // name included — twice a second.
+    const other = await app.inject({
+      headers: as("u_alex"),
+      method: "POST",
+      url: "/api/presence",
+      payload: { userId: "u_noa" },
+    });
+    assert.equal(other.statusCode, 403);
+    assert.equal(other.json().error.code, "forbidden");
 
     const bad = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/presence",
       payload: { userId: "u_alex", nope: 1 },
@@ -973,7 +1133,7 @@ describe("presence", () => {
     assert.equal(bad.statusCode, 400);
     assert.equal(bad.json().error.code, "bad_request");
 
-    const badPath = await app.inject({ method: "GET", url: "/api/ring/NOPE" });
+    const badPath = await app.inject({ headers: as("u_alex"), method: "GET", url: "/api/ring/NOPE" });
     assert.equal(badPath.statusCode, 400);
   });
 });
@@ -999,6 +1159,7 @@ describe("ringing state machine", () => {
     assert.equal(caller.incoming, null);
 
     const accept = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1013,6 +1174,7 @@ describe("ringing state machine", () => {
     assert.equal((await poll("u_alex")).outgoing.ringState, "accepted");
 
     const join = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/join`,
       payload: { userId: "u_noa" },
@@ -1025,6 +1187,7 @@ describe("ringing state machine", () => {
   it("a second accept is idempotent, not an error", async () => {
     const { id } = await ringCall();
     const first = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1033,6 +1196,7 @@ describe("ringing state machine", () => {
     assert.equal(first.json().alreadyAccepted, false);
 
     const second = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1046,6 +1210,7 @@ describe("ringing state machine", () => {
   it("only the callee may accept or decline, only the caller may cancel", async () => {
     const { id } = await ringCall();
     const callerAccept = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_alex" },
@@ -1054,6 +1219,7 @@ describe("ringing state machine", () => {
     assert.equal(callerAccept.json().error.code, "forbidden");
 
     const calleeCancel = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/cancel`,
       payload: { userId: "u_noa" },
@@ -1061,9 +1227,10 @@ describe("ringing state machine", () => {
     assert.equal(calleeCancel.statusCode, 403);
 
     const stranger = await app.inject({
+      headers: as("u_maya"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
-      payload: { userId: "u_someone" },
+      payload: { userId: "u_maya" },
     });
     assert.equal(stranger.statusCode, 403);
     await hangUp(id);
@@ -1074,6 +1241,7 @@ describe("ringing state machine", () => {
     const before = agentHits.length;
 
     const declined = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/decline`,
       payload: { userId: "u_noa" },
@@ -1092,6 +1260,7 @@ describe("ringing state machine", () => {
 
     // Accepting after a decline is a conflict, not a resurrection.
     const late = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1101,6 +1270,7 @@ describe("ringing state machine", () => {
 
     // A repeated decline is idempotent and does NOT stop the agent twice.
     const again = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/decline`,
       payload: { userId: "u_noa" },
@@ -1116,6 +1286,7 @@ describe("ringing state machine", () => {
     // /end and /ring/cancel are the same transition; the tester's hang-up button
     // must not leave the agent in the room just because the call never connected.
     const ended = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${id}/end`,
       payload: { userId: "u_alex" },
@@ -1129,6 +1300,7 @@ describe("ringing state machine", () => {
     // The callee, still polling with a stale screen, must be told to stop ringing.
     assert.equal((await poll("u_noa")).incoming, null);
     const late = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1138,6 +1310,7 @@ describe("ringing state machine", () => {
 
     // And a join on the cancelled call explains itself.
     const join = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/join`,
       payload: { userId: "u_noa" },
@@ -1149,6 +1322,7 @@ describe("ringing state machine", () => {
   it("hanging up a call that was actually answered does NOT relabel it as cancelled", async () => {
     const { id } = await ringCall();
     const accepted = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1157,11 +1331,12 @@ describe("ringing state machine", () => {
     assert.ok(answeredAt);
 
     // Both sides join: the call is now live, and the ring is history.
-    await app.inject({ method: "POST", url: `/api/calls/${id}/join`, payload: { userId: "u_noa" } });
-    await app.inject({ method: "POST", url: `/api/calls/${id}/join`, payload: { userId: "u_alex" } });
+    await app.inject({ headers: as("u_noa"), method: "POST", url: `/api/calls/${id}/join`, payload: { userId: "u_noa" } });
+    await app.inject({ headers: as("u_alex"), method: "POST", url: `/api/calls/${id}/join`, payload: { userId: "u_alex" } });
 
     const before = agentHits.length;
     const ended = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${id}/end`,
       payload: { userId: "u_alex" },
@@ -1189,6 +1364,7 @@ describe("ringing state machine", () => {
 
     // /end is idempotent: a double-click must not fire a second stop.
     const twice = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${id}/end`,
       payload: { userId: "u_alex" },
@@ -1202,6 +1378,7 @@ describe("ringing state machine", () => {
     const { id } = await ringCall();
     const before = agentHits.length;
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${id}/ring/cancel`,
       payload: { userId: "u_alex" },
@@ -1230,6 +1407,7 @@ describe("ringing state machine", () => {
     assert.equal(agentHits.at(-1)!.url, `/jobs/${id}/stop`);
 
     const late = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1241,6 +1419,7 @@ describe("ringing state machine", () => {
   it("an accepted ring that nobody joins also expires rather than stranding the agent", async () => {
     const { id } = await ringCall({ ringTimeoutSeconds: 1 });
     const accept = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1260,6 +1439,7 @@ describe("ringing state machine", () => {
   it("a callee who joins a still-ringing call has answered it", async () => {
     const { id } = await ringCall();
     const join = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/join`,
       payload: { userId: "u_noa" },
@@ -1279,13 +1459,14 @@ describe("ringing state machine", () => {
       { callerId: "u_alex", calleeId: "u_noa", ring: true },
       { callerId: "u_noa", calleeId: "u_alex", ring: true },
     ]) {
-      const dup = await app.inject({ method: "POST", url: "/api/calls", payload });
+      const dup = await app.inject({ headers: as(payload.callerId), method: "POST", url: "/api/calls", payload });
       assert.equal(dup.statusCode, 409, "a double-dial must not create a second ring");
       assert.equal(dup.json().error.code, "busy");
     }
 
     // A link-invite call is unaffected: busy only guards the ring flow.
     const link = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -1295,6 +1476,7 @@ describe("ringing state machine", () => {
     assert.equal(link.json().ring, null);
 
     await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/decline`,
       payload: { userId: "u_noa" },
@@ -1313,12 +1495,13 @@ describe("ringing state machine", () => {
   });
 
   it("a DIRECT call can ring, and declining it contacts no agent at all", async () => {
-    await app.inject({ method: "PATCH", url: "/api/users/u_noa", payload: { lang: "ru" } });
+    await app.inject({ headers: as("u_noa"), method: "PATCH", url: "/api/users/u_noa", payload: { lang: "ru" } });
     const { id, ring } = await ringCall();
     assert.equal(ring.mode, "DIRECT");
     const before = agentHits.length;
 
     const declined = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/decline`,
       payload: { userId: "u_noa" },
@@ -1327,17 +1510,19 @@ describe("ringing state machine", () => {
     assert.equal(declined.json().ring.ringState, "declined");
     assert.equal(agentHits.length, before, "DIRECT never contacts the agent, not even to stop it");
 
-    await app.inject({ method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
+    await app.inject({ headers: as("u_noa"), method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
   });
 
   it("ring endpoints refuse a link-invite call and an unknown call", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
     });
     const id = created.json().call.id;
     const res = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/ring/accept`,
       payload: { userId: "u_noa" },
@@ -1347,6 +1532,7 @@ describe("ringing state machine", () => {
     assert.match(res.json().error.message, /without a ring/);
 
     const missing = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: "/api/calls/c_000000000000/ring/decline",
       payload: { userId: "u_noa" },
@@ -1381,6 +1567,7 @@ describe("call lifetime", () => {
 
   async function linkCall(): Promise<string> {
     const res = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -1413,6 +1600,7 @@ describe("call lifetime", () => {
     assert.equal(stops.length, 1, "the idle call must release its agent exactly once");
 
     const join = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${id}/join`,
       payload: { userId: "u_alex" },
@@ -1425,6 +1613,7 @@ describe("call lifetime", () => {
     const { cfg, reapDeadCalls, CALL_LIFETIME_LIMITS } = await lifetime();
     const id = await linkCall();
     const joined = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: `/api/calls/${id}/join`,
       payload: { userId: "u_alex" },
@@ -1496,14 +1685,14 @@ describe("call lifetime", () => {
 
     // ...and readable from the archive by BOTH people who were on the call.
     for (const userId of ["u_alex", "u_noa"]) {
-      const res = await app.inject({ method: "GET", url: `/api/users/${userId}/calls/${id}` });
+      const res = await app.inject({ headers: as(userId), method: "GET", url: `/api/users/${userId}/calls/${id}` });
       assert.equal(res.statusCode, 200, `${userId} was on this call`);
       assert.equal(res.json().call.id, id);
       assert.equal(res.json().call.state, "ended");
       assert.ok(res.json().archivedAt, "the record records when it left memory");
     }
 
-    const listed = await app.inject({ method: "GET", url: "/api/users/u_alex/calls" });
+    const listed = await app.inject({ headers: as("u_alex"), method: "GET", url: "/api/users/u_alex/calls" });
     assert.equal(listed.statusCode, 200);
     const entry = listed.json().calls.find((c: any) => c.callId === id);
     assert.ok(entry, "an archived call must show up in its participants' listing");
@@ -1526,13 +1715,21 @@ describe("call lifetime", () => {
 
     // Omri is a real user and was on no such call. He is told the record does
     // not exist, NOT that he may not see it: a 403 would confirm it exists.
-    const stranger = await app.inject({ method: "GET", url: `/api/users/u_omri/calls/${id}` });
+    const stranger = await app.inject({ headers: as("u_omri"), method: "GET", url: `/api/users/u_omri/calls/${id}` });
     assert.equal(stranger.statusCode, 404);
     assert.equal(stranger.json().error.code, "not_found");
-    assert.deepEqual((await app.inject({ method: "GET", url: "/api/users/u_omri/calls" })).json().calls, []);
+    assert.deepEqual((await app.inject({ headers: as("u_omri"), method: "GET", url: "/api/users/u_omri/calls" })).json().calls, []);
 
-    const ghost = await app.inject({ method: "GET", url: `/api/users/u_nobody/calls/${id}` });
-    assert.equal(ghost.statusCode, 404, "an unknown user is not a way to browse the archive");
+    // A correctly signed token naming a user the store does not have is not a
+    // session at all. That is not a contrived case: the store is in memory, so
+    // it is what every browser holds after a restart, and it must land on the
+    // login screen rather than one status code away from the archive.
+    const ghost = await app.inject({
+      headers: as("u_nobody"),
+      method: "GET",
+      url: `/api/users/u_nobody/calls/${id}`,
+    });
+    assert.equal(ghost.statusCode, 401, "an unknown user is not a way to browse the archive");
   });
 
   it("the archive survives a restart, because it is on disk and not in the map", async () => {
@@ -1588,6 +1785,7 @@ describe("call lifetime", () => {
 describe("judge verdict", () => {
   it("forwards a WRONG verdict to the agent with the shared secret and returns its answer", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -1596,6 +1794,7 @@ describe("judge verdict", () => {
     const before = agentHits.length;
 
     const res = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/verdict`,
       payload: {
@@ -1629,12 +1828,14 @@ describe("judge verdict", () => {
 
   it("passes an explicit utteranceId through unchanged", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
     });
     const id = created.json().call.id;
     const res = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/verdict`,
       payload: { userId: "u_noa", utteranceId: "u_he_ru_000012" },
@@ -1647,6 +1848,7 @@ describe("judge verdict", () => {
 
   it("refuses a non-participant, an unknown call and a malformed body", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -1654,14 +1856,16 @@ describe("judge verdict", () => {
     const id = created.json().call.id;
 
     const stranger = await app.inject({
+      headers: as("u_maya"),
       method: "POST",
       url: `/api/calls/${id}/verdict`,
-      payload: { userId: "u_someone" },
+      payload: { userId: "u_maya" },
     });
     assert.equal(stranger.statusCode, 403);
     assert.equal(stranger.json().error.code, "forbidden");
 
     const missing = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: "/api/calls/c_000000000000/verdict",
       payload: { userId: "u_noa" },
@@ -1669,6 +1873,7 @@ describe("judge verdict", () => {
     assert.equal(missing.statusCode, 404);
 
     const bad = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/verdict`,
       payload: { userId: "u_noa", verdict: "maybe" },
@@ -1679,8 +1884,9 @@ describe("judge verdict", () => {
   });
 
   it("a DIRECT call has nothing to judge and contacts no agent", async () => {
-    await app.inject({ method: "PATCH", url: "/api/users/u_noa", payload: { lang: "ru" } });
+    await app.inject({ headers: as("u_noa"), method: "PATCH", url: "/api/users/u_noa", payload: { lang: "ru" } });
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -1689,6 +1895,7 @@ describe("judge verdict", () => {
     const before = agentHits.length;
 
     const res = await app.inject({
+      headers: as("u_noa"),
       method: "POST",
       url: `/api/calls/${id}/verdict`,
       payload: { userId: "u_noa" },
@@ -1698,11 +1905,12 @@ describe("judge verdict", () => {
     assert.match(res.json().error.message, /DIRECT/);
     assert.equal(agentHits.length, before, "no agent exists for a DIRECT call — do not call one");
 
-    await app.inject({ method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
+    await app.inject({ headers: as("u_noa"), method: "PATCH", url: "/api/users/u_noa", payload: { lang: "he" } });
   });
 
   it("surfaces an agent 404 as a 404 instead of pretending the label landed", async () => {
     const created = await app.inject({
+      headers: as("u_alex"),
       method: "POST",
       url: "/api/calls",
       payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -1711,6 +1919,7 @@ describe("judge verdict", () => {
     verdictStatus = 404;
     try {
       const res = await app.inject({
+        headers: as("u_noa"),
         method: "POST",
         url: `/api/calls/${id}/verdict`,
         payload: { userId: "u_noa" },
@@ -1732,12 +1941,14 @@ describe("judge verdict", () => {
     await offline.ready();
     try {
       const created = await app.inject({
+        headers: as("u_alex"),
         method: "POST",
         url: "/api/calls",
         payload: { callerId: "u_alex", calleeId: "u_noa" },
       });
       const id = created.json().call.id;
       const res = await offline.inject({
+        headers: as("u_noa"),
         method: "POST",
         url: `/api/calls/${id}/verdict`,
         payload: { userId: "u_noa" },
@@ -1757,6 +1968,7 @@ describe("judge verdict", () => {
     await offline.ready();
     try {
       const created = await offline.inject({
+        headers: as("u_alex"),
         method: "POST",
         url: "/api/calls",
         payload: { callerId: "u_alex", calleeId: "u_noa" },
@@ -1768,6 +1980,7 @@ describe("judge verdict", () => {
       assert.ok(call.agent.error);
 
       const res = await offline.inject({
+        headers: as("u_noa"),
         method: "POST",
         url: `/api/calls/${call.id}/verdict`,
         payload: { userId: "u_noa" },
@@ -1893,6 +2106,29 @@ describe("allowed origins", () => {
         allowed.headers["access-control-allow-origin"],
         "https://calm-river-1234.trycloudflare.com",
       );
+      // Load-bearing for the two-tunnel cloud profile: without this header the
+      // browser drops the session cookie on every cross-origin call, and the
+      // page silently behaves as if nobody were signed in. It is also why the
+      // origin above must be the reflected one and never "*" — a wildcard and
+      // credentials are mutually exclusive, and the browser would refuse both.
+      assert.equal(allowed.headers["access-control-allow-credentials"], "true");
+      assert.notEqual(allowed.headers["access-control-allow-origin"], "*");
+
+      const preflight = await tunnelApp.inject({
+        method: "OPTIONS",
+        url: "/api/users/u_alex",
+        headers: {
+          origin: "https://calm-river-1234.trycloudflare.com",
+          "access-control-request-method": "GET",
+          "access-control-request-headers": "authorization",
+        },
+      });
+      assert.ok(
+        String(preflight.headers["access-control-allow-headers"] ?? "")
+          .toLowerCase()
+          .includes("authorization"),
+        "the bearer half of the session must survive the preflight",
+      );
 
       const refused = await tunnelApp.inject({
         method: "GET",
@@ -1905,5 +2141,1162 @@ describe("allowed origins", () => {
     } finally {
       await tunnelApp.close();
     }
+  });
+});
+
+
+/**
+ * IDENTITY. Until 31.08.2026 the answer to "who is making this request" was the
+ * `?me=<userId>` query parameter: whoever held the URL was that person, every
+ * /api/users/:userId/... route trusted the path, and POST /api/auth/phone/start
+ * returned the confirmation code in its own response so anyone could mint the
+ * URL for anyone's number.
+ *
+ * What follows is the whole contract in one block: no session is 401, somebody
+ * else's session is 403, a token this server did not sign is 401, and a real
+ * session does everything a user is supposed to be able to do.
+ */
+describe("session: identity is a signed token, not a query parameter", () => {
+  /**
+   * One row per route that acts on behalf of a user — the same list the routes
+   * themselves guard. Written out rather than derived, because a table built
+   * from the router would go green by agreeing with a bug.
+   */
+  function actingAsAlex(callId: string): Array<{
+    method: "GET" | "POST" | "PATCH";
+    url: string;
+    payload?: Record<string, unknown>;
+  }> {
+    return [
+      { method: "GET", url: "/api/users/u_alex" },
+      { method: "PATCH", url: "/api/users/u_alex", payload: { tone: "neutral" } },
+      { method: "GET", url: "/api/users/u_alex/contacts" },
+      {
+        method: "PATCH",
+        url: "/api/users/u_alex/contacts/u_noa",
+        payload: { forceTranslate: false },
+      },
+      { method: "GET", url: "/api/users/u_alex/calls" },
+      { method: "GET", url: `/api/users/u_alex/calls/${callId}` },
+      { method: "POST", url: "/api/presence", payload: { userId: "u_alex" } },
+      { method: "GET", url: "/api/ring/u_alex" },
+      { method: "POST", url: "/api/calls", payload: { callerId: "u_alex", calleeId: "u_noa" } },
+      { method: "POST", url: `/api/calls/${callId}/join`, payload: { userId: "u_alex" } },
+      {
+        method: "POST",
+        url: `/api/calls/${callId}/mode`,
+        payload: { userId: "u_alex", force: false },
+      },
+      { method: "POST", url: `/api/calls/${callId}/end`, payload: { userId: "u_alex" } },
+      { method: "POST", url: `/api/calls/${callId}/verdict`, payload: { userId: "u_alex" } },
+      { method: "POST", url: `/api/calls/${callId}/ring/accept`, payload: { userId: "u_alex" } },
+      { method: "POST", url: `/api/calls/${callId}/ring/decline`, payload: { userId: "u_alex" } },
+      { method: "POST", url: `/api/calls/${callId}/ring/cancel`, payload: { userId: "u_alex" } },
+    ];
+  }
+
+  /** A call that exists, so a 401/403 cannot be a 404 wearing a disguise. */
+  async function aliveCallId(): Promise<string> {
+    const created = await app.inject({
+      headers: as("u_alex"),
+      method: "POST",
+      url: "/api/calls",
+      payload: { callerId: "u_alex", calleeId: "u_noa" },
+    });
+    assert.equal(created.statusCode, 201);
+    return created.json().call.id as string;
+  }
+
+  it("answers 401 on every user route when there is no session at all", async () => {
+    const callId = await aliveCallId();
+    for (const req of actingAsAlex(callId)) {
+      const res = await app.inject({ method: req.method, url: req.url, payload: req.payload });
+      assert.equal(
+        res.statusCode,
+        401,
+        `${req.method} ${req.url} must be 401 without a session, got ${res.statusCode}`,
+      );
+      assert.equal(res.json().error.code, "unauthorized");
+    }
+    await hangUp(callId);
+  });
+
+  it("answers 403 on every one of them for a session that belongs to someone else", async () => {
+    const callId = await aliveCallId();
+    // Maya is real, signed in, and none of this is hers. This is the `?me=`
+    // hole stated as a test: holding the URL is no longer holding the identity.
+    for (const req of actingAsAlex(callId)) {
+      const res = await app.inject({
+        headers: as("u_maya"),
+        method: req.method,
+        url: req.url,
+        payload: req.payload,
+      });
+      assert.equal(
+        res.statusCode,
+        403,
+        `${req.method} ${req.url} must be 403 for another user, got ${res.statusCode}`,
+      );
+      assert.equal(res.json().error.code, "forbidden");
+    }
+    await hangUp(callId);
+  });
+
+  it("refuses a forged token: wrong key, edited payload, or mangled signature", async () => {
+    const url = "/api/users/u_alex";
+
+    const wrongKey = issueSession("a-different-secret-entirely-0000000000", "u_alex", 3600).token;
+    const wrongKeyRes = await app.inject({
+      headers: { authorization: `Bearer ${wrongKey}` },
+      method: "GET",
+      url,
+    });
+    assert.equal(wrongKeyRes.statusCode, 401, "a token signed with another key is not a session");
+
+    // The interesting forgery: take a session you legitimately hold and rewrite
+    // whose it is. The signature covers the payload, so it stops being valid.
+    const mine = issueSession(TEST_SESSION_SECRET, "u_maya", 3600).token;
+    const signature = mine.split(".")[2]!;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const swapped = Buffer.from(
+      JSON.stringify({ u: "u_alex", i: nowSeconds, e: nowSeconds + 3600 }),
+      "utf8",
+    ).toString("base64url");
+    const tampered = await app.inject({
+      headers: { authorization: `Bearer sv1.${swapped}.${signature}` },
+      method: "GET",
+      url,
+    });
+    assert.equal(tampered.statusCode, 401, "an edited payload must not keep an old signature");
+
+    const mangled = await app.inject({
+      headers: { authorization: `Bearer ${mine.slice(0, -3)}xyz` },
+      method: "GET",
+      url: "/api/users/u_maya",
+    });
+    assert.equal(mangled.statusCode, 401);
+
+    const nonsense = await app.inject({
+      headers: { authorization: "Bearer not-a-token" },
+      method: "GET",
+      url,
+    });
+    assert.equal(nonsense.statusCode, 401);
+  });
+
+  it("refuses an expired token, however well signed", async () => {
+    const expired = issueSession(TEST_SESSION_SECRET, "u_alex", -1).token;
+    const res = await app.inject({
+      headers: { authorization: `Bearer ${expired}` },
+      method: "GET",
+      url: "/api/users/u_alex",
+    });
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.json().error.code, "unauthorized");
+  });
+
+  it("carries a real phone user from registration through a call on his own session", async () => {
+    // The end-to-end shape of the founder's own path: verify a number, get a
+    // profile AND a session in the same response, then use nothing but that
+    // session for everything after it. No ?me=, no user id in a header.
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "056-400-0001" },
+    });
+    assert.equal(started.statusCode, 201);
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: started.json().challengeId, code: started.json().devCode },
+    });
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        registrationToken: verified.json().registrationToken,
+        displayName: "Основатель",
+        lang: "ru",
+        gender: "m",
+      },
+    });
+    assert.equal(registered.statusCode, 201);
+    const me = registered.json().user.id as string;
+    const token = registered.json().session.token as string;
+    assert.ok(token, "registration must hand back a session");
+    assert.ok(
+      Date.parse(registered.json().session.expiresAt) > Date.now(),
+      "a session must carry an expiry, and it must be in the future",
+    );
+    const mine = { authorization: `Bearer ${token}` };
+
+    const who = await app.inject({ headers: mine, method: "GET", url: "/api/auth/session" });
+    assert.equal(who.statusCode, 200);
+    assert.equal(who.json().user.id, me, "the session answers who it is without being told");
+
+    const profile = await app.inject({ headers: mine, method: "GET", url: `/api/users/${me}` });
+    assert.equal(profile.statusCode, 200);
+    assert.equal(profile.json().user.displayName, "Основатель");
+
+    const renamed = await app.inject({
+      headers: mine,
+      method: "PATCH",
+      url: `/api/users/${me}`,
+      payload: { tone: "friendly" },
+    });
+    assert.equal(renamed.statusCode, 200);
+
+    const contacts = await app.inject({
+      headers: mine,
+      method: "GET",
+      url: `/api/users/${me}/contacts`,
+    });
+    assert.equal(contacts.statusCode, 200);
+    assert.ok(
+      contacts.json().contacts.some((c: { userId: string }) => c.userId === "u_noa"),
+      "the seeded grid must still be reachable after the session check",
+    );
+
+    const card = await app.inject({
+      headers: mine,
+      method: "PATCH",
+      url: `/api/users/${me}/contacts/u_noa`,
+      payload: { forceTranslate: true },
+    });
+    assert.equal(card.statusCode, 200);
+    assert.equal(card.json().contact.forceTranslate, true);
+
+    const heartbeat = await app.inject({
+      headers: mine,
+      method: "POST",
+      url: "/api/presence",
+      payload: { userId: me },
+    });
+    assert.equal(heartbeat.statusCode, 200);
+    assert.equal(heartbeat.json().self.online, true);
+
+    const ring = await app.inject({ headers: mine, method: "GET", url: `/api/ring/${me}` });
+    assert.equal(ring.statusCode, 200);
+
+    const created = await app.inject({
+      headers: mine,
+      method: "POST",
+      url: "/api/calls",
+      payload: { callerId: me, calleeId: "u_noa" },
+    });
+    assert.equal(created.statusCode, 201);
+    const callId = created.json().call.id as string;
+
+    const joined = await app.inject({
+      headers: mine,
+      method: "POST",
+      url: `/api/calls/${callId}/join`,
+      payload: { userId: me },
+    });
+    assert.equal(joined.statusCode, 200);
+    assert.ok(joined.json().token, "a joined call still mints a LiveKit token");
+
+    const ended = await app.inject({
+      headers: mine,
+      method: "POST",
+      url: `/api/calls/${callId}/end`,
+      payload: { userId: me },
+    });
+    assert.equal(ended.statusCode, 200);
+
+    const history = await app.inject({ headers: mine, method: "GET", url: `/api/users/${me}/calls` });
+    assert.equal(history.statusCode, 200);
+
+    // Undo the override so the rest of the file sees the contact grid it expects.
+    await app.inject({
+      headers: mine,
+      method: "PATCH",
+      url: `/api/users/${me}/contacts/u_noa`,
+      payload: { forceTranslate: false },
+    });
+  });
+
+  it("sets an httpOnly SameSite=Lax cookie, Secure everywhere but a local host", async () => {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "056-400-0002" },
+    });
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: started.json().challengeId, code: started.json().devCode },
+    });
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        registrationToken: verified.json().registrationToken,
+        displayName: "Куки",
+        lang: "ru",
+        gender: "f",
+      },
+    });
+    const cookie = registered.headers["set-cookie"] as string;
+    assert.match(cookie, /^sv_session=/);
+    assert.match(cookie, /HttpOnly/, "script must not be able to read the session");
+    assert.match(cookie, /SameSite=Lax/, "Strict would drop the cookie on an invite link");
+    assert.match(cookie, /Max-Age=\d+/);
+    assert.match(cookie, /Path=\//);
+    // inject() speaks to localhost, where a Secure cookie is silently dropped
+    // and "logging in does nothing" is the least debuggable failure there is.
+    assert.ok(!/Secure/.test(cookie), `no Secure on a local host: ${cookie}`);
+
+    const me = registered.json().user.id as string;
+    const token = cookie.slice("sv_session=".length).split(";")[0]!;
+    const byCookie = await app.inject({
+      headers: { cookie: `sv_session=${token}` },
+      method: "GET",
+      url: `/api/users/${me}`,
+    });
+    assert.equal(byCookie.statusCode, 200, "the cookie alone must be a session");
+    assert.equal(byCookie.json().user.id, me);
+
+    // The deployed page is https behind Caddy, which forwards plain http on
+    // loopback — so the decision is taken from the Host, never the protocol.
+    const publicHost = await app.inject({
+      headers: { host: "samevoice.0110.digital" },
+      method: "POST",
+      url: "/api/auth/logout",
+    });
+    assert.match(publicHost.headers["set-cookie"] as string, /Secure/);
+
+    const loggedOut = await app.inject({ method: "POST", url: "/api/auth/logout" });
+    assert.match(loggedOut.headers["set-cookie"] as string, /sv_session=;/);
+    assert.match(loggedOut.headers["set-cookie"] as string, /Max-Age=0/);
+  });
+
+  it("treats verifying a number that already has a profile as the login itself", async () => {
+    const again = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "056-400-0001" },
+    });
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: again.json().challengeId, code: again.json().devCode },
+    });
+    assert.equal(verified.statusCode, 200);
+    assert.ok(verified.json().existingUser, "the number is already known");
+    assert.ok(verified.json().session?.token, "a returning user must not have to register again");
+    assert.match(verified.headers["set-cookie"] as string, /^sv_session=/);
+
+    const who = await app.inject({
+      headers: { authorization: `Bearer ${verified.json().session.token}` },
+      method: "GET",
+      url: "/api/auth/session",
+    });
+    assert.equal(who.json().user.id, verified.json().existingUser.id);
+  });
+
+  it("answers GET /api/auth/session with 401 when there is nothing to answer from", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/auth/session" });
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.json().error.code, "unauthorized");
+  });
+});
+
+/**
+ * THE CODE IN THE RESPONSE, and who may ask for one.
+ *
+ * devCode is not removed: SMS is not wired, and removing it would leave nobody
+ * able to log in at all. It is a switch that defaults to off, and the other
+ * half of the fix is an allowlist of numbers permitted to start verification.
+ */
+describe("confirmation-code delivery and the tester allowlist", () => {
+  async function withApp(
+    overrides: Record<string, unknown>,
+    fn: (built: FastifyInstance) => Promise<void>,
+    logStream?: NodeJS.WritableStream,
+  ): Promise<void> {
+    const { loadConfig } = await import("../src/config.js");
+    const { buildApp } = await import("../src/index.js");
+    const built = await buildApp({ ...loadConfig(), ...overrides } as never, { logStream });
+    try {
+      await fn(built);
+    } finally {
+      await built.close();
+    }
+  }
+
+  it("keeps the code out of the response by default and puts it in the log — without the number", async () => {
+    const lines: string[] = [];
+    const stream = {
+      write(chunk: string): boolean {
+        lines.push(chunk);
+        return true;
+      },
+    } as unknown as NodeJS.WritableStream;
+
+    await withApp(
+      { authDevCodeInResponse: false, logLevel: "warn" },
+      async (built) => {
+        const started = await built.inject({
+          method: "POST",
+          url: "/api/auth/phone/start",
+          payload: { phone: "056-400-0003" },
+        });
+        assert.equal(started.statusCode, 201);
+        assert.equal(started.json().devCode, undefined, "the code must NOT be in the response");
+        assert.equal(started.json().codeDelivery, "server_log");
+        assert.match(started.json().challengeId, /^pv_[0-9a-f]{24}$/);
+
+        const logged = lines.join("");
+        assert.ok(
+          logged.includes(started.json().challengeId),
+          "the operator must be able to find the challenge in the log",
+        );
+        const code = /"code":"(\d{6})"/.exec(logged)?.[1];
+        assert.ok(code, `a six-digit code must reach the log: ${logged}`);
+        // The invariant, asserted rather than promised: a phone number is
+        // personal data and must never appear in a log line.
+        assert.ok(
+          !logged.includes("+972564000003") && !logged.includes("0564000003"),
+          `the phone number must never reach the log: ${logged}`,
+        );
+
+        const verified = await built.inject({
+          method: "POST",
+          url: "/api/auth/phone/verify",
+          payload: { challengeId: started.json().challengeId, code },
+        });
+        assert.equal(verified.statusCode, 200, "the logged code is the real one");
+      },
+      stream,
+    );
+  });
+
+  it("lets anyone start when the allowlist is empty — the behaviour the boot warning is about", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "056-400-0009" },
+    });
+    assert.equal(res.statusCode, 201);
+  });
+
+  it("refuses a number that is not on a non-empty allowlist, and says nothing about it", async () => {
+    await withApp({ authPhoneAllowlist: ["+972564000004"] }, async (built) => {
+      const allowed = await built.inject({
+        method: "POST",
+        url: "/api/auth/phone/start",
+        // Israeli notation on the wire, E.164 in the config: one normalizer,
+        // so the two forms are the same number rather than two.
+        payload: { phone: "056-400-0004" },
+      });
+      assert.equal(allowed.statusCode, 201);
+
+      const refused = await built.inject({
+        method: "POST",
+        url: "/api/auth/phone/start",
+        payload: { phone: "056-400-0005" },
+      });
+      assert.equal(refused.statusCode, 403);
+      assert.equal(refused.json().error.code, "forbidden");
+      assert.ok(
+        !JSON.stringify(refused.json()).includes("564000005"),
+        "a rejection must not echo the number back",
+      );
+    });
+  });
+
+  /**
+   * FIVE GUESSES PER CHALLENGE IS NOT FIVE GUESSES.
+   *
+   * The per-challenge counter is exactly what a new challenge resets, and
+   * minting one is a single unauthenticated POST. Guess five, ask for a fresh
+   * code, guess five more: the search covers the whole six-digit space at five
+   * guesses per two requests, so a script reaches even odds against a chosen
+   * number in roughly 140,000 guesses. Landing on a number that already has a
+   * profile is not a registration — POST /api/auth/phone/verify treats a known
+   * number as the login and returns that person's session.
+   *
+   * This walks that attack in miniature: the budget is keyed on the NUMBER, so
+   * fresh challenges buy nothing, and once it is out even the RIGHT code is
+   * refused.
+   */
+  it("bounds guesses per number, so a fresh challenge does not buy fresh tries", async () => {
+    const phone = "058-400-0011";
+    const start = async (): Promise<{ challengeId: string; devCode: string }> => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/auth/phone/start",
+        payload: { phone },
+      });
+      assert.equal(res.statusCode, 201);
+      return res.json();
+    };
+    const guess = async (challengeId: string, code: string) =>
+      app.inject({
+        method: "POST",
+        url: "/api/auth/phone/verify",
+        payload: { challengeId, code },
+      });
+
+    const { MAX_ATTEMPTS_PER_PHONE } = await import("../src/phoneVerification.js");
+    // Only a guess against a LIVE challenge costs anything — one against a
+    // challenge that has run out is not a guess at the code, and is free. So
+    // `invalid_code` is what counts, and `invalid_challenge` is the signal to
+    // mint another one, which is exactly the loop the attack runs.
+    let spent = 0;
+    let latest = await start();
+    for (let i = 0; spent < MAX_ATTEMPTS_PER_PHONE && i < MAX_ATTEMPTS_PER_PHONE * 4; i += 1) {
+      const wrong = latest.devCode === "000000" ? "999999" : "000000";
+      const res = await guess(latest.challengeId, wrong);
+      assert.equal(res.statusCode, 400);
+      if (res.json().error.code === "invalid_code") spent += 1;
+      else latest = await start();
+    }
+    assert.equal(spent, MAX_ATTEMPTS_PER_PHONE, "the budget must actually have been spent");
+
+    // The budget is spent. A brand-new challenge and its OWN correct code —
+    // everything a legitimate login has — must still not get through, or the
+    // ceiling is per challenge again and bounds nothing.
+    const fresh = await start();
+    const refused = await guess(fresh.challengeId, fresh.devCode);
+    assert.equal(refused.statusCode, 400, "the number is out of guesses for this window");
+    assert.equal(
+      refused.json().error.code,
+      "invalid_challenge",
+      "and it must not announce that the ceiling is what stopped it",
+    );
+
+    // Per number, not global: a different number is untouched by the first
+    // one's spending, or one script locks every tester out of logging in.
+    const other = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "058-400-0012" },
+    });
+    const otherOk = await guess(other.json().challengeId, other.json().devCode);
+    assert.equal(otherOk.statusCode, 200);
+    assert.equal(otherOk.json().verified, true);
+  });
+
+  it("rejects an unparseable allowlist at startup instead of silently blocking everyone", async () => {
+    const { loadConfig } = await import("../src/config.js");
+    process.env.AUTH_PHONE_ALLOWLIST = "not-a-number";
+    try {
+      assert.throws(() => loadConfig(), /AUTH_PHONE_ALLOWLIST/);
+    } finally {
+      delete process.env.AUTH_PHONE_ALLOWLIST;
+    }
+  });
+
+  it("hands out no seeded session by default, and only seeded ones when switched on", async () => {
+    const off = await app.inject({
+      method: "POST",
+      url: "/api/auth/seeded-login",
+      payload: { userId: "u_alex" },
+    });
+    assert.equal(off.statusCode, 403, "the debug login must be off unless asked for");
+
+    await withApp({ authSeededLogin: true }, async (built) => {
+      const on = await built.inject({
+        method: "POST",
+        url: "/api/auth/seeded-login",
+        payload: { userId: "u_noa" },
+      });
+      assert.equal(on.statusCode, 200);
+      assert.equal(on.json().user.id, "u_noa");
+      assert.ok(on.json().session.token);
+
+      // Even switched on it is a login for the four test fixtures and nothing
+      // else: a real person's profile is reachable only through their number.
+      const phoneUser = await built.inject({
+        method: "POST",
+        url: "/api/auth/phone/start",
+        payload: { phone: "056-400-0006" },
+      });
+      const verified = await built.inject({
+        method: "POST",
+        url: "/api/auth/phone/verify",
+        payload: { challengeId: phoneUser.json().challengeId, code: phoneUser.json().devCode },
+      });
+      const registered = await built.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        payload: {
+          registrationToken: verified.json().registrationToken,
+          displayName: "Настоящий",
+          lang: "he",
+          gender: "f",
+        },
+      });
+      const realUserId = registered.json().user.id as string;
+
+      const stolen = await built.inject({
+        method: "POST",
+        url: "/api/auth/seeded-login",
+        payload: { userId: realUserId },
+      });
+      assert.equal(stolen.statusCode, 403, "a phone-registered profile is never a seeded identity");
+    });
+  });
+});
+
+/**
+ * Persistence. Users, the phone index and contacts used to live only in Maps, so
+ * `systemctl restart` deleted every identity that had passed phone verification
+ * while the seeded four — recreated by code on every boot — kept working. The
+ * founder's own ?me= link answered "user not found"; the failure therefore read
+ * as a broken link rather than as a wiped store, and stayed unexplained.
+ *
+ * A restart is reproduced by calling loadIdentityStore() again on the same
+ * directory. That is not an imitation of a boot: it is the function buildApp()
+ * calls, with the argument buildApp() passes.
+ *
+ * This block runs LAST on purpose — its final test resets the store to the bare
+ * seed, which any test after it would inherit.
+ */
+describe("identity persistence: profiles and contacts survive a restart", () => {
+  /** Unused by every other test in this file: one number, one profile, forever. */
+  const PHONE_E164 = "+972524044040";
+  const SEEDED_IDS = ["u_alex", "u_maya", "u_noa", "u_omri"];
+
+  function snapshotFile(): string {
+    return join(identityDir, "identities.json");
+  }
+
+  it("writes the profile, the phone index and BOTH contact directions on registration", async () => {
+    const store = await import("../src/store.js");
+    assert.equal(store.identityStorePath(), snapshotFile());
+
+    // createUserFromPhone() rather than the three auth requests: this is the
+    // function POST /api/auth/register calls once verification has passed, and
+    // it is the boundary that owns persistence. Driving it directly keeps this
+    // block measuring the store instead of the delivery of a confirmation code.
+    const user = store.createUserFromPhone({
+      phone: PHONE_E164,
+      displayName: "Дов",
+      lang: "ru",
+      gender: "m",
+    });
+    const userId = user.id;
+    assert.match(userId, /^u_[0-9a-f]{16}$/);
+
+    assert.ok(existsSync(snapshotFile()), `registration must have written ${snapshotFile()}`);
+    const snapshot = JSON.parse(readFileSync(snapshotFile(), "utf8"));
+    assert.equal(snapshot.version, 1);
+    assert.ok(
+      snapshot.users.some((u: { id: string; displayName: string }) => u.id === userId && u.displayName === "Дов"),
+      "the profile must be in the file, not only in memory",
+    );
+    assert.deepEqual(
+      snapshot.phones.filter((p: { userId: string }) => p.userId === userId),
+      [{ phone: PHONE_E164, userId }],
+      "the phone index is what stops one number minting a second profile at the next login",
+    );
+    // Both directions. A one-way row lets him dial out and never be reachable,
+    // which is the shape the auto-join exists to prevent.
+    assert.ok(
+      snapshot.contacts.some(
+        (c: { ownerId: string; contactUserId: string }) => c.ownerId === userId && c.contactUserId === "u_alex",
+      ),
+    );
+    assert.ok(
+      snapshot.contacts.some(
+        (c: { ownerId: string; contactUserId: string }) => c.ownerId === "u_alex" && c.contactUserId === userId,
+      ),
+    );
+    // The write goes to a temporary file and is renamed onto the snapshot; a
+    // leftover .tmp beside it would mean the rename never happened.
+    assert.equal(existsSync(`${snapshotFile()}.tmp`), false);
+  });
+
+  it("brings the user, his number and his contact settings back after a restart", async () => {
+    const store = await import("../src/store.js");
+    const userId = store.getUserByPhone(PHONE_E164)!.id;
+
+    // A per-contact override, because a contact ROW surviving is not the same as
+    // the settings on it surviving — the pinned language is what a tester loses.
+    store.updateContact(userId, "u_noa", { forceTranslate: true, overrides: { tone: "formal" } });
+
+    store.loadIdentityStore(identityDir);
+
+    const user = store.getUser(userId);
+    assert.ok(user, `${userId} must exist after a restart — this is the founder's ?me= link`);
+    assert.equal(user!.displayName, "Дов");
+    assert.equal(store.getUserByPhone(PHONE_E164)?.id, userId, "the phone index must survive too");
+
+    assert.deepEqual(
+      store.listContacts(userId).map((c) => c.contactUserId).sort(),
+      SEEDED_IDS,
+      "an empty contact list after a restart is the bug that hid for days",
+    );
+    assert.ok(store.listContacts("u_alex").some((c) => c.contactUserId === userId));
+
+    const noa = store.getContact(userId, "u_noa");
+    assert.equal(noa?.forceTranslate, true);
+    assert.deepEqual(noa?.overrides, { tone: "formal" });
+  });
+
+  it("does not duplicate the seeded accounts by loading the snapshot on top of the seed", async () => {
+    const store = await import("../src/store.js");
+    const before = store.listUsers().length;
+
+    store.loadIdentityStore(identityDir);
+    store.loadIdentityStore(identityDir);
+
+    assert.equal(store.listUsers().length, before, "a second boot must not add a second Alex");
+    assert.equal(store.listUsers().filter((u) => u.id === "u_alex").length, 1);
+    assert.deepEqual([...store.stage0TestIdentityIdList()].sort(), SEEDED_IDS);
+
+    const alexContacts = store.listContacts("u_alex").map((c) => c.contactUserId);
+    assert.equal(new Set(alexContacts).size, alexContacts.length, "u_alex must not hold a contact twice");
+    for (const id of SEEDED_IDS) {
+      assert.ok(store.getUser(id), `seeded ${id} must still exist after a restart`);
+    }
+  });
+
+  it("refuses to start on a truncated snapshot instead of coming up empty", async () => {
+    const store = await import("../src/store.js");
+    const dir = mkdtempSync(join(tmpdir(), "speakeasy-identity-corrupt-"));
+    const file = join(dir, "identities.json");
+    // Exactly what a crash between write and rename would leave if the write
+    // were not staged through a temporary file: a real snapshot, tail missing.
+    const good = readFileSync(snapshotFile(), "utf8");
+    writeFileSync(file, good.slice(0, Math.floor(good.length / 2)), "utf8");
+
+    try {
+      assert.throws(
+        () => store.loadIdentityStore(dir),
+        (err: Error) => {
+          assert.match(err.message, /is not valid JSON/);
+          // The path, or the operator has nothing to go and look at.
+          assert.ok(err.message.includes(file), `message must name ${file}: ${err.message}`);
+          return true;
+        },
+        "a corrupt store must stop the process, never start it with the seed alone",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+    // Loud AND harmless: the failed load changed nothing. Memory still holds the
+    // registered user, and the store still points at the good directory — a
+    // caller that swallowed the error cannot overwrite the file an operator now
+    // has to go and read. Production does not swallow it: index.ts prints the
+    // message and exits.
+    assert.equal(store.identityStorePath(), snapshotFile());
+    assert.ok(store.getUserByPhone(PHONE_E164), "a failed load must not empty the store it had");
+  });
+
+  it("refuses a snapshot that parses but is not one, naming the field", async () => {
+    const store = await import("../src/store.js");
+    const dir = mkdtempSync(join(tmpdir(), "speakeasy-identity-wrong-shape-"));
+    const file = join(dir, "identities.json");
+    writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        savedAt: "2026-08-31T00:00:00.000Z",
+        users: [{ id: "alex", handle: "alex", displayName: "Alex", lang: "ru", gender: "m", tone: "neutral" }],
+        phones: [],
+        contacts: [],
+      }),
+      "utf8",
+    );
+
+    try {
+      assert.throws(
+        () => store.loadIdentityStore(dir),
+        (err: Error) => {
+          assert.match(err.message, /does not match snapshot v1/);
+          assert.ok(err.message.includes(file), `message must name ${file}: ${err.message}`);
+          assert.match(err.message, /users\.0\.id/);
+          return true;
+        },
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    assert.equal(store.identityStorePath(), snapshotFile());
+  });
+
+  /**
+   * TWO BACKENDS, ONE IDENTITY_DIR — the case that cost 390 profiles.
+   *
+   * saveIdentities() serializes this process's whole memory, so before the
+   * guard the file was replaced by whoever wrote last. Measured on 31.08.2026
+   * with two backends sharing one directory: a 545,725-byte snapshot holding
+   * 404 profiles became a 15,834-byte one holding 14 — silently, by a write
+   * that reported success and logged nothing.
+   *
+   * The other process is played by writing the file underneath this one, which
+   * is exactly what its rename(2) does; it needs no second node to be the same
+   * event.
+   */
+  it("does not delete rows another process wrote into the same snapshot", async () => {
+    const store = await import("../src/store.js");
+    const mine = store.getUserByPhone(PHONE_E164)!.id;
+
+    const theirs = {
+      id: "u_00000000deadbeef",
+      handle: "user_00000000",
+      displayName: "Другой процесс",
+      lang: "ru",
+      gender: "f",
+      tone: "friendly",
+    };
+    const onDisk = JSON.parse(readFileSync(snapshotFile(), "utf8"));
+    onDisk.users.push(theirs);
+    onDisk.phones.push({ phone: "+972529999001", userId: theirs.id });
+    onDisk.contacts.push({
+      ownerId: theirs.id,
+      contactUserId: "u_alex",
+      forceTranslate: false,
+      overrides: {},
+    });
+    writeFileSync(snapshotFile(), `${JSON.stringify(onDisk, null, 2)}\n`, "utf8");
+
+    // Any mutation will do; the point is the save it triggers.
+    store.updateUser(mine, { tone: "formal" });
+
+    const saved = JSON.parse(readFileSync(snapshotFile(), "utf8"));
+    const ids = saved.users.map((u: { id: string }) => u.id);
+    assert.ok(
+      ids.includes(theirs.id),
+      "the other process's profile must survive this process's save, not be silently deleted",
+    );
+    assert.ok(ids.includes(mine), "and this process's own profiles must still be there");
+    assert.ok(
+      saved.phones.some((p: { phone: string }) => p.phone === "+972529999001"),
+      "the phone index is what stops that number minting a second profile — it must survive too",
+    );
+    // Add-only: the merge must not undo the edit whose save it runs inside.
+    assert.equal(
+      saved.users.find((u: { id: string }) => u.id === mine).tone,
+      "formal",
+      "merging the file in must not revert the edit that is being saved",
+    );
+
+    // The row that came back from the file must be usable, not just present:
+    // a merge that loaded it somewhere the API cannot see would pass the
+    // assertions above and still leave that person unreachable.
+    assert.equal(store.getUserByPhone("+972529999001")?.id, theirs.id);
+  });
+
+  /**
+   * The file holds the phone numbers — the index that stops one number minting
+   * a second profile IS the numbers. 0644 published them to every account on
+   * the box, from the one file that works hardest to keep them out of the log.
+   */
+  it("keeps the snapshot readable only by its owner", async () => {
+    const { statSync } = await import("node:fs");
+    assert.equal(
+      statSync(snapshotFile()).mode & 0o777,
+      0o600,
+      "the snapshot carries phone numbers and must not be world-readable",
+    );
+  });
+
+  it("resetStore() leaves no file behind, and the emptied directory boots as a first boot", async () => {
+    const store = await import("../src/store.js");
+    assert.ok(existsSync(snapshotFile()));
+
+    store.resetStore();
+
+    assert.equal(
+      existsSync(snapshotFile()),
+      false,
+      "a leftover snapshot would leak one test's phone users into the next test's contact lists",
+    );
+    assert.equal(existsSync(`${snapshotFile()}.tmp`), false);
+    assert.equal(store.getUserByPhone(PHONE_E164), undefined);
+    assert.deepEqual(store.listUsers().map((u) => u.id).sort(), SEEDED_IDS);
+
+    // A directory with no snapshot is the ordinary first boot, not an error.
+    store.loadIdentityStore(identityDir);
+    assert.deepEqual(store.listUsers().map((u) => u.id).sort(), SEEDED_IDS);
+    assert.deepEqual(store.listContacts("u_alex").map((c) => c.contactUserId).sort(), ["u_maya", "u_noa", "u_omri"]);
+  });
+});
+
+
+/**
+ * Adding a contact BY PHONE NUMBER.
+ *
+ * The gap it closes: a phone-registered user is auto-joined to the four seeded
+ * test identities and to nothing else (deliberately not transitively — see
+ * STAGE0_AUTO_JOIN_TEST_IDENTITIES), so two humans on real numbers were
+ * invisible to each other and could not dial each other from the contacts
+ * screen at all. These tests pin the three things that make the fix honest:
+ * both directions, one answer for every number, and a bounded number of tries.
+ */
+describe("adding a contact by phone number", () => {
+  /** The three real steps: start -> verify -> register. Returns the new user id. */
+  async function registerByPhone(
+    phone: string,
+    profile: { displayName: string; lang: "ru" | "he"; gender: "m" | "f" | "u" },
+  ): Promise<string> {
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone },
+    });
+    assert.equal(started.statusCode, 201);
+    const challenge = started.json();
+    assert.ok(
+      typeof challenge.devCode === "string",
+      "these tests need the confirmation code back in the response (AUTH_DEV_CODE_IN_RESPONSE)",
+    );
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    assert.equal(verified.statusCode, 200);
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { registrationToken: verified.json().registrationToken, ...profile },
+    });
+    assert.equal(registered.statusCode, 201);
+    return registered.json().user.id as string;
+  }
+
+  async function addByPhone(actorId: string, phone: string) {
+    return app.inject({
+      method: "POST",
+      url: "/api/contacts/by-phone",
+      headers: as(actorId),
+      payload: { phone },
+    });
+  }
+
+  async function contactsOf(userId: string): Promise<Array<Record<string, unknown>>> {
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/users/${userId}/contacts`,
+      headers: as(userId),
+    });
+    assert.equal(res.statusCode, 200);
+    return res.json().contacts as Array<Record<string, unknown>>;
+  }
+
+  async function contactIdsOf(userId: string): Promise<string[]> {
+    return (await contactsOf(userId)).map((c) => c.userId as string).sort();
+  }
+
+  it("puts each of them in the other's list, in BOTH directions", async () => {
+    const anna = await registerByPhone("057-100-0001", {
+      displayName: "Анна",
+      lang: "ru",
+      gender: "f",
+    });
+    const boris = await registerByPhone("057-100-0002", {
+      displayName: "Борис",
+      lang: "he",
+      gender: "m",
+    });
+
+    // Before: the auto-join gave each of them the seeded grid and nothing else.
+    assert.equal((await contactIdsOf(anna)).includes(boris), false);
+    assert.equal((await contactIdsOf(boris)).includes(anna), false);
+
+    assert.equal((await addByPhone(anna, "057-100-0002")).statusCode, 200);
+
+    assert.ok((await contactIdsOf(anna)).includes(boris), "Anna must now be able to dial Boris");
+    // The direction that gets forgotten when a row is written out by hand:
+    // without it Anna can dial out and never receive, because Boris never sees
+    // her in his list and presence never reports her to him.
+    assert.ok((await contactIdsOf(boris)).includes(anna), "Boris must be able to call back");
+
+    // And it is a real contact row on both sides, carrying the profile the MT
+    // prompt inflects Hebrew on — not just an id in a list.
+    const card = (await contactsOf(anna)).find((c) => c.userId === boris)!;
+    assert.equal(card.displayName, "Борис");
+    assert.equal(card.lang, "he");
+    assert.equal(card.gender, "m");
+    assert.equal(card.forceTranslate, false);
+
+    // Idempotent: adding the same number again must not duplicate the row nor
+    // reset the per-contact overrides a tester has already set on that card.
+    const patched = await app.inject({
+      method: "PATCH",
+      url: `/api/users/${anna}/contacts/${boris}`,
+      headers: as(anna),
+      payload: { lang: "ru" },
+    });
+    assert.equal(patched.statusCode, 200);
+    const before = await contactIdsOf(anna);
+    assert.equal((await addByPhone(anna, "+972571000002")).statusCode, 200);
+    assert.deepEqual(await contactIdsOf(anna), before);
+    const again = (await contactsOf(anna)).find((c) => c.userId === boris)!;
+    assert.deepEqual(again.overrides, { lang: "ru" });
+  });
+
+  /**
+   * The privacy property, and the reason this endpoint is not a directory: an
+   * answer that differed for an unregistered number would make it a membership
+   * oracle — feed it numbers, keep the hits, walk away with a list of who uses
+   * the product. It is the leak the GET /api/users directory is called out for,
+   * opened a second door and keyed on phone numbers.
+   */
+  it("answers a number nobody registered exactly as it answers a known one", async () => {
+    const dana = await registerByPhone("057-100-0003", {
+      displayName: "Дана",
+      lang: "ru",
+      gender: "f",
+    });
+    const egor = await registerByPhone("057-100-0004", {
+      displayName: "Егор",
+      lang: "he",
+      gender: "m",
+    });
+
+    const hit = await addByPhone(dana, "057-100-0004");
+    const miss = await addByPhone(dana, "059-800-0000");
+
+    assert.equal(hit.statusCode, miss.statusCode, "the status code must not separate the two");
+    assert.deepEqual(miss.json(), hit.json(), "the body must not separate the two either");
+    assert.deepEqual(Object.keys(hit.json()).sort(), ["requested"]);
+
+    // Nothing about the other person leaks through the envelope: no id, no
+    // name, and not even the number the caller typed — a phone number goes to
+    // its owner and to nobody else, and the caller is not its owner.
+    const rendered = JSON.stringify(hit.json());
+    assert.equal(rendered.includes(egor), false);
+    assert.equal(rendered.includes("Егор"), false);
+    assert.equal(rendered.includes("57100"), false);
+
+    // Own number: the same answer once more, and no self-row — a card that
+    // could "call" its owner would show up in his own list.
+    const self = await addByPhone(dana, "057-100-0003");
+    assert.equal(self.statusCode, hit.statusCode);
+    assert.deepEqual(self.json(), hit.json());
+    assert.equal((await contactIdsOf(dana)).includes(dana), false);
+
+    // The hit did land, which is what makes the equality above mean "you cannot
+    // tell them apart" rather than "the route does nothing".
+    assert.ok((await contactIdsOf(dana)).includes(egor));
+  });
+
+  it("takes the number in the local notation the account was created with", async () => {
+    const fima = await registerByPhone("+972 57 100 0005", {
+      displayName: "Фима",
+      lang: "ru",
+      gender: "m",
+    });
+    const galya = await registerByPhone("057-100-0006", {
+      displayName: "Галя",
+      lang: "he",
+      gender: "f",
+    });
+
+    // Typed the way a person types it, matched against a number stored in
+    // E.164. One parser (phoneVerification.normalizePhone) decides both ends,
+    // so "057 100 0005" and "+972571000005" are the same person; a second
+    // parser here would miss a user who is plainly there.
+    assert.equal((await addByPhone(galya, "057 100 0005")).statusCode, 200);
+    assert.ok((await contactIdsOf(galya)).includes(fima));
+  });
+
+  it("refuses a string that is not a phone number, without looking anyone up", async () => {
+    const igor = await registerByPhone("057-100-0007", {
+      displayName: "Игорь",
+      lang: "ru",
+      gender: "m",
+    });
+    // Safe to answer honestly: this reply depends only on what the caller typed,
+    // never on who else exists.
+    const res = await addByPhone(igor, "123");
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.json().error.code, "bad_request");
+  });
+
+  it("requires a session: the caller is never taken from the body or the path", async () => {
+    const anon = await app.inject({
+      method: "POST",
+      url: "/api/contacts/by-phone",
+      payload: { phone: "057-100-0002" },
+    });
+    assert.equal(anon.statusCode, 401);
+    assert.equal(anon.json().error.code, "unauthorized");
+
+    const forged = await app.inject({
+      method: "POST",
+      url: "/api/contacts/by-phone",
+      headers: { authorization: "Bearer sv1.eyJ1IjoidV9hbGV4In0.bm90YXNpZ25hdHVyZQ" },
+      payload: { phone: "057-100-0002" },
+    });
+    assert.equal(forged.statusCode, 401);
+
+    // And the token a browser actually receives is accepted. as() mints its own,
+    // so without this the whole block could pass against a login that hands out
+    // a credential this route does not take.
+    const started = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/start",
+      payload: { phone: "057-100-0010" },
+    });
+    const challenge = started.json();
+    const verified = await app.inject({
+      method: "POST",
+      url: "/api/auth/phone/verify",
+      payload: { challengeId: challenge.challengeId, code: challenge.devCode },
+    });
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        registrationToken: verified.json().registrationToken,
+        displayName: "Нина",
+        lang: "ru",
+        gender: "f",
+      },
+    });
+    const fromLogin = await app.inject({
+      method: "POST",
+      url: "/api/contacts/by-phone",
+      headers: { authorization: `Bearer ${registered.json().session.token}` },
+      payload: { phone: "057-100-0002" },
+    });
+    assert.equal(fromLogin.statusCode, 200);
+  });
+
+  /**
+   * Unlimited, this endpoint is a phone book: an Israeli mobile number is a
+   * fixed prefix plus seven digits, so a script that may ask as often as it
+   * likes walks that space and keeps the hits — and every hit also inserts it
+   * into a stranger's contact list, where it can be rung by name.
+   */
+  it("stops at the rate limit and says how long to wait", async () => {
+    const { ADD_BY_PHONE_LIMIT } = await import("../src/routes/contacts.js");
+    const lena = await registerByPhone("057-100-0008", {
+      displayName: "Лена",
+      lang: "ru",
+      gender: "f",
+    });
+
+    // Misses on purpose: enumeration is made of misses, so a budget that only
+    // charged for hits would refund the whole attack.
+    for (let i = 0; i < ADD_BY_PHONE_LIMIT; i += 1) {
+      const res = await addByPhone(lena, `059-900-${String(1000 + i).padStart(4, "0")}`);
+      assert.equal(res.statusCode, 200, `attempt ${i + 1} of the budget must be allowed`);
+    }
+
+    const blocked = await addByPhone(lena, "059-900-9999");
+    assert.equal(blocked.statusCode, 429);
+    assert.equal(blocked.json().error.code, "rate_limited");
+    assert.ok(
+      Number(blocked.headers["retry-after"]) > 0,
+      "a 429 without retry-after leaves the client guessing when to try again",
+    );
+
+    // Per user, not global: another tester is unaffected by Lena's spending.
+    const misha = await registerByPhone("057-100-0009", {
+      displayName: "Миша",
+      lang: "he",
+      gender: "m",
+    });
+    assert.equal((await addByPhone(misha, "059-900-7777")).statusCode, 200);
   });
 });

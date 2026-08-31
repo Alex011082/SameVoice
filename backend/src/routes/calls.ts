@@ -1,6 +1,7 @@
-import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { dispatchAgent, sendVerdict, stopAgent } from "../agentClient.js";
+import { requireActor, requireSelf } from "../auth.js";
 import type { Config } from "../config.js";
 import { mintAgentToken, mintHumanToken } from "../livekit.js";
 import { decideMode, effectiveGender, effectiveLang, effectiveTone } from "../mode.js";
@@ -161,8 +162,13 @@ async function dispatchForCall(cfg: Config, call: Call): Promise<void> {
 export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsync {
   return async (app) => {
     app.post("/api/calls", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const body = parse(createCallBody, req.body, reply, "body");
       if (!body) return reply;
+      // Only the caller may place the call. Unchecked, `callerId` was a way to
+      // make somebody else's phone ring in somebody else's name — the callee
+      // sees the caller's display name, not the sender's.
+      if (!requireSelf(req, reply, body.callerId)) return reply;
 
       if (body.callerId === body.calleeId) {
         return reply.code(409).send(apiError("self_call", "callerId and calleeId must differ"));
@@ -219,6 +225,9 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
         .send({ call: created, ring: toRingView(created, Date.now()) });
     });
 
+    // Left open, deliberately: the call id IS the invite link (48 random bits),
+    // and the pre-existing `ring:false` flow is somebody opening that link
+    // before they have any session at all. Joining it still needs one.
     app.get("/api/calls/:callId", async (req, reply) => {
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
@@ -229,10 +238,15 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
     });
 
     app.post("/api/calls/:callId/join", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(userOnlyBody, req.body, reply, "body");
       if (!body) return reply;
+      // The response to this one is a LiveKit token that opens the room and the
+      // microphone in it. The participant check below is what it always was;
+      // this line is what makes it mean anything.
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       await sweeper.sweep();
       const call = getCall(params.callId);
@@ -302,10 +316,12 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
     });
 
     app.post("/api/calls/:callId/mode", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(modeBody, req.body, reply, "body");
       if (!body) return reply;
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       const call = getCall(params.callId);
       if (!call) return reply.code(404).send(apiError("not_found", `call ${params.callId} does not exist`));
@@ -350,10 +366,12 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
     });
 
     app.post("/api/calls/:callId/end", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(userOnlyBody, req.body, reply, "body");
       if (!body) return reply;
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       const call = getCall(params.callId);
       if (!call) return reply.code(404).send(apiError("not_found", `call ${params.callId} does not exist`));
@@ -424,14 +442,20 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
      * having sent the response. `expectRole` is who is allowed to press this button.
      */
     async function ringGuard(
-      req: { params: unknown; body: unknown },
+      req: FastifyRequest,
       reply: FastifyReply,
       expectRole: "caller" | "callee",
     ): Promise<{ call: Call; userId: string } | null> {
+      if (requireActor(req, reply) === null) return null;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return null;
       const body = parse(userOnlyBody, req.body, reply, "body");
       if (!body) return null;
+      // Accept / decline / cancel all end up here, so this one line is what
+      // stops a third party answering or hanging up somebody else's ring. The
+      // role check below stays: it is a different question (the right person,
+      // but the wrong button).
+      if (!requireSelf(req, reply, body.userId)) return null;
 
       await sweeper.sweep();
       const call = getCall(params.callId);
@@ -543,10 +567,15 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
      * land in the JSONL, the tester is told so while she still remembers what she heard.
      */
     app.post("/api/calls/:callId/verdict", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(verdictBody, req.body, reply, "body");
       if (!body) return reply;
+      // A verdict is a labelled row in the eval log, and the label's whole value
+      // is that it is trustworthy; an unchecked userId let anyone file one
+      // under somebody else's name.
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       const call = getCall(params.callId);
       if (!call) return reply.code(404).send(apiError("not_found", `call ${params.callId} does not exist`));

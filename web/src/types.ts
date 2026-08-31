@@ -76,9 +76,29 @@ export interface ApiError {
 export interface PhoneChallengeResponse {
   challengeId: string;
   phone: string;
-  /** Development-only delivery channel. Replaced by SMS later. */
-  devCode: string;
+  /**
+   * Код подтверждения прямо в ответе — только когда сервер это разрешает
+   * (AUTH_DEV_CODE_IN_RESPONSE). По умолчанию поля НЕТ: пока он приходил
+   * всегда, любой, кто дотягивался до сервера, подтверждал чужой номер и
+   * входил вместо человека. Без него код уходит в лог сервера, о чём и
+   * говорит `codeDelivery`.
+   */
+  devCode?: string;
+  codeDelivery?: 'response' | 'server_log';
   expiresInSeconds: number;
+}
+
+/**
+ * Сессия, выданная сервером на вход. Основной носитель — httpOnly-cookie,
+ * которую браузер ставит сам; `token` здесь — её bearer-копия для кросс-origin
+ * разработки (см. src/session-token.ts).
+ *
+ * Поле необязательное: сборка backend'а без сессий его не пришлёт, и клиент
+ * тогда просто не запомнит токен, вместо того чтобы упасть на старте.
+ */
+export interface SessionGrant {
+  token: string;
+  expiresAt: string;
 }
 
 export interface PhoneVerifiedResponse {
@@ -86,11 +106,14 @@ export interface PhoneVerifiedResponse {
   phone: string;
   registrationToken: string;
   existingUser: UserProfile | null;
+  /** Есть только когда номер уже принадлежит профилю: это и есть вход. */
+  session?: SessionGrant | null;
 }
 
 export interface RegisterProfileResponse {
   created: boolean;
   user: UserProfile;
+  session?: SessionGrant | null;
 }
 
 // --- ringing ---------------------------------------------------------------

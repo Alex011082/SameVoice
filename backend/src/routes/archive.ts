@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
 import type { CallArchive } from "../archive.js";
+import { requireActor, requireSelf } from "../auth.js";
 import { getUser } from "../store.js";
 import { apiError, CALL_ID_RE, USER_ID_RE } from "../types.js";
 
@@ -12,6 +13,12 @@ import { apiError, CALL_ID_RE, USER_ID_RE } from "../types.js";
  * path makes that the shape of the route rather than a check somebody can
  * forget to write. A call this user was not on is reported as `not_found`, not
  * `forbidden` — otherwise the 403 itself confirms the call exists.
+ *
+ * Until 31.08.2026 the path was the ONLY check, so the shape guaranteed nothing:
+ * anyone could put anyone's id in it. The session now has to name the same user
+ * (403 otherwise), and the 404-not-403 rule above is untouched — it protects the
+ * call id, which is a different secret from the user id and one the session
+ * check cannot speak for.
  *
  * Storage only for now: the record is the call, its participants and its
  * timings. Transcripts and playback join to it by call id (the agent's eval log
@@ -45,8 +52,10 @@ function parse<S extends z.ZodType>(
 export function archiveRoutes(archive: CallArchive): FastifyPluginAsync {
   return async (app) => {
     app.get("/api/users/:userId/calls", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(userParams, req.params, reply, "path");
       if (!params) return reply;
+      if (!requireSelf(req, reply, params.userId)) return reply;
       if (!getUser(params.userId)) {
         return reply.code(404).send(apiError("not_found", `user ${params.userId} does not exist`));
       }
@@ -54,8 +63,10 @@ export function archiveRoutes(archive: CallArchive): FastifyPluginAsync {
     });
 
     app.get("/api/users/:userId/calls/:callId", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(recordParams, req.params, reply, "path");
       if (!params) return reply;
+      if (!requireSelf(req, reply, params.userId)) return reply;
       if (!getUser(params.userId)) {
         return reply.code(404).send(apiError("not_found", `user ${params.userId} does not exist`));
       }

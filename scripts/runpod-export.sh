@@ -49,6 +49,13 @@ FORBIDDEN_ROOTS=(
   "${TORCH_HOME:-${WORKSPACE}/torch-cache}"
   "${WORKSPACE}/voices"
   "${CALL_ARCHIVE_DIR:-${WORKSPACE}/logs/archive}"
+  # IDENTITY_DIR is the sharpest one on this list. Its single identities.json
+  # holds every phone-registered profile AND the phone->user index -- the
+  # numbers themselves, in plain text, because that index is what stops one
+  # number minting a second profile. .json is an allowed extension, so a source
+  # pointed at ${WORKSPACE}/data would carry a directory of real people's phone
+  # numbers off the Pod inside an otherwise ordinary bundle.
+  "${IDENTITY_DIR:-${WORKSPACE}/data/identity}"
 )
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -423,7 +430,7 @@ is_reportable_env_name() {
     WORKSPACE_ROOT|EXPECTED_GPU_COUNT|TZ|HOSTNAME|LANG|CUDA_VERSION) return 0 ;;
     SAMEVOICE_*|ACOUSTIC_*|PREDICTOR_*|LOCAL_MT_*|LOCAL_TTS_*|RUNPOD_*|NVIDIA_*|CUDA_VISIBLE_DEVICES|TTS_CUDA_VISIBLE_DEVICES) return 0 ;;
     STT_PROVIDER|MT_PROVIDER|TTS_PROVIDER) return 0 ;;
-    MODEL_DIR|CHECKPOINT_DIR|DATASET_DIR|BENCHMARK_DIR|HF_HOME|TORCH_HOME|XDG_CACHE_HOME|UV_CACHE_DIR|CALL_ARCHIVE_DIR|EVAL_LOG_DIR) return 0 ;;
+    MODEL_DIR|CHECKPOINT_DIR|DATASET_DIR|BENCHMARK_DIR|HF_HOME|TORCH_HOME|XDG_CACHE_HOME|UV_CACHE_DIR|CALL_ARCHIVE_DIR|EVAL_LOG_DIR|IDENTITY_DIR) return 0 ;;
     BACKEND_HOST|BACKEND_PORT|AGENT_HOST|AGENT_PORT|WEB_PORT) return 0 ;;
     EVAL_LOG_ENABLED|DEEPGRAM_ENDPOINTING_MS|*_MODEL|*_MODEL_*|*_LOOKAHEAD) return 0 ;;
   esac

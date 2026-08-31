@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { phoneAuthInitial, reducePhoneAuth } from '../src/phone-auth';
 
 describe('phone confirmation flow', () => {
+  it('accepts a challenge with no code shown, because the server usually withholds it', () => {
+    // Сервер по умолчанию НЕ кладёт код в ответ (AUTH_DEV_CODE_IN_RESPONSE
+    // выключён) — иначе любой подтверждает чужой номер. Экран ввода кода при
+    // этом обязан открыться: код придёт человеку другим путём.
+    const state = reducePhoneAuth(phoneAuthInitial(), {
+      type: 'code_sent',
+      challengeId: 'pv_0123456789abcdef01234567',
+      phone: '+972501234567',
+      devCode: null,
+    });
+
+    expect(state.phase).toBe('code');
+    if (state.phase !== 'code') throw new Error('the code screen must open without a code');
+    expect(state.devCode).toBeNull();
+    expect(state.challengeId).toBe('pv_0123456789abcdef01234567');
+  });
+
   it('moves from phone entry to code entry with the displayed development code', () => {
     const state = reducePhoneAuth(phoneAuthInitial(), {
       type: 'code_sent',

@@ -1,5 +1,13 @@
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import type { FastifyBaseLogger } from "fastify";
 import { z } from "zod";
@@ -361,6 +369,13 @@ function readSnapshot(file: string): IdentitySnapshot | null {
  * row pointing at a profile that no longer exists is already invisible to the
  * API (routes/users.ts filters it out of every list), so keeping it would only
  * let it live forever in the file.
+ *
+ * The consequence worth knowing before it surprises somebody: for an id the
+ * snapshot contains, the FILE wins. Editing a seeded profile in seedIdentities()
+ * therefore does not reach a server whose snapshot already holds that id — the
+ * one there was written by the last PATCH /api/users/:userId. Delete the file
+ * (its path is in the boot log) to come back up on the code seed alone; that
+ * also discards every phone-registered profile in it.
  */
 function applySnapshot(snapshot: IdentitySnapshot): void {
   for (const user of snapshot.users) users.set(user.id, user);
@@ -408,12 +423,20 @@ function applySnapshot(snapshot: IdentitySnapshot): void {
  * Throws on an unreadable or malformed file. Deliberately fatal — see readSnapshot().
  */
 export function loadIdentityStore(dir: string, log?: FastifyBaseLogger): void {
+  const file = join(dir, SNAPSHOT_FILE);
+  // Read FIRST, then commit. A throw here must change nothing: memory keeps
+  // whatever it held, and the store stays pointed where it was pointed, so the
+  // next write cannot overwrite the corrupt file an operator has to go and read.
+  const snapshot = readSnapshot(file);
+
   identityDir = dir;
   identityLog = log;
   seedIdentities();
+  // The file we just read counts as "ours": the first save after boot must not
+  // mistake the snapshot it was built from for another process's write and
+  // announce a merge that added nothing.
+  lastWritten = stampOf(file);
 
-  const file = join(dir, SNAPSHOT_FILE);
-  const snapshot = readSnapshot(file);
   if (snapshot === null) {
     log?.info({ file }, "identity store: no snapshot yet, starting from the Stage-0 seed");
     return;
@@ -434,6 +457,118 @@ export function loadIdentityStore(dir: string, log?: FastifyBaseLogger): void {
 }
 
 /**
+ * Size and mtime of the snapshot as THIS process last left it — the one cheap
+ * way to tell "the file on disk is still mine" from "somebody else has written
+ * it since" without re-reading it on every save.
+ */
+let lastWritten: { size: number; mtimeMs: number } | null = null;
+
+function stampOf(file: string): { size: number; mtimeMs: number } | null {
+  try {
+    const s = statSync(file);
+    return { size: s.size, mtimeMs: s.mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merge a snapshot written by ANOTHER process into memory, adding only what is
+ * missing here.
+ *
+ * Add-only, and that is the whole design: this runs immediately before we
+ * overwrite the file, so everything it copies in is about to be written back.
+ * A full applySnapshot() would also copy the other process's version of rows
+ * this one has just edited, and the edit the route is in the middle of saving
+ * would be reverted by its own save.
+ *
+ * Users first: the phone index and the contact graph are both filtered against
+ * `users`, exactly as applySnapshot() filters them.
+ */
+function mergeMissing(snapshot: IdentitySnapshot): {
+  users: number;
+  phones: number;
+  contacts: number;
+} {
+  let addedUsers = 0;
+  let addedPhones = 0;
+  let addedContacts = 0;
+  for (const user of snapshot.users) {
+    if (users.has(user.id)) continue;
+    users.set(user.id, user);
+    addedUsers += 1;
+  }
+  for (const entry of snapshot.phones) {
+    if (userIdByPhone.has(entry.phone) || !users.has(entry.userId)) continue;
+    userIdByPhone.set(entry.phone, entry.userId);
+    addedPhones += 1;
+  }
+  for (const contact of snapshot.contacts) {
+    const key = contactKey(contact.ownerId, contact.contactUserId);
+    if (contact.ownerId === contact.contactUserId || contacts.has(key)) continue;
+    if (!users.has(contact.ownerId) || !users.has(contact.contactUserId)) continue;
+    contacts.set(key, contact);
+    addedContacts += 1;
+  }
+  return { users: addedUsers, phones: addedPhones, contacts: addedContacts };
+}
+
+/**
+ * A SECOND PROCESS ON ONE IDENTITY_DIR, which is what this guard is for.
+ *
+ * saveIdentities() serializes this process's entire memory, so with no check
+ * the file is simply replaced by whoever wrote last: every identity the other
+ * process holds and this one does not is deleted by a write that reports
+ * success and logs nothing. Measured on 31.08.2026 with two backends sharing
+ * one IDENTITY_DIR — a 545,725-byte snapshot holding 404 profiles was replaced
+ * by a 15,834-byte one holding 14, and neither log said a word.
+ *
+ * Two backends is not hypothetical here: docker/entrypoint.sh points
+ * IDENTITY_DIR at a persistent volume, and a restart that overlaps its
+ * predecessor, or a second container on the same volume, is exactly this.
+ *
+ * So: before overwriting, notice that the file is not the one we left, read it,
+ * and take in whatever we are missing. The write that follows is a union
+ * instead of a replacement. This does NOT make two writers correct — the last
+ * writer still decides a row both of them edited, and the window between this
+ * stat and the rename below is real. It makes the failure lose nothing and say
+ * so out loud, instead of losing everything and saying nothing.
+ */
+function adoptForeignWrites(file: string): void {
+  const onDisk = stampOf(file);
+  if (onDisk === null) return;
+  if (
+    lastWritten !== null &&
+    onDisk.size === lastWritten.size &&
+    onDisk.mtimeMs === lastWritten.mtimeMs
+  ) {
+    return;
+  }
+
+  let snapshot: IdentitySnapshot | null;
+  try {
+    snapshot = readSnapshot(file);
+  } catch (err) {
+    // Refusing to BOOT on an unreadable file is right; refusing to SAVE on one
+    // would throw out of a route handler. Overwriting it is the better of the
+    // two options left — memory is the good copy either way.
+    identityLog?.error(
+      { file, err },
+      "identity store: a foreign write left a file this build cannot read — overwriting it from memory",
+    );
+    return;
+  }
+  if (snapshot === null) return;
+
+  const added = mergeMissing(snapshot);
+  if (added.users === 0 && added.phones === 0 && added.contacts === 0) return;
+  identityLog?.warn(
+    { file, ...added },
+    "identity store: another process is writing this directory — merged its rows in rather than overwriting them",
+  );
+}
+
+/**
  * Every mutation below ends here, synchronously, before the route replies. Sync
  * because the store's whole API is sync and every caller is a route handler
  * calling it inline: making it async would turn four functions into promises
@@ -448,26 +583,45 @@ export function loadIdentityStore(dir: string, log?: FastifyBaseLogger): void {
  * whole new one — never the truncated half that readSnapshot() would refuse to
  * boot on. Not fsync'd: a kernel-level crash can still lose the last write, and
  * the rename only rules out a file that exists but cannot be parsed.
+ *
+ * The temporary name carries the pid and four random bytes, and that is not
+ * decoration: a fixed `.tmp` shared by two processes is one of them writing
+ * into the file the other is about to rename into place — precisely the torn
+ * file the rename was chosen to rule out.
+ *
+ * MODE 0600, and the directory 0700. This file holds the phone numbers — the
+ * index that stops one number minting a second profile IS the numbers — and
+ * the 0644 default published them to every account on the box, which is a
+ * strange thing to allow in the one file that works hardest to keep them out
+ * of every log line.
  */
 function saveIdentities(): void {
   if (identityDir === null) return;
   const file = join(identityDir, SNAPSHOT_FILE);
-  const tmp = `${file}.tmp`;
-  const snapshot: IdentitySnapshot = {
-    version: SNAPSHOT_VERSION,
-    savedAt: new Date().toISOString(),
-    users: [...users.values()],
-    phones: [...userIdByPhone.entries()].map(([phone, userId]) => ({ phone, userId })),
-    contacts: [...contacts.values()],
-  };
+  const tmp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
   try {
-    mkdirSync(identityDir, { recursive: true });
-    writeFileSync(tmp, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+    mkdirSync(identityDir, { recursive: true, mode: 0o700 });
+    adoptForeignWrites(file);
+    const snapshot: IdentitySnapshot = {
+      version: SNAPSHOT_VERSION,
+      savedAt: new Date().toISOString(),
+      users: [...users.values()],
+      phones: [...userIdByPhone.entries()].map(([phone, userId]) => ({ phone, userId })),
+      contacts: [...contacts.values()],
+    };
+    writeFileSync(tmp, `${JSON.stringify(snapshot, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
     renameSync(tmp, file);
+    lastWritten = stampOf(file);
   } catch (err) {
     // Loud, and the process keeps serving: the profile is usable right now, it
     // just will not survive a restart. Same call archive.ts makes when it cannot
     // write a call — an operator who sees this knows the next restart loses data.
+    // The half-written temporary goes with it; on a full disk it is the thing
+    // standing between the operator and the space to write the next one.
+    rmSync(tmp, { force: true });
     identityLog?.error(
       { file, err },
       "identity store could not be written — identities created now will not survive a restart",
@@ -475,12 +629,24 @@ function saveIdentities(): void {
   }
 }
 
-/** Test-only, via resetStore(). The .tmp is removed too: a crashed write leaves one. */
+/**
+ * Test-only, via resetStore(). Every temporary goes, not one fixed name: a
+ * write that died mid-flight leaves one named after the pid that died.
+ */
 function removeIdentityFile(): void {
   if (identityDir === null) return;
   const file = join(identityDir, SNAPSHOT_FILE);
   rmSync(file, { force: true });
-  rmSync(`${file}.tmp`, { force: true });
+  lastWritten = null;
+  try {
+    for (const name of readdirSync(identityDir)) {
+      if (name.startsWith(`${SNAPSHOT_FILE}.`) && name.endsWith(".tmp")) {
+        rmSync(join(identityDir, name), { force: true });
+      }
+    }
+  } catch {
+    // The directory need not exist; there is nothing to clean up if it does not.
+  }
 }
 
 export function listUsers(): UserProfile[] {
@@ -547,6 +713,46 @@ export function listContacts(ownerId: string): ContactRecord[] {
 
 export function getContact(ownerId: string, contactUserId: string): ContactRecord | undefined {
   return contacts.get(contactKey(ownerId, contactUserId));
+}
+
+/**
+ * Two people become each other's contact. Used by "add a contact by phone
+ * number" (backend/src/routes/contacts.ts), which is how two humans on real
+ * numbers reach each other at all — the Stage-0 auto-join wires a new user to
+ * the seeded four and deliberately stops there.
+ *
+ * It delegates to joinEveryone() rather than calling addContact() twice, and
+ * that is the whole reason this function exists instead of being written out at
+ * the call site: BOTH directions is the property worth having in one place. A
+ * one-way row lets the adder dial out and never receive, because the other side
+ * never sees him in the list and presence never reports him. Written by hand at
+ * a second call site, the second direction is exactly what gets forgotten.
+ *
+ * Idempotent through addContact(), so re-adding a number that is already a
+ * contact changes nothing — including the per-contact overrides a tester has
+ * already set on that card.
+ *
+ * `persist` decides WHEN the snapshot is written, never WHETHER — there is no
+ * way to call this and not persist, because a contact row that does not survive
+ * a restart puts the pair back to not being able to find each other, which is
+ * the bug this function was added to fix.
+ *
+ * "deferred" exists for POST /api/contacts/by-phone and for one reason, spelled
+ * out there: writing the snapshot inside the request made a hit take 1.23 ms
+ * and a miss 0.74 ms, so the clock answered the question the identical response
+ * body refuses to. The rows still land in memory synchronously — the contact
+ * list is correct on the very next request — and only the file write moves to
+ * the check phase, after the reply is on the socket.
+ */
+export function linkContactPair(
+  userIdA: string,
+  userIdB: string,
+  persist: "now" | "deferred" = "now",
+): void {
+  joinEveryone([userIdA, userIdB]);
+  // Same reason createUserFromPhone() saves after its auto-join.
+  if (persist === "now") saveIdentities();
+  else setImmediate(saveIdentities);
 }
 
 export function updateContact(

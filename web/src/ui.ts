@@ -29,6 +29,8 @@ const el = {
   phoneCodeInput: () => must<HTMLInputElement>('phone-code-input'),
   phoneDestination: () => must<HTMLElement>('phone-destination'),
   phoneDevCode: () => must<HTMLElement>('phone-dev-code'),
+  phoneDevCodeBox: () => must<HTMLElement>('phone-dev-code-box'),
+  phoneCodeHint: () => must<HTMLElement>('phone-code-hint'),
   phoneChange: () => must<HTMLButtonElement>('phone-change'),
   phoneAuthError: () => must<HTMLParagraphElement>('phone-auth-error'),
   profileForm: () => must<HTMLFormElement>('profile-form'),
@@ -44,6 +46,10 @@ const el = {
   contactsError: () => must<HTMLParagraphElement>('contacts-error'),
   joinForm: () => must<HTMLFormElement>('join-form'),
   joinInput: () => must<HTMLInputElement>('join-input'),
+  addPhoneForm: () => must<HTMLFormElement>('add-phone-form'),
+  addPhoneInput: () => must<HTMLInputElement>('add-phone-input'),
+  addPhoneSubmit: () => must<HTMLButtonElement>('add-phone-submit'),
+  addPhoneStatus: () => must<HTMLParagraphElement>('add-phone-status'),
 
   screenCall: () => must<HTMLElement>('screen-call'),
   peerName: () => must<HTMLElement>('call-peer-name'),
@@ -167,7 +173,14 @@ export function renderPhoneAuth(state: PhoneAuthState, handlers: PhoneAuthHandle
     title.textContent = 'Подтвердите номер';
     hint.textContent = 'Шесть цифр — и номер ваш.';
     el.phoneDestination().textContent = state.phone;
-    el.phoneDevCode().textContent = state.devCode;
+    // Код на экране — свойство сервера, а не клиента: он приходит в ответе
+    // только там, где это осознанно включено (AUTH_DEV_CODE_IN_RESPONSE), а
+    // иначе уходит в лог сервера. Пустая рамка «Временный код» без кода
+    // выглядела бы как поломка, поэтому её просто нет.
+    const hasCode = state.devCode !== null;
+    el.phoneDevCodeBox().hidden = !hasCode;
+    el.phoneCodeHint().hidden = hasCode;
+    el.phoneDevCode().textContent = state.devCode ?? '';
     queueMicrotask(() => el.phoneCodeInput().focus());
   } else if (state.phase === 'verified') {
     title.textContent = 'Создайте профиль';
@@ -583,6 +596,44 @@ export function renderContacts(
   for (const entry of model.entries) {
     list.append(contactCard(me, entry, handlers, presence[entry.contact.userId]));
   }
+}
+
+/**
+ * «Добавить по номеру».
+ *
+ * Поле не проверяет номер само: разбирает его ровно один парсер, и он на
+ * сервере (normalizePhone в backend/src/phoneVerification.ts) — тот же, что
+ * решал, как выглядит номер при регистрации. Вторая проверка здесь означала бы
+ * два разных представления одного номера и промах по человеку, который есть.
+ * Поэтому пустая строка просто не отправляется, а всё остальное решает сервер.
+ */
+export function onAddByPhone(handler: (raw: string) => void): void {
+  el.addPhoneForm().addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const value = el.addPhoneInput().value.trim();
+    if (value.length > 0) handler(value);
+  });
+}
+
+/** Строка под формой. `null` — убрать её совсем. */
+export function setAddByPhoneStatus(status: { text: string; tone: 'ok' | 'error' } | null): void {
+  const node = el.addPhoneStatus();
+  node.hidden = status === null;
+  node.dataset['tone'] = status?.tone ?? 'ok';
+  node.textContent = status?.text ?? '';
+}
+
+/**
+ * Пока запрос идёт, кнопка выключена. Не косметика: второе нажатие тратит ещё
+ * одну попытку из часового лимита, который человек не видит и не считает.
+ */
+export function setAddByPhoneBusy(busy: boolean): void {
+  el.addPhoneSubmit().disabled = busy;
+}
+
+/** Номер убирается из поля после успеха: он больше не нужен и не должен там висеть. */
+export function clearAddByPhoneInput(): void {
+  el.addPhoneInput().value = '';
 }
 
 export function onJoinById(handler: (raw: string) => void): void {

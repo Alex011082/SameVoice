@@ -191,6 +191,9 @@ ${C_CYAN}==>${C_RESET} now do exactly this, in this order:
          you    ${URL}/?me=u_alex
          her    ${URL}/?me=u_noa
 
+       (both need AUTH_SEEDED_LOGIN=true — ?me= names a seeded test profile,
+        it does not sign anyone in on its own)
+
   ${C_YELLOW}Notes that cost time if you learn them the hard way:${C_RESET}
     - This hostname is ${C_BOLD}single-use${C_RESET}. Restarting this script gets a different one,
       invalidates the link you already sent, and makes the browser treat it as

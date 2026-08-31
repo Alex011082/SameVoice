@@ -3,11 +3,13 @@ import { pathToFileURL } from "node:url";
 import cors from "@fastify/cors";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { createCallArchive } from "./archive.js";
+import { registerAuth } from "./auth.js";
 import { loadConfig, type Config, type OriginRule } from "./config.js";
 import { createCallSweeper } from "./ringing.js";
 import { archiveRoutes } from "./routes/archive.js";
 import { authRoutes } from "./routes/auth.js";
 import { callRoutes } from "./routes/calls.js";
+import { contactRoutes } from "./routes/contacts.js";
 import { healthRoutes, VERSION } from "./routes/health.js";
 import { presenceRoutes } from "./routes/presence.js";
 import { userRoutes } from "./routes/users.js";
@@ -49,12 +51,23 @@ export function originAllowed(cfg: Config, origin: string): boolean {
   return cfg.webOrigins.some((rule) => matches(rule, scheme, host, port));
 }
 
-export async function buildApp(cfg: Config): Promise<FastifyInstance> {
+/**
+ * `logStream` exists for exactly one assertion: that a confirmation code goes
+ * to the log and the phone number does NOT. Pino writes straight to file
+ * descriptor 1, past anything a test can hook from inside the process, so
+ * without somewhere to point it the personal-data invariant is untestable and
+ * would be enforced by review alone. Production never passes it.
+ */
+export async function buildApp(
+  cfg: Config,
+  opts: { logStream?: NodeJS.WritableStream } = {},
+): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: cfg.logLevel,
       timestamp: () => `,"time":"${new Date().toISOString()}"`,
       base: { service: "backend" },
+      ...(opts.logStream ? { stream: opts.logStream } : {}),
     },
     genReqId: () => randomUUID().slice(0, 8),
     requestIdHeader: "x-request-id",
@@ -70,10 +83,19 @@ export async function buildApp(cfg: Config): Promise<FastifyInstance> {
       cb(null, originAllowed(cfg, origin));
     },
     methods: ["GET", "POST", "PATCH", "OPTIONS"],
-    allowedHeaders: ["content-type", "x-request-id"],
+    // `authorization` is the bearer half of the session (backend/src/session.ts):
+    // a SameSite=Lax cookie is not sent on a cross-origin fetch, and the dev
+    // setup is exactly that — page on :5173, API on :8787.
+    allowedHeaders: ["content-type", "x-request-id", "authorization"],
     exposedHeaders: ["x-request-id"],
-    credentials: false,
+    // Needed for the cookie to travel at all on a cross-origin request. Safe
+    // only because the origin callback above is an allowlist and never `*`;
+    // the two settings are one decision and must be read together.
+    credentials: true,
   });
+
+  // Before any route: this is what turns `?me=` from an identity into a hint.
+  registerAuth(app, cfg);
 
   app.addHook("onSend", async (req, reply) => {
     reply.header("x-request-id", String(req.id));
@@ -95,11 +117,40 @@ export async function buildApp(cfg: Config): Promise<FastifyInstance> {
   app.addHook("onClose", async () => sweeper.stop());
 
   await app.register(healthRoutes(cfg));
-  await app.register(authRoutes);
+  await app.register(authRoutes(cfg));
   await app.register(userRoutes);
+  await app.register(contactRoutes);
   await app.register(archiveRoutes(archive));
   await app.register(presenceRoutes(cfg, sweeper));
   await app.register(callRoutes(cfg, sweeper));
+
+  // Said at boot, not in a doc: every one of these is a deliberate opening that
+  // somebody has to close again before real people are on this server, and an
+  // opening nobody can see is one nobody closes.
+  if (cfg.authPhoneAllowlist.length === 0) {
+    app.log.warn(
+      "AUTH_PHONE_ALLOWLIST is empty — ANYONE who can reach this server can register a profile. " +
+        "Set it to the testers' numbers before this URL is shared.",
+    );
+  }
+  if (cfg.authDevCodeInResponse) {
+    app.log.warn(
+      "AUTH_DEV_CODE_IN_RESPONSE is on — the confirmation code is returned to the browser, " +
+        "so anyone can verify anyone's number. Development boxes only.",
+    );
+  }
+  if (cfg.authSeededLogin) {
+    app.log.warn(
+      "AUTH_SEEDED_LOGIN is on — anyone can take a session as a seeded test identity, " +
+        "and those identities are contacts of every registered user.",
+    );
+  }
+  if (cfg.sessionSecretEphemeral) {
+    app.log.warn(
+      "SESSION_SECRET is not set — a random key was generated, so every session ends at the " +
+        "next restart. Set it to keep people signed in (openssl rand -hex 32).",
+    );
+  }
 
   app.setNotFoundHandler((req, reply) => {
     reply.code(404).send(apiError("not_found", `no route for ${req.method} ${req.url}`));
@@ -157,6 +208,13 @@ async function start(): Promise<void> {
       ringTimeoutSeconds: cfg.ringTimeoutSeconds,
       presenceTtlSeconds: cfg.presenceTtlSeconds,
       callArchiveDir: cfg.callArchiveDir,
+      sessionTtlSeconds: cfg.sessionTtlSeconds,
+      sessionCookieSecure: cfg.sessionCookieSecure,
+      authDevCodeInResponse: cfg.authDevCodeInResponse,
+      // The COUNT, never the numbers: this line is a log line, and a phone
+      // number in a log line is the thing the whole auth flow is protecting.
+      authPhoneAllowlistSize: cfg.authPhoneAllowlist.length,
+      authSeededLogin: cfg.authSeededLogin,
       identityDir: cfg.identityDir,
       // Every other operationally surprising setting is printed here, and this
       // is the most surprising one: a number that passes verification is joined

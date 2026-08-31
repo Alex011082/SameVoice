@@ -15,6 +15,12 @@ import type {
   Tone,
   UserProfile,
 } from './types';
+import {
+  forgetSessionToken,
+  rememberSessionToken,
+  sessionAuthHeaders,
+  type TokenStore,
+} from './session-token';
 import { parseRingPoll, parseRingView } from './types';
 
 const DEFAULT_BASE = 'http://127.0.0.1:8787';
@@ -49,14 +55,50 @@ export class ApiRequestError extends Error {
   }
 }
 
+/**
+ * localStorage, когда он есть.
+ *
+ * Тесты клиента идут в node-окружении, где `window` не существует вовсе, а
+ * Safari в приватном режиме бросает исключение при самом обращении к свойству.
+ * Оба случая означают одно: bearer-копии нет, запрос уйдёт с одной cookie.
+ */
+function browserTokenStore(): TokenStore | null {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const store = browserTokenStore();
+  return store === null ? {} : sessionAuthHeaders(store);
+}
+
+/**
+ * ВСЕ запросы идут с сессией — оба носителя сразу, потому что ни одного не
+ * хватает по отдельности.
+ *
+ * `credentials: 'include'` отправляет httpOnly-cookie `sv_session`, которую
+ * ставит backend; на боевом домене (страница и API за одним Caddy) этого
+ * достаточно и заголовка не будет вовсе. Bearer — единственное, что доезжает
+ * при разработке: страница на :5173, API на :8787, а cookie с `SameSite=Lax`
+ * в кросс-origin fetch не уходит.
+ *
+ * Это общий путь, а не отдельная «защищённая» обёртка: раньше личность
+ * приезжала параметром `?me=` в пути запроса, и любая ручка, которую забыли
+ * обернуть, снова становилась дырой. Теперь забыть нечего.
+ */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${BACKEND_URL}${path}`, {
+      credentials: 'include',
       ...init,
       headers: {
         Accept: 'application/json',
         ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...authHeaders(),
         ...init?.headers,
       },
     });
@@ -104,6 +146,17 @@ function post<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: 'POST', body: JSON.stringify(body) });
 }
 
+/**
+ * Сохранить bearer-копию токена, который сервер только что выдал.
+ *
+ * Cookie он поставил сам и она главная; эта копия нужна лишь там, где cookie
+ * не доедет. Хранится только токен — ни номера, ни имени.
+ */
+function keepSession(session: { token: string } | null | undefined): void {
+  const store = browserTokenStore();
+  if (store !== null && session?.token) rememberSessionToken(store, session.token);
+}
+
 function patch<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
 }
@@ -116,14 +169,64 @@ export const api = {
   startPhoneVerification: (phone: string): Promise<PhoneChallengeResponse> =>
     post<PhoneChallengeResponse>('/api/auth/phone/start', { phone }),
 
-  verifyPhone: (challengeId: string, code: string): Promise<PhoneVerifiedResponse> =>
-    post<PhoneVerifiedResponse>('/api/auth/phone/verify', { challengeId, code }),
+  /**
+   * Подтверждённый номер, у которого УЖЕ есть профиль, — это и есть вход:
+   * регистрировать нечего, сервер сразу выдаёт сессию.
+   */
+  verifyPhone: async (challengeId: string, code: string): Promise<PhoneVerifiedResponse> => {
+    const body = await post<PhoneVerifiedResponse>('/api/auth/phone/verify', { challengeId, code });
+    keepSession(body.session);
+    return body;
+  },
 
-  registerProfile: (
+  registerProfile: async (
     registrationToken: string,
     profile: { displayName: string; lang: Lang; gender: Gender },
-  ): Promise<RegisterProfileResponse> =>
-    post<RegisterProfileResponse>('/api/auth/register', { registrationToken, ...profile }),
+  ): Promise<RegisterProfileResponse> => {
+    const body = await post<RegisterProfileResponse>('/api/auth/register', {
+      registrationToken,
+      ...profile,
+    });
+    keepSession(body.session);
+    return body;
+  },
+
+  /**
+   * Кто я — по сессии, а не по адресной строке.
+   *
+   * Это и есть замена `?me=`: раньше клиент решал, кем он вошёл, читая параметр
+   * URL, и сервер ему верил. Теперь он спрашивает. 401 означает «войдите», а не
+   * «такого пользователя нет».
+   */
+  session: async (): Promise<UserProfile> =>
+    (await request<{ user: UserProfile }>('/api/auth/session')).user,
+
+  /**
+   * Вход одной из четырёх посевных тестовых личностей — только для разбора
+   * поломок и только когда backend это разрешает (AUTH_SEEDED_LOGIN). На
+   * сервере без флага ответ 403, и экран честно это скажет.
+   */
+  seededLogin: async (userId: string): Promise<UserProfile> => {
+    const body = await post<{ user: UserProfile; session: { token: string } }>(
+      '/api/auth/seeded-login',
+      { userId },
+    );
+    keepSession(body.session);
+    return body.user;
+  },
+
+  /**
+   * Выход. Cookie снимает сервер, bearer-копию — мы: оставить её значило бы,
+   * что «выйти» работает на боевом домене и молча не работает при разработке.
+   */
+  logout: async (): Promise<void> => {
+    try {
+      await post<{ ok: boolean }>('/api/auth/logout', {});
+    } finally {
+      const store = browserTokenStore();
+      if (store !== null) forgetSessionToken(store);
+    }
+  },
 
   listUsers: async (): Promise<UserProfile[]> => (await request<{ users: UserProfile[] }>('/api/users')).users,
 
@@ -139,6 +242,23 @@ export const api = {
   listContacts: async (userId: string): Promise<ContactCard[]> =>
     (await request<{ contacts: ContactCard[] }>(`/api/users/${encodeURIComponent(userId)}/contacts`))
       .contacts,
+
+  /**
+   * Добавить контакт ПО НОМЕРУ ТЕЛЕФОНА — единственный способ для двух людей,
+   * зарегистрированных по своим номерам, найти друг друга: новый профиль
+   * автоматически связывается только с четырьмя тестовыми аккаунтами.
+   *
+   * Ответ намеренно не читается, потому что читать в нём нечего. Сервер отвечает
+   * одинаково и на чужой зарегистрированный номер, и на номер, за которым никого
+   * нет: иначе ручка становится справочником «кто здесь есть» — тем самым, каким
+   * до 31.08.2026 был GET /api/users, отдававший имя, язык и пол каждого
+   * зарегистрировавшегося по номеру любому, кто дотянулся до порта. Теперь тот
+   * список сузили до четырёх посевных личностей на сервере, а не в клиенте.
+   * Результат виден только по списку контактов.
+   */
+  addContactByPhone: async (phone: string): Promise<void> => {
+    await post<{ requested: boolean }>('/api/contacts/by-phone', { phone });
+  },
 
   updateContact: async (
     userId: string,
@@ -228,14 +348,22 @@ export const api = {
   goodbye: (userId: string): void => {
     const url = `${BACKEND_URL}/api/presence`;
     const body = JSON.stringify({ userId, online: false });
-    try {
-      if (navigator.sendBeacon?.(url, new Blob([body], { type: 'application/json' }))) return;
-    } catch {
-      // Fall through to the best-effort fetch below.
+    // sendBeacon шлёт cookie, но заголовок к нему не приложить. Значит он
+    // годится ровно там, где cookie доезжает, — на одном origin со страницей.
+    // При разработке (страница :5173, API :8787) сессию несёт только bearer,
+    // и beacon получил бы 401: прощание молча не сработало бы, а собеседник
+    // ждал бы полного TTL присутствия.
+    if (BACKEND_URL === '') {
+      try {
+        if (navigator.sendBeacon?.(url, new Blob([body], { type: 'application/json' }))) return;
+      } catch {
+        // Fall through to the best-effort fetch below.
+      }
     }
     void fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body,
       keepalive: true,
     }).catch(() => undefined);

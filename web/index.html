@@ -55,11 +55,15 @@
 
             <form id="phone-code-form" class="auth-card" hidden>
               <p class="verified-destination">Код для <strong id="phone-destination"></strong></p>
-              <div class="dev-code" role="status">
+              <div id="phone-dev-code-box" class="dev-code" role="status">
                 <span>Временный код</span>
                 <strong id="phone-dev-code"></strong>
                 <small>SMS подключим позже — пока код показывается здесь.</small>
               </div>
+              <p id="phone-code-hint" class="verified-destination" role="status" hidden>
+                Код отправлен. SMS ещё не подключены — если сообщение не пришло,
+                спросите код у того, кто держит сервер.
+              </p>
               <label for="phone-code-input">Введите код</label>
               <input
                 id="phone-code-input"
@@ -193,6 +197,38 @@
           </p>
 
           <ul id="contact-list" class="people"></ul>
+
+          <!-- «Добавить по номеру». Единственный способ для двух людей на своих
+               номерах найти друг друга: новый профиль автоматически связывается
+               только с четырьмя тестовыми аккаунтами, поэтому двое живых
+               тестировщиков не видели друг друга в списках вообще.
+
+               Это НЕ поиск по людям, и выглядеть как поиск не должно: свёрнутый
+               блок, подпись — действие («Добавить»), а не «Найти», поле просит
+               номер, который человек и так знает, и никакой выдачи под ним не
+               появляется. Сервер отвечает одинаково на знакомый и на незнакомый
+               номер (backend/src/routes/contacts.ts), и подпись ниже говорит об
+               этом прямо — иначе экран пришлось бы читать как справочник. -->
+          <details class="joinbox addbox">
+            <summary>Добавить по номеру</summary>
+            <form id="add-phone-form" class="joinbox-row">
+              <input
+                id="add-phone-input"
+                type="tel"
+                inputmode="tel"
+                autocomplete="off"
+                placeholder="050 123 4567"
+                aria-label="Номер телефона"
+                aria-describedby="add-phone-note"
+              />
+              <button id="add-phone-submit" type="submit" class="btn">Добавить</button>
+            </form>
+            <p id="add-phone-note" class="addbox-note">
+              Израильский номер или международный с «+». Есть ли у номера профиль,
+              мы не сообщаем: если есть — контакт появится в списке выше.
+            </p>
+            <p id="add-phone-status" class="addbox-status" hidden role="status"></p>
+          </details>
 
           <details class="joinbox">
             <summary>Присоединиться по приглашению</summary>

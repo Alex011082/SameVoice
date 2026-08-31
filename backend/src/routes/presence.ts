@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
+import { requireActor, requireSelf } from "../auth.js";
 import type { Config } from "../config.js";
 import { RING_RESULT_GRACE_MS, toRingView, type CallSweeper } from "../ringing.js";
 import {
@@ -75,8 +76,13 @@ function poll(cfg: Config, userId: string, nowMs: number): RingPollResponse {
 export function presenceRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsync {
   return async (app) => {
     app.post("/api/presence", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const body = parse(heartbeatBody, req.body, reply, "body");
       if (!body) return reply;
+      // The heartbeat is also the ring poll, so an unchecked userId here handed
+      // out somebody else's incoming calls — caller name included — at two
+      // requests a second.
+      if (!requireSelf(req, reply, body.userId)) return reply;
       if (!getUser(body.userId)) {
         return reply.code(404).send(apiError("not_found", `user ${body.userId} does not exist`));
       }
@@ -94,8 +100,10 @@ export function presenceRoutes(cfg: Config, sweeper: CallSweeper): FastifyPlugin
 
     /** Same payload, no side effect — for a client that wants to look without claiming to be online. */
     app.get("/api/ring/:userId", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(userParams, req.params, reply, "path");
       if (!params) return reply;
+      if (!requireSelf(req, reply, params.userId)) return reply;
       if (!getUser(params.userId)) {
         return reply.code(404).send(apiError("not_found", `user ${params.userId} does not exist`));
       }

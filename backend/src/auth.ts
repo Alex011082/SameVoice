@@ -35,17 +35,25 @@ export function registerAuth(app: FastifyInstance, cfg: Config): void {
   app.decorateRequest("actor", null);
 
   app.addHook("onRequest", async (req) => {
-    const cookieToken = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-    const token = cookieToken ?? bearerToken(req.headers.authorization);
-    if (!token) return;
-    const session = readSession(cfg.sessionSecret, token);
-    // A token that outlives its user authorizes nothing. This is not
-    // hypothetical: users live in a Map (backend/src/store.ts), so every
-    // restart wipes them while the tokens in people's browsers survive. 401
-    // sends the client back to the login screen, which is the truth; without
-    // this check it would instead get a 404 from deep inside the app.
-    if (!session || !getUser(session.userId)) return;
-    req.actor = session;
+    // Both carriers are tried, cookie first, and a bad one does not stop the
+    // other: a browser that still holds a cookie from an earlier deploy would
+    // otherwise mask the fresh bearer copy beside it, and the user would be
+    // permanently signed out with a valid session in their own localStorage.
+    for (const token of [
+      parseCookies(req.headers.cookie)[SESSION_COOKIE],
+      bearerToken(req.headers.authorization),
+    ]) {
+      if (!token) continue;
+      const session = readSession(cfg.sessionSecret, token);
+      // A token that outlives its user authorizes nothing. Not hypothetical:
+      // users live in a Map (backend/src/store.ts), so a restart wipes them
+      // while the tokens in people's browsers survive. 401 sends the client
+      // back to the login screen, which is the truth; without this check it
+      // would get a 404 from somewhere deep inside the app instead.
+      if (!session || !getUser(session.userId)) continue;
+      req.actor = session;
+      return;
+    }
   });
 }
 

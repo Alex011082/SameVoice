@@ -16,6 +16,25 @@ describe('errors a tester can act on, in Russian', () => {
     ).toContain('Запросите новый.');
   });
 
+  it('turns a stale session into «войдите заново», not into English from the server', () => {
+    // Не редкость, а норма: профили живут в памяти backend'а, поэтому его
+    // перезапуск делает сессию в браузере недействительной. Раньше клиенту
+    // вообще нечего было показать — личность бралась из `?me=`, и «протухнуть»
+    // ей было негде.
+    const expired = apiError('unauthorized', 'sign in first — no valid session', 401);
+
+    expect(contactsErrorText(expired)).toContain('войдите по номеру заново');
+    expect(contactsErrorText(expired)).not.toContain('sign in first');
+    expect(callErrorText(expired)).toContain('войдите по номеру заново');
+  });
+
+  it('explains a link opened under the wrong profile instead of showing 403', () => {
+    const wrongProfile = apiError('forbidden', 'this session belongs to a different user', 403);
+
+    expect(callErrorText(wrongProfile)).toContain('ссылка выписана на другой профиль');
+    expect(contactsErrorText(wrongProfile)).toContain('под другим профилем');
+  });
+
   it('says the network is down rather than blaming the code', () => {
     const offline = apiError('network', 'cannot reach the backend at http://x - is it running?', 0);
 

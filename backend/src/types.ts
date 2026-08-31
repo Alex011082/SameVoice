@@ -190,6 +190,7 @@ export type ApiErrorCode =
   | "invalid_verification"
   | "not_found"
   | "forbidden"
+  | "rate_limited"
   | "conflict"
   | "self_call"
   | "mode_locked"

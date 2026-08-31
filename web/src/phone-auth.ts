@@ -4,13 +4,20 @@ export type PhoneAuthState =
       phase: 'code';
       challengeId: string;
       phone: string;
-      devCode: string;
+      /**
+       * Код, показанный на экране, — или null, когда сервер его не отдал.
+       * Второе теперь и есть значение по умолчанию: код приходит в ответе
+       * только на сервере с включённым AUTH_DEV_CODE_IN_RESPONSE, иначе он
+       * уходит в лог сервера. Экран должен уметь оба случая, а не считать
+       * пустую строку кодом.
+       */
+      devCode: string | null;
       error: string | null;
     }
   | { phase: 'verified'; phone: string; registrationToken: string; error: string | null };
 
 export type PhoneAuthEvent =
-  | { type: 'code_sent'; challengeId: string; phone: string; devCode: string }
+  | { type: 'code_sent'; challengeId: string; phone: string; devCode: string | null }
   | { type: 'failed'; message: string }
   | { type: 'verified'; registrationToken: string }
   | { type: 'restart' };

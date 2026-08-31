@@ -36,7 +36,17 @@ mkdir -p \
   "${UV_CACHE_DIR:-${WORKSPACE}/uv-cache}" \
   "${CALL_ARCHIVE_DIR:-${WORKSPACE}/logs/archive}" \
   "${EVAL_LOG_DIR:-${WORKSPACE}/logs/calls}" \
+  "${IDENTITY_DIR:-${WORKSPACE}/data/identity}" \
   "${WORKSPACE}/config"
+
+# One directory on that list is tightened, and only this one: its
+# identities.json holds the phone numbers — the phone->user index that stops one
+# number minting a second profile IS the numbers. The backend writes that file
+# 0600 and would create the directory 0700, but the mkdir -p above gets there
+# first with the umask default, and mkdir does not re-chmod a directory that is
+# already present. Doing it here also covers the mounted-volume case, where the
+# directory outlives every container that has ever written to it.
+chmod 700 "${IDENTITY_DIR:-${WORKSPACE}/data/identity}"
 
 # Explicit opt-in only. This makes a keyless mock container bootable for local
 # smoke tests without silently using development credentials in a real Pod.
@@ -57,6 +67,10 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${WORKSPACE}/cache}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-${WORKSPACE}/uv-cache}"
 export CALL_ARCHIVE_DIR="${CALL_ARCHIVE_DIR:-${WORKSPACE}/logs/archive}"
 export EVAL_LOG_DIR="${EVAL_LOG_DIR:-${WORKSPACE}/logs/calls}"
+# The identity snapshot — every phone-registered profile and the contact graph.
+# Left at its repo-relative default it would sit on the container overlay and
+# die with the container, which is the exact failure it was written to end.
+export IDENTITY_DIR="${IDENTITY_DIR:-${WORKSPACE}/data/identity}"
 
 export BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
 export AGENT_HOST="${AGENT_HOST:-127.0.0.1}"

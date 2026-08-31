@@ -1,6 +1,7 @@
 import './styles.css';
 
 import { ConnectionState } from 'livekit-client';
+import { addByPhoneDone, addByPhoneFailed } from './add-by-phone';
 import { api, ApiRequestError, BACKEND_URL } from './api';
 import { startRingingAttention, stopRingingAttention } from './attention';
 import { AutoJoinGate } from './autojoin';
@@ -9,10 +10,12 @@ import { contactsModel } from './contact-directory';
 import { authErrorText, callErrorText, contactsErrorText } from './errors';
 import { FlagLog, type FlagTarget } from './flags';
 import { phoneAuthInitial, reducePhoneAuth, type PhoneAuthState } from './phone-auth';
+import { resolveIdentity } from './identity';
 import { profileUrl } from './profile-navigation';
 import { byGender } from './russian';
 import { RingPoller } from './ringpoll';
-import { selectSeededIdentities } from './seeded-identities';
+import { rememberSessionToken } from './session-token';
+import { isSeededIdentity, selectSeededIdentities } from './seeded-identities';
 import type { RingState } from './ring';
 import { diagnoseCurrentOrigin, insecureContextMessage } from './secure';
 import { SubtitleModel } from './subtitles';
@@ -20,6 +23,7 @@ import type {
   AppConfig,
   ContactCard,
   JoinResponse,
+  SessionGrant,
   StateMessage,
   SubtitleMessage,
   UserProfile,
@@ -349,23 +353,60 @@ async function boot(): Promise<void> {
     `stt:${cfg.providers.stt} mt:${cfg.providers.mt} tts:${cfg.providers.tts}`,
   ]);
 
-  const meId = param('me');
-  if (!meId) {
+  /**
+   * КТО МЫ. Раньше ответ был в адресной строке: `?me=<userId>` — и кто держал
+   * ссылку, тот и был этим человеком. Теперь личность даёт подписанная сессия
+   * (cookie, поставленная сервером), и клиент её не выбирает, а спрашивает.
+   *
+   * `?me=` при этом ОСТАЛСЯ и остался полезным — но перестал быть входом. Он
+   * говорит «покажи меня как этого» и ничего не открывает: если он не совпадает
+   * с сессией, показан всё равно тот, кем вы вошли, а не тот, кого назвали в
+   * URL. Дыры в этом нет ровно потому, что сервер параметр не читает вовсе —
+   * каждая ручка сверяет userId с сессией и отвечает 403, — так что ссылка
+   * теперь ничем не отличается от закладки.
+   */
+  const meHint = param('me');
+  let signedIn: UserProfile | null = null;
+  let sessionError: unknown = null;
+  try {
+    signedIn = await api.session();
+  } catch (err) {
+    sessionError = err;
+    signedIn = await seededDebugSession(meHint);
+  }
+
+  if (signedIn === null) {
+    const anonymous = resolveIdentity(meHint, null);
     await showIdentityPicker();
+    if (anonymous.ignoredHint !== null) {
+      ui.setIdentityError(
+        sessionError instanceof ApiRequestError && sessionError.status === 401
+          ? `Ссылка на профиль «${anonymous.ignoredHint}» сама по себе больше не открывает его: войдите по номеру телефона.`
+          : `Профиль «${anonymous.ignoredHint}» сервер не отдал: ${describeError(sessionError)}`,
+      );
+    }
     return;
   }
 
-  try {
-    state.me = await api.getUser(meId);
-  } catch (err) {
-    await showIdentityPicker();
-    ui.setIdentityError(`Профиль «${meId}» сервер не знает: ${describeError(err)}`);
-    return;
+  const identity = resolveIdentity(meHint, signedIn.id);
+  state.me = signedIn;
+  if (identity.ignoredHint !== null) {
+    // Молчать здесь нельзя: человек открыл ссылку на один профиль, а видит
+    // другой, и без этой строки решит, что смотрит на профиль из ссылки.
+    stickyBanner = `Ссылка открыта для другого профиля («${identity.ignoredHint}»). Вы вошли как ${signedIn.displayName}.`;
+    ui.setBanner(stickyBanner, 'error');
   }
+  // Адрес приводится к тому, кем мы вошли на самом деле: закладки и
+  // инвайт-ссылки продолжают работать, но показывают правду.
+  setParams({ me: identity.userId });
 
   ui.renderWhoami(state.me, () => {
-    setParams({ me: null, call: null });
-    window.location.reload();
+    // Выход — это отзыв сессии на сервере, а не забытый параметр в URL.
+    // Иначе «выйти» очищало бы адресную строку и оставляло вход в силе.
+    void api.logout().finally(() => {
+      setParams({ me: null, call: null });
+      window.location.reload();
+    });
   });
 
   // Say the awkward thing before the microphone is asked for, not after: an
@@ -387,6 +428,32 @@ async function boot(): Promise<void> {
   }
 
   await showContacts();
+}
+
+/**
+ * `?me=<посевная личность>` без сессии — просьба войти тестовым профилем.
+ *
+ * ССЫЛКА ПРИ ЭТОМ НИЧЕГО НЕ ОТКРЫВАЕТ, и в этом вся разница с тем, как было.
+ * Разрешение даёт сервер флагом AUTH_SEEDED_LOGIN, выключенным по умолчанию и
+ * выключенным на боевом сервере; ссылка лишь называет, какую из четырёх фикстур
+ * просить, — ровно то же, что нажать её кнопку на экране `?debug=1`. Живой
+ * профиль так не получить вовсе: сервер отвечает 403 на любой id, которого нет
+ * в посевной четвёрке, каким бы правдоподобным он ни выглядел.
+ *
+ * Нужно это ради одной вещи, зато настоящей: две вкладки на ноутбуке —
+ * единственный локальный способ проверить направление перевода, потому что у
+ * этих четырёх профилей нет и не будет номера телефона. scripts/dev.sh печатает
+ * ровно такие ссылки.
+ */
+async function seededDebugSession(hint: string | null): Promise<UserProfile | null> {
+  if (hint === null || !isSeededIdentity(hint)) return null;
+  try {
+    return await api.seededLogin(hint);
+  } catch {
+    // 403 — вход тестовой личностью на этом сервере выключен, и это норма.
+    // Дальше человека встретит обычный экран входа по номеру.
+    return null;
+  }
 }
 
 async function showIdentityPicker(): Promise<void> {
@@ -418,9 +485,24 @@ async function showIdentityPicker(): Promise<void> {
 async function renderSeededIdentities(): Promise<void> {
   try {
     const users = selectSeededIdentities(await api.listUsers());
+    // Раньше выбор личности был просто записью в адресную строку. Теперь это
+    // запрос сессии, и сервер вправе отказать: на боевом сервере вход тестовой
+    // личностью выключен (AUTH_SEEDED_LOGIN), потому что эти четыре профиля —
+    // контакты всех, кто зарегистрировался по номеру.
     const pick = (userId: string): void => {
-      setParams({ me: userId });
-      window.location.reload();
+      void (async () => {
+        try {
+          await api.seededLogin(userId);
+          setParams({ me: userId });
+          window.location.reload();
+        } catch (err) {
+          ui.setIdentityError(
+            err instanceof ApiRequestError && err.status === 403
+              ? 'Вход тестовой личностью на этом сервере выключен. Войдите по номеру телефона.'
+              : describeError(err),
+          );
+        }
+      })();
     };
     // Обычный путь — два вопроса. Полный список профилей остаётся, но виден
     // только под ?debug=1: он нужен, чтобы войти конкретным пользователем при
@@ -439,7 +521,7 @@ async function startPhoneConfirmation(phone: string): Promise<void> {
       type: 'code_sent',
       challengeId: challenge.challengeId,
       phone: challenge.phone,
-      devCode: challenge.devCode,
+      devCode: challenge.devCode ?? null,
     });
   } catch (err) {
     phoneAuth = reducePhoneAuth(phoneAuth, { type: 'failed', message: authErrorText('phone', err) });
@@ -452,6 +534,10 @@ async function verifyPhoneConfirmation(code: string): Promise<void> {
   try {
     const verified = await api.verifyPhone(phoneAuth.challengeId, code);
     if (verified.existingUser) {
+      // Номер уже принадлежит профилю — значит это вход, и сервер выдал сессию.
+      // Запомнить её надо ДО перехода: страница перезагрузится, и в памяти
+      // ничего не останется.
+      keepSession(verified.session);
       window.location.assign(profileUrl(window.location.href, verified.existingUser.id));
       return;
     }
@@ -469,6 +555,7 @@ async function registerProfile(profile: ui.ProfileRegistrationInput): Promise<vo
   if (phoneAuth.phase !== 'verified') return;
   try {
     const registered = await api.registerProfile(phoneAuth.registrationToken, profile);
+    keepSession(registered.session);
     window.location.assign(profileUrl(window.location.href, registered.user.id));
   } catch (err) {
     phoneAuth = reducePhoneAuth(phoneAuth, {
@@ -476,6 +563,44 @@ async function registerProfile(profile: ui.ProfileRegistrationInput): Promise<vo
       message: authErrorText('profile', err),
     });
     await showIdentityPicker();
+  }
+}
+
+/**
+ * Bearer-копия сессии, если сервер её прислал.
+ *
+ * `null`/`undefined` — это сборка backend'а без сессий, а не ошибка: клиент
+ * просто ничего не запоминает, а ручки, которым нужна сессия, ответят 401 и
+ * скажут об этом по-русски. Сама cookie ставится сервером и от этой строки не
+ * зависит.
+ */
+function keepSession(session: SessionGrant | null | undefined): void {
+  if (session) rememberSessionToken(window.localStorage, session.token);
+}
+
+/**
+ * «Добавить по номеру» — единственный способ для двух людей на своих номерах
+ * найти друг друга: новый профиль автоматически связывается только с четырьмя
+ * тестовыми аккаунтами, поэтому двое живых тестировщиков не появлялись в
+ * списках друг у друга и позвонить друг другу не могли.
+ *
+ * Список перечитывается СРАЗУ после успеха, потому что это единственное место,
+ * где виден результат: сервер отвечает одинаково на знакомый и на незнакомый
+ * номер, и подтверждение под формой намеренно ничего о чужом номере не говорит.
+ */
+async function addContactByPhone(raw: string): Promise<void> {
+  if (!state.me) return;
+  ui.setAddByPhoneStatus(null);
+  ui.setAddByPhoneBusy(true);
+  try {
+    await api.addContactByPhone(raw);
+    ui.clearAddByPhoneInput();
+    await showContacts();
+    ui.setAddByPhoneStatus(addByPhoneDone());
+  } catch (err) {
+    ui.setAddByPhoneStatus(addByPhoneFailed(err));
+  } finally {
+    ui.setAddByPhoneBusy(false);
   }
 }
 
@@ -1062,6 +1187,10 @@ ui.onHangup(() => {
 
 ui.onJoinById((raw) => {
   void joinExistingCall(raw);
+});
+
+ui.onAddByPhone((raw) => {
+  void addContactByPhone(raw);
 });
 
 // iOS suspends media when the tab is backgrounded and often needs a fresh
