@@ -190,6 +190,7 @@ def _predict(
     lang: str,
     top_k: int,
     context_terms: list[str],
+    context_note: str = "",
     timeout_s: float,
 ) -> tuple[dict[str, Any], float]:
     endpoint = url.rstrip("/")
@@ -202,6 +203,10 @@ def _predict(
             "lang": lang,
             "top_k": top_k,
             "context_terms": context_terms,
+            # Сужение контекста (docs/15): пол/собеседник/тема + память пары.
+            # Пустая строка — честный ноль; сервер в continuation-режиме поле
+            # игнорирует, в chat-режиме вклеивает в системный промпт.
+            "context_note": context_note,
             "max_new_tokens": 6,
         },
         timeout_s,
@@ -317,6 +322,7 @@ def _run_sample(
         if isinstance(context_terms_raw, list)
         else []
     )
+    context_note = str(sample.get("contextNote") or "")
 
     try:
         prediction, predictor_rtt = _predict(
@@ -325,6 +331,7 @@ def _run_sample(
             lang=lang,
             top_k=top_k,
             context_terms=context_terms,
+            context_note=context_note,
             timeout_s=timeout_s,
         )
     except Exception as exc:
