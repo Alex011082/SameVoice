@@ -31,6 +31,9 @@ CHAT_INSTRUCTION = os.getenv(
     "разговорным языком. Пиши только продолжение реплики, без пояснений.",
 )
 GPU_CONCURRENCY = concurrency_from_env("PREDICTOR_GPU_CONCURRENCY")
+# Путь к LoRA-адаптеру после дообучения (scripts/predictor-finetune.py).
+# Адаптер вливается в веса (merge_and_unload) — скорость инференса не меняется.
+ADAPTER_PATH = os.getenv("PREDICTOR_ADAPTER", "")
 
 
 class PredictRequest(BaseModel):
@@ -103,6 +106,11 @@ class PredictorEngine:
 
             tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
             model = AutoModelForCausalLM.from_pretrained(MODEL_ID)
+            if ADAPTER_PATH:
+                from peft import PeftModel
+
+                model = PeftModel.from_pretrained(model, ADAPTER_PATH)
+                model = model.merge_and_unload()
             device = "cuda" if torch.cuda.is_available() else "cpu"
             if device == "cuda":
                 model = model.to(device=device, dtype=torch.float16)
@@ -241,6 +249,7 @@ def healthz() -> dict[str, object]:
         "ok": True,
         "service": "predictor",
         "model": MODEL_ID,
+        "adapter": ADAPTER_PATH,
         "prompt_style": PROMPT_STYLE,
         "loaded": engine.loaded,
         "device": engine.device,
