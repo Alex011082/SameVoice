@@ -1,0 +1,478 @@
+
+=== 13:13:24 старт bootstrap, окружение:
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+/usr/bin/python3
+/usr/local/bin/pip
+/usr/bin/curl
+/usr/bin/wget
+
+=== 13:13:24 поднимаю http-отдачу лога (порт 8000)
+
+=== 13:13:24 проверяю GPU
+NVIDIA GeForce RTX 4090, 24564 MiB, 610.43.02
+-- диагностика CUDA:
+crw-rw-rw- 1 nobody nogroup 195, 254 Jul  9 09:08 /dev/nvidia-modeset
+crw-rw-rw- 1 nobody nogroup 507,   0 Jul  9 09:08 /dev/nvidia-uvm
+crw-rw-rw- 1 nobody nogroup 507,   1 Jul  9 09:08 /dev/nvidia-uvm-tools
+crw-rw-rw- 1 nobody nogroup 195,   1 Jul  9 09:08 /dev/nvidia1
+crw-rw-rw- 1 nobody nogroup 195, 255 Jul  9 09:08 /dev/nvidiactl
+
+/dev/nvidia-caps:
+total 0
+drwxr-xr-x 2 root root  40 Aug 31 13:13 .
+drwxr-xr-x 7 root root 480 Aug 31 13:13 ..
+CUDA_VERSION=12.8.1
+LD_LIBRARY_PATH=/usr/local/cuda/lib64
+LIBRARY_PATH=/usr/local/cuda/lib64/stubs
+NVIDIA_CTK_LIBCUDA_DIR=/usr/lib/x86_64-linux-gnu
+NVIDIA_DRIVER_CAPABILITIES=compute,utility
+NVIDIA_PRODUCT_NAME=CUDA
+NVIDIA_REQUIRE_CUDA=cuda>=12.8 brand=unknown,driver>=470,driver<471 brand=grid,driver>=470,driver<471 brand=tesla,driver>=470,driver<471 brand=nvidia,driver>=470,driver<471 brand=quadro,driver>=470,driver<471 brand=quadrortx,driver>=470,driver<471 brand=nvidiartx,driver>=470,driver<471 brand=vapps,driver>=470,driver<471 brand=vpc,driver>=470,driver<471 brand=vcs,driver>=470,driver<471 brand=vws,driver>=470,driver<471 brand=cloudgaming,driver>=470,driver<471 brand=unknown,driver>=535,driver<536 brand=grid,driver>=535,driver<536 brand=tesla,driver>=535,driver<536 brand=nvidia,driver>=535,driver<536 brand=quadro,driver>=535,driver<536 brand=quadrortx,driver>=535,driver<536 brand=nvidiartx,driver>=535,driver<536 brand=vapps,driver>=535,driver<536 brand=vpc,driver>=535,driver<536 brand=vcs,driver>=535,driver<536 brand=vws,driver>=535,driver<536 brand=cloudgaming,driver>=535,driver<536 brand=unknown,driver>=550,driver<551 brand=grid,driver>=550,driver<551 brand=tesla,driver>=550,driver<551 brand=nvidia,driver>=550,driver<551 brand=quadro,driver>=550,driver<551 brand=quadrortx,driver>=550,driver<551 brand=nvidiartx,driver>=550,driver<551 brand=vapps,driver>=550,driver<551 brand=vpc,driver>=550,driver<551 brand=vcs,driver>=550,driver<551 brand=vws,driver>=550,driver<551 brand=cloudgaming,driver>=550,driver<551 brand=unknown,driver>=560,driver<561 brand=grid,driver>=560,driver<561 brand=tesla,driver>=560,driver<561 brand=nvidia,driver>=560,driver<561 brand=quadro,driver>=560,driver<561 brand=quadrortx,driver>=560,driver<561 brand=nvidiartx,driver>=560,driver<561 brand=vapps,driver>=560,driver<561 brand=vpc,driver>=560,driver<561 brand=vcs,driver>=560,driver<561 brand=vws,driver>=560,driver<561 brand=cloudgaming,driver>=560,driver<561 brand=unknown,driver>=565,driver<566 brand=grid,driver>=565,driver<566 brand=tesla,driver>=565,driver<566 brand=nvidia,driver>=565,driver<566 brand=quadro,driver>=565,driver<566 brand=quadrortx,driver>=565,driver<566 brand=nvidiartx,driver>=565,driver<566 brand=vapps,driver>=565,driver<566 brand=vpc,driver>=565,driver<566 brand=vcs,driver>=565,driver<566 brand=vws,driver>=565,driver<566 brand=cloudgaming,driver>=565,driver<566
+NVIDIA_VISIBLE_DEVICES=void
+NV_CUDA_CUDART_DEV_VERSION=12.8.90-1
+NV_CUDA_CUDART_VERSION=12.8.90-1
+NV_CUDA_LIB_VERSION=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_DEV_PACKAGE=cuda-nsight-compute-12-8=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_VERSION=12.8.1-1
+NV_CUDNN_PACKAGE=libcudnn9-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_DEV=libcudnn9-dev-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_NAME=libcudnn9-cuda-12
+NV_LIBNCCL_DEV_PACKAGE=libnccl-dev=2.25.1-1+cuda12.8
+NV_LIBNCCL_PACKAGE=libnccl2=2.25.1-1+cuda12.8
+NV_NVPROF_DEV_PACKAGE=cuda-nvprof-12-8=12.8.90-1
+PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUNPOD_GPU_NAME=NVIDIA+GeForce+RTX+4090
+torch 2.8.0.dev20250319+cu128 | cuda build 12.8
+CUDA ок: NVIDIA GeForce RTX 4090
+
+=== 13:13:30 доустанавливаю лёгкие зависимости (torch НЕ трогаю)
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python3 -m pip install --upgrade pip
+
+=== 13:13:41 раскладываю код
+
+=== 13:13:42 запускаю сервисы
+порт 8101 жив
+порт 8105 жив
+
+=== 13:13:44 ЭКСПЕРИМЕНТ: сетка предиктора (top_k x max_new_tokens), RU
+
+--- конфигурация top_k=20 max_new_tokens=6
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=ru iterations=30 in-flight=[1, 2]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-tk20-mnt6.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       182.3 p90=       191.9 p95=       192.2 max=       203.1
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=       180.8 p90=       190.0 p95=       190.5 max=       201.4
+    total_ms                 n=30   p50=       180.8 p90=       190.1 p95=       190.5 max=       201.4
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=         9.5 p90=        13.9 p95=        14.0 max=        14.3
+    queue_wait_ms            n=30   p50=         0.1 p90=         0.1 p95=         0.1 max=         0.2
+    inference_ms             n=30   p50=         7.8 p90=        12.1 p95=        12.2 max=        12.3
+    total_ms                 n=30   p50=         8.2 p90=        12.6 p95=        12.7 max=        12.7
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       167.6 p90=       173.3 p95=       182.6 max=       186.9
+    pruner_round_trip_ms     n=30   p50=        17.7 p90=        18.3 p95=        18.4 max=        18.5
+    sum_round_trip_ms        n=30   p50=       185.3 p90=       191.5 p95=       195.8 max=       197.1
+    sum of the two p50s      185.3 ms   (p50 of the measured sums: 185.3 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 180.8 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 190.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       334.1 p90=       337.7 p95=       342.4 max=       350.4
+    queue_wait_ms            n=30   p50=       164.8 p90=       166.2 p95=       168.9 max=       174.9
+    inference_ms             n=30   p50=       167.2 p90=       169.0 p95=       171.3 max=       177.4
+    total_ms                 n=30   p50=       332.0 p90=       335.7 p95=       340.1 max=       348.1
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        16.6 p90=        29.6 p95=        33.8 max=        36.5
+    queue_wait_ms            n=30   p50=         6.6 p90=        14.0 p95=        15.5 max=        17.0
+    inference_ms             n=30   p50=         8.5 p90=        16.3 p95=        17.2 max=        17.4
+    total_ms                 n=30   p50=        15.3 p90=        28.1 p95=        32.6 max=        34.4
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       316.0 p90=       329.9 p95=       342.0 max=       350.3
+    pruner_round_trip_ms     n=30   p50=        18.1 p90=        18.5 p95=        18.8 max=        19.0
+    sum_round_trip_ms        n=30   p50=       333.8 p90=       340.0 p95=       354.1 max=       367.2
+    sum of the two p50s      334.1 ms   (p50 of the measured sums: 333.8 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 167.2 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 171.3 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 168.9 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 15.5 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 180.8 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 190.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 167.2 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 171.3 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 168.9 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 15.5 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-tk20-mnt6.json
+
+--- конфигурация top_k=6 max_new_tokens=6
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=ru iterations=30 in-flight=[1, 2]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-tk6-mnt6.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       165.0 p90=       166.6 p95=       167.3 max=       168.5
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=       164.2 p90=       165.7 p95=       166.5 max=       167.7
+    total_ms                 n=30   p50=       164.2 p90=       165.7 p95=       166.5 max=       167.7
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=         9.4 p90=        16.2 p95=        17.1 max=        18.2
+    queue_wait_ms            n=30   p50=         0.1 p90=         0.1 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=         7.8 p90=        14.4 p95=        15.3 max=        16.4
+    total_ms                 n=30   p50=         8.2 p90=        14.9 p95=        15.7 max=        16.8
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       166.3 p90=       167.3 p95=       169.1 max=       172.5
+    pruner_round_trip_ms     n=30   p50=        17.3 p90=        17.6 p95=        17.6 max=        18.3
+    sum_round_trip_ms        n=30   p50=       183.6 p90=       184.4 p95=       185.0 max=       187.9
+    sum of the two p50s      183.6 ms   (p50 of the measured sums: 183.6 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 164.2 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 166.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       331.2 p90=       343.0 p95=       353.4 max=       361.9
+    queue_wait_ms            n=30   p50=       163.2 p90=       172.4 p95=       174.0 max=       183.8
+    inference_ms             n=30   p50=       165.9 p90=       174.9 p95=       176.6 max=       186.2
+    total_ms                 n=30   p50=       329.0 p90=       340.6 p95=       351.2 max=       359.6
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        16.8 p90=        28.7 p95=        30.4 max=        34.3
+    queue_wait_ms            n=30   p50=         6.5 p90=        13.4 p95=        14.2 max=        15.7
+    inference_ms             n=30   p50=         8.5 p90=        14.8 p95=        15.6 max=        16.2
+    total_ms                 n=30   p50=        15.4 p90=        27.5 p95=        29.4 max=        32.1
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       313.7 p90=       320.6 p95=       322.1 max=       332.0
+    pruner_round_trip_ms     n=30   p50=        17.7 p90=        18.1 p95=        18.2 max=        18.2
+    sum_round_trip_ms        n=30   p50=       331.6 p90=       335.9 p95=       338.5 max=       340.8
+    sum of the two p50s      331.4 ms   (p50 of the measured sums: 331.6 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 165.9 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 176.6 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 174.0 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.2 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 164.2 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 166.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 165.9 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 176.6 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 174.0 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.2 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-tk6-mnt6.json
+
+--- конфигурация top_k=2 max_new_tokens=6
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=ru iterations=30 in-flight=[1, 2]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-tk2-mnt6.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       166.1 p90=       175.8 p95=       183.4 max=       186.3
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=       165.3 p90=       174.9 p95=       182.5 max=       185.5
+    total_ms                 n=30   p50=       165.3 p90=       174.9 p95=       182.5 max=       185.5
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=         9.5 p90=        16.2 p95=        17.2 max=        20.5
+    queue_wait_ms            n=30   p50=         0.1 p90=         0.1 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=         7.8 p90=        14.7 p95=        15.3 max=        18.6
+    total_ms                 n=30   p50=         8.2 p90=        15.2 p95=        15.8 max=        19.1
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       174.0 p90=       185.9 p95=       186.2 max=       187.0
+    pruner_round_trip_ms     n=30   p50=        16.2 p90=        17.0 p95=        17.1 max=        17.8
+    sum_round_trip_ms        n=30   p50=       188.6 p90=       195.3 p95=       196.0 max=       202.9
+    sum of the two p50s      190.2 ms   (p50 of the measured sums: 188.6 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 165.3 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 182.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       333.4 p90=       336.5 p95=       343.1 max=       351.2
+    queue_wait_ms            n=30   p50=       164.2 p90=       166.1 p95=       167.8 max=       178.6
+    inference_ms             n=30   p50=       166.8 p90=       168.6 p95=       169.7 max=       181.1
+    total_ms                 n=30   p50=       331.2 p90=       333.7 p95=       340.6 max=       348.8
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        17.0 p90=        27.8 p95=        30.9 max=        35.4
+    queue_wait_ms            n=30   p50=         6.5 p90=        13.5 p95=        14.2 max=        16.7
+    inference_ms             n=30   p50=         8.6 p90=        14.9 p95=        16.0 max=        17.2
+    total_ms                 n=30   p50=        15.6 p90=        26.6 p95=        29.8 max=        33.1
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       317.0 p90=       333.1 p95=       334.2 max=       334.7
+    pruner_round_trip_ms     n=30   p50=        17.8 p90=        18.1 p95=        19.3 max=        23.6
+    sum_round_trip_ms        n=30   p50=       334.6 p90=       348.2 p95=       351.5 max=       353.2
+    sum of the two p50s      334.8 ms   (p50 of the measured sums: 334.6 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 166.8 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 169.7 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 167.8 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.2 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 165.3 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 182.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 166.8 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 169.7 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 167.8 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.2 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-tk2-mnt6.json
+
+--- конфигурация top_k=6 max_new_tokens=3
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=ru iterations=30 in-flight=[1, 2]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-tk6-mnt3.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=        85.0 p90=        89.4 p95=        92.3 max=        94.4
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=        84.1 p90=        88.6 p95=        91.5 max=        93.5
+    total_ms                 n=30   p50=        84.1 p90=        88.6 p95=        91.5 max=        93.5
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=         9.6 p90=        17.6 p95=        17.8 max=        18.3
+    queue_wait_ms            n=30   p50=         0.1 p90=         0.1 p95=         0.1 max=         0.2
+    inference_ms             n=30   p50=         7.8 p90=        14.9 p95=        15.8 max=        16.6
+    total_ms                 n=30   p50=         8.3 p90=        15.3 p95=        16.3 max=        17.0
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=        85.7 p90=        86.7 p95=        87.3 max=        87.7
+    pruner_round_trip_ms     n=30   p50=        17.3 p90=        17.7 p95=        17.8 max=        17.9
+    sum_round_trip_ms        n=30   p50=       103.0 p90=       103.8 p95=       104.3 max=       104.8
+    sum of the two p50s      103.0 ms   (p50 of the measured sums: 103.0 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 84.1 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 91.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       170.4 p90=       171.2 p95=       171.5 max=       172.5
+    queue_wait_ms            n=30   p50=        82.9 p90=        83.3 p95=        83.9 max=        84.8
+    inference_ms             n=30   p50=        85.3 p90=        85.8 p95=        85.8 max=        86.8
+    total_ms                 n=30   p50=       168.3 p90=       169.0 p95=       169.3 max=       170.0
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        16.7 p90=        28.3 p95=        32.1 max=        35.8
+    queue_wait_ms            n=30   p50=         6.5 p90=        13.6 p95=        14.9 max=        16.5
+    inference_ms             n=30   p50=         8.5 p90=        15.1 p95=        16.6 max=        16.9
+    total_ms                 n=30   p50=        15.4 p90=        27.2 p95=        31.0 max=        33.5
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       154.1 p90=       170.5 p95=       171.8 max=       174.3
+    pruner_round_trip_ms     n=30   p50=        17.7 p90=        18.0 p95=        18.1 max=        18.2
+    sum_round_trip_ms        n=30   p50=       171.8 p90=       186.5 p95=       188.3 max=       192.3
+    sum of the two p50s      171.8 ms   (p50 of the measured sums: 171.8 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 85.3 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 85.8 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 83.9 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.9 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 84.1 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 91.5 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 85.3 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 85.8 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 83.9 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.9 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-tk6-mnt3.json
+
+--- конфигурация top_k=6 max_new_tokens=2
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=ru iterations=30 in-flight=[1, 2]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-tk6-mnt2.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=        57.6 p90=        60.4 p95=        61.6 max=        63.0
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=        56.8 p90=        59.6 p95=        60.8 max=        62.2
+    total_ms                 n=30   p50=        56.8 p90=        59.6 p95=        60.8 max=        62.2
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=         9.5 p90=        16.3 p95=        17.0 max=        17.9
+    queue_wait_ms            n=30   p50=         0.1 p90=         0.1 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=         7.8 p90=        14.5 p95=        15.2 max=        16.0
+    total_ms                 n=30   p50=         8.2 p90=        14.9 p95=        15.6 max=        16.4
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=        58.2 p90=        61.9 p95=        62.9 max=        64.3
+    pruner_round_trip_ms     n=30   p50=        16.7 p90=        17.2 p95=        17.5 max=        17.6
+    sum_round_trip_ms        n=30   p50=        74.9 p90=        76.1 p95=        77.7 max=        81.1
+    sum of the two p50s      74.9 ms   (p50 of the measured sums: 74.9 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 56.8 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 60.8 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       115.9 p90=       117.4 p95=       118.3 max=       118.7
+    queue_wait_ms            n=30   p50=        55.7 p90=        56.3 p95=        57.0 max=        59.1
+    inference_ms             n=30   p50=        58.1 p90=        58.7 p95=        59.4 max=        59.9
+    total_ms                 n=30   p50=       113.7 p90=       115.3 p95=       115.9 max=       116.1
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        16.0 p90=        29.0 p95=        32.3 max=        35.6
+    queue_wait_ms            n=30   p50=         6.4 p90=        14.1 p95=        15.1 max=        16.2
+    inference_ms             n=30   p50=         8.1 p90=        15.6 p95=        16.6 max=        16.8
+    total_ms                 n=30   p50=        14.9 p90=        27.8 p95=        31.3 max=        33.3
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       100.0 p90=       107.5 p95=       108.2 max=       118.7
+    pruner_round_trip_ms     n=30   p50=        17.8 p90=        18.0 p95=        18.1 max=        18.2
+    sum_round_trip_ms        n=30   p50=       117.2 p90=       121.9 p95=       125.1 max=       127.4
+    sum of the two p50s      117.8 ms   (p50 of the measured sums: 117.2 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 58.1 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 59.4 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 57.0 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 15.1 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 56.8 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 60.8 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 58.1 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 59.4 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 57.0 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 15.1 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-tk6-mnt2.json
+
+--- конфигурация top_k=2 max_new_tokens=2
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=ru iterations=30 in-flight=[1, 2]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-tk2-mnt2.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=        59.3 p90=        59.9 p95=        60.4 max=        60.8
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=        57.8 p90=        58.4 p95=        58.9 max=        59.3
+    total_ms                 n=30   p50=        57.8 p90=        58.4 p95=        59.0 max=        59.3
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=         9.5 p90=        16.6 p95=        16.9 max=        18.3
+    queue_wait_ms            n=30   p50=         0.1 p90=         0.1 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=         7.8 p90=        14.8 p95=        15.0 max=        16.1
+    total_ms                 n=30   p50=         8.2 p90=        15.2 p95=        15.5 max=        16.6
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=        59.5 p90=        60.2 p95=        60.5 max=        61.4
+    pruner_round_trip_ms     n=30   p50=        17.5 p90=        18.0 p95=        18.2 max=        30.4
+    sum_round_trip_ms        n=30   p50=        76.9 p90=        78.2 p95=        78.8 max=        90.2
+    sum of the two p50s      77.0 ms   (p50 of the measured sums: 76.9 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 57.8 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 58.9 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       116.8 p90=       118.2 p95=       118.5 max=       124.1
+    queue_wait_ms            n=30   p50=        56.1 p90=        56.8 p95=        57.0 max=        61.8
+    inference_ms             n=30   p50=        58.5 p90=        59.3 p95=        59.6 max=        62.7
+    total_ms                 n=30   p50=       114.7 p90=       115.8 p95=       116.3 max=       120.9
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        16.8 p90=        29.6 p95=        32.4 max=        35.3
+    queue_wait_ms            n=30   p50=         6.6 p90=        14.5 p95=        14.8 max=        16.1
+    inference_ms             n=30   p50=         8.5 p90=        16.1 p95=        16.5 max=        16.7
+    total_ms                 n=30   p50=        15.5 p90=        28.4 p95=        31.3 max=        33.0
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       100.1 p90=       106.7 p95=       107.8 max=       117.7
+    pruner_round_trip_ms     n=30   p50=        17.4 p90=        17.8 p95=        17.9 max=        18.0
+    sum_round_trip_ms        n=30   p50=       117.4 p90=       120.8 p95=       124.0 max=       126.5
+    sum of the two p50s      117.5 ms   (p50 of the measured sums: 117.4 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 58.5 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 59.6 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 57.0 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.8 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 57.8 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 58.9 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.1 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 58.5 ms
+  PASS         predictor inference p95    target <= 100 ms | measured 59.6 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 57.0 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 14.8 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-tk2-mnt2.json
+
+=== 13:15:48 ГОТОВО
+2645 MiB

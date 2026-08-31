@@ -1,0 +1,410 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-31T13:14:13.448346+00:00",
+  "script": "scripts/scorer-cost-bench.py",
+  "question": "Cost only: what does the prediction+pruning machinery charge one utterance on the critical path? The saving half of the question (lead over baseline STT) needs a labelled corpus and is not answered here.",
+  "not_measured_here": {
+    "metrics": [
+      "recall",
+      "retention",
+      "rank movement",
+      "promotion verdict",
+      "STT lead"
+    ],
+    "reason": "no labelled corpus exists yet; on placeholder words and synthetic audio such numbers would be noise formatted as data",
+    "measured_instead_by": [
+      "scripts/acoustic-replay-bench.py",
+      "agent/src/speakeasy_agent/benchmark_gate.py",
+      "docs/10-acoustic-replay-benchmark.md"
+    ]
+  },
+  "config": {
+    "lang": "ru",
+    "iterations": 30,
+    "in_flight_levels": [
+      1,
+      2
+    ],
+    "windows_ms": [
+      150
+    ],
+    "critical_window_ms": 150,
+    "top_k": 20,
+    "max_new_tokens": 6,
+    "candidate_count": 20,
+    "predictor_url": "http://127.0.0.1:8101",
+    "pruner_url": "http://127.0.0.1:8105",
+    "audio": {
+      "kind": "synthetic",
+      "tone_hz": 440,
+      "amplitude": 0.2,
+      "audio_ms": 1000
+    }
+  },
+  "targets": {
+    "predictor_inference_p50_ms_max": 50.0,
+    "predictor_inference_p95_ms_max": 100.0,
+    "queue_wait_p95_ms_max": 20.0,
+    "source": "founder's stated targets for the first paid session; not measurements"
+  },
+  "health": {
+    "predictor": {
+      "ok": true,
+      "service": "predictor",
+      "model": "Qwen/Qwen3-0.6B-Base",
+      "loaded": false,
+      "device": "unloaded",
+      "gpu_concurrency": 1,
+      "gpu_queue_waiting": 0
+    },
+    "pruner": {
+      "ok": true,
+      "service": "acoustic-pruner",
+      "gpu_concurrency": 1,
+      "gpu_queue_waiting": 0,
+      "engines": {
+        "ru": {
+          "model": "bond005/wav2vec2-base-ru",
+          "loaded": false,
+          "device": "unloaded",
+          "load_ms": 0.0
+        },
+        "he": {
+          "model": "imvladikon/wav2vec2-large-xlsr-53-hebrew",
+          "loaded": false,
+          "device": "unloaded",
+          "load_ms": 0.0
+        }
+      }
+    }
+  },
+  "warmup": {
+    "predictor": {
+      "round_trip_ms": 14735.2,
+      "response": {
+        "ok": true,
+        "model": "Qwen/Qwen3-0.6B-Base",
+        "device": "cuda",
+        "load_ms": 14731.064459308982
+      }
+    },
+    "pruner": {
+      "round_trip_ms": 12080.5,
+      "response": {
+        "ok": true,
+        "lang": "ru",
+        "model": "bond005/wav2vec2-base-ru",
+        "load_ms": 12076.22174732387,
+        "device": "cuda"
+      }
+    },
+    "discarded_iterations": 3,
+    "discarded": {
+      "predictor_round_trip_ms": [
+        836.872,
+        190.698,
+        189.563
+      ],
+      "pruner_round_trip_ms": [
+        773.165,
+        12.179,
+        11.614
+      ]
+    }
+  },
+  "levels": [
+    {
+      "in_flight": 1,
+      "predictor": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "round_trip_ms": {
+          "n": 30,
+          "p50_ms": 182.3,
+          "p90_ms": 191.9,
+          "p95_ms": 192.2,
+          "min_ms": 166.0,
+          "max_ms": 203.1
+        },
+        "queue_wait_ms": {
+          "n": 30,
+          "p50_ms": 0.0,
+          "p90_ms": 0.0,
+          "p95_ms": 0.0,
+          "min_ms": 0.0,
+          "max_ms": 0.0
+        },
+        "inference_ms": {
+          "n": 30,
+          "p50_ms": 180.8,
+          "p90_ms": 190.0,
+          "p95_ms": 190.5,
+          "min_ms": 164.5,
+          "max_ms": 201.4
+        },
+        "total_ms": {
+          "n": 30,
+          "p50_ms": 180.8,
+          "p90_ms": 190.1,
+          "p95_ms": 190.5,
+          "min_ms": 164.5,
+          "max_ms": 201.4
+        }
+      },
+      "pruner_windows": [
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 9.5,
+            "p90_ms": 13.9,
+            "p95_ms": 14.0,
+            "min_ms": 8.6,
+            "max_ms": 14.3
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 0.1,
+            "p90_ms": 0.1,
+            "p95_ms": 0.1,
+            "min_ms": 0.1,
+            "max_ms": 0.2
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 7.8,
+            "p90_ms": 12.1,
+            "p95_ms": 12.2,
+            "min_ms": 6.9,
+            "max_ms": 12.3
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 8.2,
+            "p90_ms": 12.6,
+            "p95_ms": 12.7,
+            "min_ms": 7.3,
+            "max_ms": 12.7
+          },
+          "window_ms": 150
+        }
+      ],
+      "critical_path": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "predictor_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 167.6,
+          "p90_ms": 173.3,
+          "p95_ms": 182.6,
+          "min_ms": 165.3,
+          "max_ms": 186.9
+        },
+        "pruner_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 17.7,
+          "p90_ms": 18.3,
+          "p95_ms": 18.4,
+          "min_ms": 9.7,
+          "max_ms": 18.5
+        },
+        "sum_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 185.3,
+          "p90_ms": 191.5,
+          "p95_ms": 195.8,
+          "min_ms": 176.6,
+          "max_ms": 197.1
+        },
+        "window_ms": 150,
+        "sum_of_the_two_p50s_ms": 185.3,
+        "p50_of_sum_minus_sum_of_p50s_ms": 0.0
+      },
+      "verdicts": [
+        {
+          "check": "predictor inference p50",
+          "target_ms": 50.0,
+          "measured_ms": 180.8,
+          "verdict": "FAIL",
+          "in_flight": 1
+        },
+        {
+          "check": "predictor inference p95",
+          "target_ms": 100.0,
+          "measured_ms": 190.5,
+          "verdict": "FAIL",
+          "in_flight": 1
+        },
+        {
+          "check": "predictor queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 0.0,
+          "verdict": "VACUOUS",
+          "note": "1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here",
+          "in_flight": 1
+        },
+        {
+          "check": "pruner queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 0.1,
+          "verdict": "VACUOUS",
+          "note": "1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here",
+          "in_flight": 1
+        }
+      ]
+    },
+    {
+      "in_flight": 2,
+      "predictor": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "round_trip_ms": {
+          "n": 30,
+          "p50_ms": 334.1,
+          "p90_ms": 337.7,
+          "p95_ms": 342.4,
+          "min_ms": 169.6,
+          "max_ms": 350.4
+        },
+        "queue_wait_ms": {
+          "n": 30,
+          "p50_ms": 164.8,
+          "p90_ms": 166.2,
+          "p95_ms": 168.9,
+          "min_ms": 0.0,
+          "max_ms": 174.9
+        },
+        "inference_ms": {
+          "n": 30,
+          "p50_ms": 167.2,
+          "p90_ms": 169.0,
+          "p95_ms": 171.3,
+          "min_ms": 165.0,
+          "max_ms": 177.4
+        },
+        "total_ms": {
+          "n": 30,
+          "p50_ms": 332.0,
+          "p90_ms": 335.7,
+          "p95_ms": 340.1,
+          "min_ms": 166.5,
+          "max_ms": 348.1
+        }
+      },
+      "pruner_windows": [
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 16.6,
+            "p90_ms": 29.6,
+            "p95_ms": 33.8,
+            "min_ms": 16.0,
+            "max_ms": 36.5
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 6.6,
+            "p90_ms": 14.0,
+            "p95_ms": 15.5,
+            "min_ms": 0.1,
+            "max_ms": 17.0
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 8.5,
+            "p90_ms": 16.3,
+            "p95_ms": 17.2,
+            "min_ms": 7.9,
+            "max_ms": 17.4
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 15.3,
+            "p90_ms": 28.1,
+            "p95_ms": 32.6,
+            "min_ms": 14.7,
+            "max_ms": 34.4
+          },
+          "window_ms": 150
+        }
+      ],
+      "critical_path": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "predictor_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 316.0,
+          "p90_ms": 329.9,
+          "p95_ms": 342.0,
+          "min_ms": 168.3,
+          "max_ms": 350.3
+        },
+        "pruner_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 18.1,
+          "p90_ms": 18.5,
+          "p95_ms": 18.8,
+          "min_ms": 9.1,
+          "max_ms": 19.0
+        },
+        "sum_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 333.8,
+          "p90_ms": 340.0,
+          "p95_ms": 354.1,
+          "min_ms": 178.7,
+          "max_ms": 367.2
+        },
+        "window_ms": 150,
+        "sum_of_the_two_p50s_ms": 334.1,
+        "p50_of_sum_minus_sum_of_p50s_ms": -0.3
+      },
+      "verdicts": [
+        {
+          "check": "predictor inference p50",
+          "target_ms": 50.0,
+          "measured_ms": 167.2,
+          "verdict": "FAIL",
+          "in_flight": 2
+        },
+        {
+          "check": "predictor inference p95",
+          "target_ms": 100.0,
+          "measured_ms": 171.3,
+          "verdict": "FAIL",
+          "in_flight": 2
+        },
+        {
+          "check": "predictor queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 168.9,
+          "verdict": "FAIL",
+          "in_flight": 2
+        },
+        {
+          "check": "pruner queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 15.5,
+          "verdict": "PASS",
+          "in_flight": 2
+        }
+      ]
+    }
+  ],
+  "caveats": [
+    "Correctness is not measured here. No recall, retention or rank number exists in this artifact; those need the labelled manifest of docs/10-acoustic-replay-benchmark.md and are produced by scripts/acoustic-replay-bench.py.",
+    "The critical-path pair is a HYPOTHETICAL inline design, not a measurement of today's agent. Today the pruner is not on the critical path at all: acoustic_shadow.py:_maybe_start_scoring spawns a background task and _score loops over ACOUSTIC_PRUNER_SHADOW_WINDOWS_MS, so one scored attempt costs ONE /v1/prune PER WINDOW (five by default, docker/runpod-gpu.env.example:65) and blocks nothing. Read the pair below as 'what one predict + one prune would cost if the pruner were moved onto the path', and multiply the pruner column by the number of windows for what the shadow actually spends per attempt today.",
+    "The predictor and the pruner are pinned to the same physical card. In the per-service phases only one of them is driven at a time; in the critical-path phase both are, so at 2+ in flight those numbers describe the pair, not either service alone (gpu/queueing.py).",
+    "Round trips are loopback, measured from inside the Pod. They contain no wide-area network time and are not an end-user latency.",
+    "Audio is synthetic. Whether real speech costs the pruner measurably more per window is не измерено; re-run with --wav to find out."
+  ]
+}
