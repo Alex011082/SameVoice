@@ -8,7 +8,11 @@
 Уроки 31.08.2026, вшитые сюда:
  - запрос строит json.dumps, а не bash-склейка (четыре уровня кавычек);
  - шлёт curl: urllib с User-Agent "Python-urllib" получает от RunPod 403;
- - образ runpod/pytorch, а не runpod/base: на base pip-torch не видел CUDA;
+ - образ runpod/pytorch: torch уже внутри (минус 3 ГБ pip). Важно: "CUDA
+   unknown error" при рабочем nvidia-smi — это БИТЫЙ ХОСТ, не образ
+   (воспроизведено 31.08 на обоих образах: поды 38e2j684pmplz0 и
+   dxu04j15dgwv8e, у второго /dev/nvidia-uvm на месте, uvm мёртв на хосте).
+   Лечение одно: погасить под и пересоздать — приедет другая машина;
  - dockerArgs подменяет штатный старт образа — sshd не будет, и не нужен.
 
 Использование:
