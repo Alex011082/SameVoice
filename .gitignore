@@ -59,6 +59,11 @@ voice-embeddings/
 user-memory/
 consented-data/
 logs/calls/
+# The identity snapshot: profiles, the contact graph AND phone numbers
+# (backend/src/store.ts). `data/` above already covers it; spelled out because a
+# phone number is personal data and must never reach a commit even if that
+# broader line is one day narrowed.
+data/identity/
 *.wav
 *.mp3
 *.flac

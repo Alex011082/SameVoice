@@ -1,7 +1,9 @@
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { normalizePhone } from "./phoneVerification.js";
 
 // The repo-root .env is the single source of truth shared by backend, agent and vite.
 // Resolved relative to this module so it works from src/ (tsx) and from dist/ (node) alike.
@@ -51,6 +53,50 @@ export interface Config {
    * started in — the same trap the agent's EVAL_LOG_DIR already documents.
    */
   callArchiveDir: string;
+
+  // --- identity: who is making this request ---------------------------------
+
+  /**
+   * HMAC key for session tokens (backend/src/session.ts). Absent from the
+   * environment means a random key per boot — see sessionSecretEphemeral.
+   */
+  sessionSecret: string;
+  /**
+   * True when SESSION_SECRET was not set and a random key was generated at
+   * boot, which invalidates every existing session on every restart. It is
+   * warned about rather than hidden, because the day users become durable is
+   * the day "you were logged out again" stops being explainable.
+   */
+  sessionSecretEphemeral: boolean;
+  sessionTtlSeconds: number;
+  /** "auto" decides per request from the Host header — see session.ts. */
+  sessionCookieSecure: boolean | "auto";
+  /**
+   * Whether POST /api/auth/phone/start returns the confirmation code in its own
+   * response. OFF by default: with it on, anyone who can reach the server can
+   * verify anyone's number and open the app as them.
+   */
+  authDevCodeInResponse: boolean;
+  /**
+   * Numbers allowed to START verification, already normalized to E.164 so the
+   * comparison cannot fail on notation. Empty means anyone may register — the
+   * pre-31.08.2026 behaviour, kept as the default and warned about at boot.
+   */
+  authPhoneAllowlist: readonly string[];
+  /**
+   * Whether POST /api/auth/seeded-login hands out a session as one of the four
+   * seeded test identities with no proof at all. OFF by default.
+   */
+  authSeededLogin: boolean;
+  /**
+   * Where the identity snapshot (users, the phone index, contacts) is kept.
+   * Same anchoring rule as callArchiveDir: a relative path is resolved against
+   * the REPO root, never against the working directory of whatever started the
+   * process. Separate from callArchiveDir because the contents are different in
+   * kind — a call archive is a record of something that happened, this is the
+   * live account data the server needs to answer the next request at all.
+   */
+  identityDir: string;
 }
 
 const REQUIRED = [
@@ -132,6 +178,51 @@ function boolFromEnv(name: string, fallback: boolean): boolean {
   throw new Error(`Invalid ${name}="${raw}": expected true or false.`);
 }
 
+/** Same as boolFromEnv, plus the literal "auto" that session.ts resolves per request. */
+function boolOrAutoFromEnv(name: string, fallback: "auto"): boolean | "auto" {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (raw === undefined || raw === "" || raw === "auto") return fallback;
+  return boolFromEnv(name, true);
+}
+
+/**
+ * The allowlist goes through the SAME normalizer an incoming number does.
+ * Written any other way, `0501234567` in the file would never match
+ * `+972501234567` on the wire, and the failure would read as "the allowlist
+ * blocks everybody" rather than "the notation differs".
+ */
+function parsePhoneAllowlist(raw: string): string[] {
+  const entries = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+  const allowed: string[] = [];
+  const problems: string[] = [];
+  for (const entry of entries) {
+    const normalized = normalizePhone(entry);
+    // The rejected entry is echoed back here and NOWHERE else in the backend:
+    // this is a startup crash on the operator's own terminal, quoting his own
+    // config file. It is not a log line and not an API response, which is where
+    // the "a phone number is personal data" rule bites.
+    if (normalized === null) problems.push(`  - "${entry}" is not a phone number`);
+    else if (!allowed.includes(normalized)) allowed.push(normalized);
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      [
+        "SpeakEasy backend cannot start: AUTH_PHONE_ALLOWLIST contains invalid entries.",
+        ...problems,
+        "",
+        "AUTH_PHONE_ALLOWLIST is a comma-separated list of the numbers allowed to",
+        "start phone verification. Israeli mobile notation and +E.164 both work:",
+        "  AUTH_PHONE_ALLOWLIST=050-123-4567,+972527654321",
+        "Leave it empty to let anyone register (the pre-31.08.2026 behaviour).",
+      ].join("\n"),
+    );
+  }
+  return allowed;
+}
+
 /** A path from the environment, anchored to the repo root when it is relative. */
 function pathFromEnv(name: string, fallback: string): string {
   const raw = process.env[name]?.trim() || fallback;
@@ -199,6 +290,19 @@ export function loadConfig(): Config {
     );
   }
 
+  // A random key beats a committed default: a default secret in .env.example is
+  // a secret every deployment that never changed it shares with the internet.
+  // The cost is that sessions do not survive a restart, which is what the boot
+  // warning in buildApp() says out loud.
+  const configuredSecret = process.env.SESSION_SECRET?.trim() ?? "";
+  const sessionSecretEphemeral = configuredSecret.length === 0;
+  const sessionSecret = sessionSecretEphemeral ? randomBytes(32).toString("hex") : configuredSecret;
+  if (!sessionSecretEphemeral && configuredSecret.length < 32) {
+    process.emitWarning(
+      `SESSION_SECRET is ${configuredSecret.length} chars; use at least 32 (openssl rand -hex 32).`,
+    );
+  }
+
   return {
     port: intFromEnv("BACKEND_PORT", 8787),
     host: process.env.BACKEND_HOST?.trim() || "0.0.0.0",
@@ -221,5 +325,18 @@ export function loadConfig(): Config {
     presenceTtlSeconds: intFromEnv("PRESENCE_TTL_SECONDS", 15),
     presencePollIntervalMs: intFromEnv("PRESENCE_POLL_MS", 2000),
     callArchiveDir: pathFromEnv("CALL_ARCHIVE_DIR", "logs/archive"),
+    sessionSecret,
+    sessionSecretEphemeral,
+    // 30 days. An app you have to log into every week is an app nobody carries,
+    // and the token names a user id and nothing else; the logout button revokes
+    // it on the spot for the case that matters.
+    sessionTtlSeconds: intFromEnv("SESSION_TTL_SECONDS", 30 * 24 * 3600),
+    sessionCookieSecure: boolOrAutoFromEnv("SESSION_COOKIE_SECURE", "auto"),
+    authDevCodeInResponse: boolFromEnv("AUTH_DEV_CODE_IN_RESPONSE", false),
+    authPhoneAllowlist: parsePhoneAllowlist(process.env.AUTH_PHONE_ALLOWLIST ?? ""),
+    authSeededLogin: boolFromEnv("AUTH_SEEDED_LOGIN", false),
+    // Under data/ rather than logs/: the file holds phone numbers, and
+    // .gitignore's "Datasets / user data" section is where user data belongs.
+    identityDir: pathFromEnv("IDENTITY_DIR", "data/identity"),
   };
 }

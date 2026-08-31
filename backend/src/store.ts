@@ -1,4 +1,8 @@
 import { randomBytes } from "node:crypto";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { FastifyBaseLogger } from "fastify";
+import { z } from "zod";
 import {
   CALL_ID_RE,
   isRingLive,
@@ -14,6 +18,7 @@ import {
   type ModeReason,
   type RingState,
   type UserProfile,
+  USER_ID_RE,
 } from "./types.js";
 
 export interface ContactRecord {
@@ -122,11 +127,16 @@ function joinEveryone(userIds: readonly string[]): void {
   }
 }
 
-function seed(): void {
+/**
+ * The half of the store that survives a restart: profiles, the phone index and
+ * the contact graph. Split out from seed() so that loadIdentityStore() can
+ * rebuild exactly this much from the file without touching live calls — the
+ * archive owns those, and a reload that dropped them would 404 a call two
+ * people are talking on.
+ */
+function seedIdentities(): void {
   users.clear();
   contacts.clear();
-  calls.clear();
-  presence.clear();
   userIdByPhone.clear();
 
   const alex: UserProfile = {
@@ -188,11 +198,289 @@ function seed(): void {
   joinEveryone(stage0TestIdentityIds);
 }
 
+function seed(): void {
+  seedIdentities();
+  calls.clear();
+  presence.clear();
+}
+
 seed();
 
-/** Test-only: restore the Stage-0 seed and drop every call. */
+/**
+ * Test-only: restore the Stage-0 seed, drop every call, AND delete the snapshot
+ * on disk. The file is deleted rather than left for the next test to inherit:
+ * one test's phone user showing up in the next test's contact list is a failure
+ * that reads as a bug in the code under test.
+ */
 export function resetStore(): void {
   seed();
+  removeIdentityFile();
+}
+
+// ---------------------------------------------------------------------------
+// Persistence
+// ---------------------------------------------------------------------------
+//
+// Profiles, the phone index and the contact graph used to live only in the Maps
+// above, so `systemctl restart` erased every identity that had ever passed
+// phone verification. The seeded four kept working — the code recreates them on
+// every boot — which is exactly what made the bug hard to see: the founder's own
+// registered profile (u_4e224d03a7370d19) answered "user not found" through his
+// ?me= link while the test grid was fine, so it read as a broken link rather
+// than as a wiped store.
+//
+// The shape is backend/src/archive.ts's, which already made this call for
+// finished calls: a directory from config, plain JSON on disk, gitignored. One
+// deliberate difference. Calls get one file each; identities get a single
+// snapshot, because a contact row is meaningless without both of its users and
+// a per-user file set can be caught half-written — rows pointing at a profile
+// whose own file was never created.
+//
+// PERSONAL DATA. The phone number is in this file because it is in the Map:
+// getUserByPhone() is the only thing stopping one number from minting a second
+// profile on every login. It lives in the file the same way it lives in memory
+// and nowhere else — never in a log line (the counters below are counts, not
+// numbers), never in a response to anyone but its owner, and never in a commit:
+// .gitignore covers `data/` and, explicitly, `data/identity/`.
+
+const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_FILE = "identities.json";
+
+const langSchema = z.enum(["ru", "he"]);
+const genderSchema = z.enum(["m", "f", "u"]);
+const toneSchema = z.enum(["neutral", "friendly", "formal"]);
+const userIdSchema = z.string().regex(USER_ID_RE);
+
+const snapshotSchema = z
+  .object({
+    version: z.literal(SNAPSHOT_VERSION),
+    savedAt: z.string(),
+    users: z.array(
+      z
+        .object({
+          id: userIdSchema,
+          handle: z.string().min(1),
+          displayName: z.string().min(1),
+          lang: langSchema,
+          gender: genderSchema,
+          tone: toneSchema,
+        })
+        .strict(),
+    ),
+    // Mirrors normalizePhone()'s output shape. Validated on the way in because a
+    // phone that is not E.164 here would key an index nothing can ever look up.
+    phones: z.array(
+      z.object({ phone: z.string().regex(/^\+[1-9]\d{7,14}$/), userId: userIdSchema }).strict(),
+    ),
+    contacts: z.array(
+      z
+        .object({
+          ownerId: userIdSchema,
+          contactUserId: userIdSchema,
+          forceTranslate: z.boolean(),
+          overrides: z
+            .object({
+              lang: langSchema.optional(),
+              gender: genderSchema.optional(),
+              tone: toneSchema.optional(),
+            })
+            .strict(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+type IdentitySnapshot = z.infer<typeof snapshotSchema>;
+
+/** null until loadIdentityStore() runs: importing this module writes no files. */
+let identityDir: string | null = null;
+let identityLog: FastifyBaseLogger | undefined;
+
+/** The snapshot path, or null while nothing is attached. */
+export function identityStorePath(): string | null {
+  return identityDir === null ? null : join(identityDir, SNAPSHOT_FILE);
+}
+
+/**
+ * Refuses to answer with a half-read file. A JSON parse error or a shape that
+ * does not match means the process must not start: silently starting from an
+ * empty store is what let the missing-contacts failure look like a client bug
+ * for days, and it would do it again here — every phone user gone, the seeded
+ * four present, the API answering 200 the whole time.
+ *
+ * `null` means only "there is no file yet", which is the ordinary first boot.
+ */
+function readSnapshot(file: string): IdentitySnapshot | null {
+  let raw: string;
+  try {
+    raw = readFileSync(file, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new Error(
+      `SpeakEasy backend cannot start: identity store ${file} could not be read (${String(err)}).`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(
+      [
+        `SpeakEasy backend cannot start: identity store ${file} is not valid JSON (${String(err)}).`,
+        "It holds every phone-registered profile and their contacts. Starting without it would",
+        "silently answer \"user not found\" for all of them, so the process stops instead.",
+        "Move the file aside to start from the Stage-0 seed alone — that discards those profiles.",
+      ].join("\n"),
+    );
+  }
+
+  const result = snapshotSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `  - ${i.path.join(".") || "<root>"}: ${i.message}`)
+      .join("\n");
+    throw new Error(
+      [
+        `SpeakEasy backend cannot start: identity store ${file} does not match snapshot v${SNAPSHOT_VERSION}.`,
+        issues,
+      ].join("\n"),
+    );
+  }
+  return result.data;
+}
+
+/**
+ * The file on top of the seed. Both halves are keyed — users by id, contacts by
+ * `${ownerId}->${contactUserId}` — so a snapshot that contains the seeded four
+ * (it always does, they are ordinary users once they are in it) overwrites them
+ * with themselves instead of adding a second Alex.
+ *
+ * Rows whose endpoints are not users are dropped rather than kept: a contact
+ * row pointing at a profile that no longer exists is already invisible to the
+ * API (routes/users.ts filters it out of every list), so keeping it would only
+ * let it live forever in the file.
+ */
+function applySnapshot(snapshot: IdentitySnapshot): void {
+  for (const user of snapshot.users) users.set(user.id, user);
+
+  let droppedPhones = 0;
+  for (const entry of snapshot.phones) {
+    if (!users.has(entry.userId)) {
+      droppedPhones += 1;
+      continue;
+    }
+    userIdByPhone.set(entry.phone, entry.userId);
+  }
+
+  let droppedContacts = 0;
+  for (const contact of snapshot.contacts) {
+    if (
+      contact.ownerId === contact.contactUserId ||
+      !users.has(contact.ownerId) ||
+      !users.has(contact.contactUserId)
+    ) {
+      droppedContacts += 1;
+      continue;
+    }
+    contacts.set(contactKey(contact.ownerId, contact.contactUserId), contact);
+  }
+
+  if (droppedPhones > 0 || droppedContacts > 0) {
+    identityLog?.warn(
+      { droppedPhones, droppedContacts },
+      "identity store: dropped rows pointing at users the snapshot does not contain",
+    );
+  }
+}
+
+/**
+ * Point the store at `dir` and rebuild the identity half from the seed plus
+ * whatever is in it. This IS the boot path — buildApp() calls it once — which is
+ * also why a test can call it again to reproduce a restart without a second
+ * process.
+ *
+ * The seed runs first, unconditionally, so the four test identities exist even
+ * on a first boot with no file; see applySnapshot() for why running the file on
+ * top of them cannot duplicate them.
+ *
+ * Throws on an unreadable or malformed file. Deliberately fatal — see readSnapshot().
+ */
+export function loadIdentityStore(dir: string, log?: FastifyBaseLogger): void {
+  identityDir = dir;
+  identityLog = log;
+  seedIdentities();
+
+  const file = join(dir, SNAPSHOT_FILE);
+  const snapshot = readSnapshot(file);
+  if (snapshot === null) {
+    log?.info({ file }, "identity store: no snapshot yet, starting from the Stage-0 seed");
+    return;
+  }
+  applySnapshot(snapshot);
+  // Counts only: the size of the phone index tells an operator everything the
+  // log needs to say and names nobody.
+  log?.info(
+    {
+      file,
+      users: users.size,
+      contacts: contacts.size,
+      phoneIdentities: userIdByPhone.size,
+      savedAt: snapshot.savedAt,
+    },
+    "identity store loaded",
+  );
+}
+
+/**
+ * Every mutation below ends here, synchronously, before the route replies. Sync
+ * because the store's whole API is sync and every caller is a route handler
+ * calling it inline: making it async would turn four functions into promises
+ * across three route files for a write that happens on registration and on a
+ * profile or contact edit — never on the call path, never on presence polling.
+ * The cost is an event-loop stall per registration, on a snapshot that today
+ * holds four seeded profiles plus the testers; its duration is не измерено.
+ * If the file ever grows to where that matters, measure first, then batch.
+ *
+ * Written to a temporary file and renamed. rename(2) within a directory is
+ * atomic, so a crash mid-write leaves either the whole previous snapshot or the
+ * whole new one — never the truncated half that readSnapshot() would refuse to
+ * boot on. Not fsync'd: a kernel-level crash can still lose the last write, and
+ * the rename only rules out a file that exists but cannot be parsed.
+ */
+function saveIdentities(): void {
+  if (identityDir === null) return;
+  const file = join(identityDir, SNAPSHOT_FILE);
+  const tmp = `${file}.tmp`;
+  const snapshot: IdentitySnapshot = {
+    version: SNAPSHOT_VERSION,
+    savedAt: new Date().toISOString(),
+    users: [...users.values()],
+    phones: [...userIdByPhone.entries()].map(([phone, userId]) => ({ phone, userId })),
+    contacts: [...contacts.values()],
+  };
+  try {
+    mkdirSync(identityDir, { recursive: true });
+    writeFileSync(tmp, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+    renameSync(tmp, file);
+  } catch (err) {
+    // Loud, and the process keeps serving: the profile is usable right now, it
+    // just will not survive a restart. Same call archive.ts makes when it cannot
+    // write a call — an operator who sees this knows the next restart loses data.
+    identityLog?.error(
+      { file, err },
+      "identity store could not be written — identities created now will not survive a restart",
+    );
+  }
+}
+
+/** Test-only, via resetStore(). The .tmp is removed too: a crashed write leaves one. */
+function removeIdentityFile(): void {
+  if (identityDir === null) return;
+  const file = join(identityDir, SNAPSHOT_FILE);
+  rmSync(file, { force: true });
+  rmSync(`${file}.tmp`, { force: true });
 }
 
 export function listUsers(): UserProfile[] {
@@ -234,6 +522,10 @@ export function createUserFromPhone(input: {
   // empty app. He joins the grid rather than only pointing at it, so the test
   // identities can call him back.
   if (STAGE0_AUTO_JOIN_TEST_IDENTITIES) joinEveryone([id, ...stage0TestIdentityIds]);
+  // After the auto-join, not before: the contact rows are the half of this that
+  // was worth losing sleep over, and a snapshot without them boots a user into
+  // the empty app the auto-join exists to prevent.
+  saveIdentities();
   return user;
 }
 
@@ -245,6 +537,7 @@ export function updateUser(
   if (!existing) return undefined;
   const next: UserProfile = { ...existing, ...patch };
   users.set(userId, next);
+  saveIdentities();
   return next;
 }
 
@@ -274,6 +567,7 @@ export function updateContact(
     overrides: overrides as ContactOverrides,
   };
   contacts.set(contactKey(ownerId, contactUserId), next);
+  saveIdentities();
   return next;
 }
 

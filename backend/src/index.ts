@@ -11,7 +11,11 @@ import { callRoutes } from "./routes/calls.js";
 import { healthRoutes, VERSION } from "./routes/health.js";
 import { presenceRoutes } from "./routes/presence.js";
 import { userRoutes } from "./routes/users.js";
-import { STAGE0_AUTO_JOIN_TEST_IDENTITIES, stage0TestIdentityIdList } from "./store.js";
+import {
+  loadIdentityStore,
+  STAGE0_AUTO_JOIN_TEST_IDENTITIES,
+  stage0TestIdentityIdList,
+} from "./store.js";
 import { apiError } from "./types.js";
 
 const LOCAL_ORIGIN_RE =
@@ -75,6 +79,12 @@ export async function buildApp(cfg: Config): Promise<FastifyInstance> {
     reply.header("x-request-id", String(req.id));
   });
 
+  // Before any route can answer: the seeded four exist in code, but every
+  // phone-registered profile exists only in this file, and a request that
+  // arrives before it is read would be told the user does not exist. Throws on a
+  // corrupt file rather than starting with an empty store — see store.ts.
+  loadIdentityStore(cfg.identityDir, app.log);
+
   const archive = createCallArchive(cfg.callArchiveDir, app.log);
   // Whatever previous runs of this process wrote is part of the archive too.
   await archive.load();
@@ -117,7 +127,15 @@ async function start(): Promise<void> {
     process.exit(1);
   }
 
-  const app = await buildApp(cfg);
+  let app: FastifyInstance;
+  try {
+    app = await buildApp(cfg);
+  } catch (err) {
+    // A corrupt identity store lands here. It is a startup failure like a
+    // missing env var, so it gets the same treatment: the message, no stack.
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
 
   try {
     await app.listen({ port: cfg.port, host: cfg.host });
@@ -139,6 +157,7 @@ async function start(): Promise<void> {
       ringTimeoutSeconds: cfg.ringTimeoutSeconds,
       presenceTtlSeconds: cfg.presenceTtlSeconds,
       callArchiveDir: cfg.callArchiveDir,
+      identityDir: cfg.identityDir,
       // Every other operationally surprising setting is printed here, and this
       // is the most surprising one: a number that passes verification is joined
       // to the test identities in BOTH directions. Whoever wonders why

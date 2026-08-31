@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +24,12 @@ let agentServer: Server;
 let app: FastifyInstance;
 /** Finished calls are written to disk; nothing here may touch the real logs/. */
 let archiveDir: string;
+/**
+ * Profiles, the phone index and contacts are written to disk too — and that
+ * file holds real phone numbers, so it gets its own throwaway directory for the
+ * same reason the archive does: nothing here may touch the repo's data/.
+ */
+let identityDir: string;
 /**
  * The real Stage-0 test-identity list, read from the store the seed fills.
  * Recognising them by the SHAPE of their id ("looks hand-written") was a third
@@ -111,6 +117,8 @@ before(async () => {
   process.env.PRESENCE_POLL_MS = "2000";
   archiveDir = mkdtempSync(join(tmpdir(), "speakeasy-archive-"));
   process.env.CALL_ARCHIVE_DIR = archiveDir;
+  identityDir = mkdtempSync(join(tmpdir(), "speakeasy-identity-"));
+  process.env.IDENTITY_DIR = identityDir;
   delete process.env.WEB_ORIGINS;
   delete process.env.ALLOW_LOCAL_ORIGINS;
 
@@ -127,6 +135,7 @@ after(async () => {
   await app?.close();
   await new Promise<void>((resolve) => agentServer.close(() => resolve()));
   if (archiveDir) rmSync(archiveDir, { recursive: true, force: true });
+  if (identityDir) rmSync(identityDir, { recursive: true, force: true });
 });
 
 describe("health and config", () => {
