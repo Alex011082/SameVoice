@@ -1,0 +1,192 @@
+
+=== 13:33:35 старт bootstrap, окружение:
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+/usr/bin/python3
+/usr/local/bin/pip
+/usr/bin/curl
+/usr/bin/wget
+
+=== 13:33:35 поднимаю http-отдачу лога (порт 8000)
+
+=== 13:33:35 проверяю GPU
+NVIDIA GeForce RTX 4090, 24564 MiB, 610.43.02
+-- диагностика CUDA:
+crw-rw-rw- 1 nobody nogroup 195, 254 Jul  9 09:08 /dev/nvidia-modeset
+crw-rw-rw- 1 nobody nogroup 507,   0 Jul  9 09:08 /dev/nvidia-uvm
+crw-rw-rw- 1 nobody nogroup 507,   1 Jul  9 09:08 /dev/nvidia-uvm-tools
+crw-rw-rw- 1 nobody nogroup 195,   1 Jul  9 09:08 /dev/nvidia1
+crw-rw-rw- 1 nobody nogroup 195, 255 Jul  9 09:08 /dev/nvidiactl
+
+/dev/nvidia-caps:
+total 0
+drwxr-xr-x 2 root root  40 Aug 31 13:33 .
+drwxr-xr-x 7 root root 480 Aug 31 13:33 ..
+CUDA_VERSION=12.8.1
+LD_LIBRARY_PATH=/usr/local/cuda/lib64
+LIBRARY_PATH=/usr/local/cuda/lib64/stubs
+NVIDIA_CTK_LIBCUDA_DIR=/usr/lib/x86_64-linux-gnu
+NVIDIA_DRIVER_CAPABILITIES=compute,utility
+NVIDIA_PRODUCT_NAME=CUDA
+NVIDIA_REQUIRE_CUDA=cuda>=12.8 brand=unknown,driver>=470,driver<471 brand=grid,driver>=470,driver<471 brand=tesla,driver>=470,driver<471 brand=nvidia,driver>=470,driver<471 brand=quadro,driver>=470,driver<471 brand=quadrortx,driver>=470,driver<471 brand=nvidiartx,driver>=470,driver<471 brand=vapps,driver>=470,driver<471 brand=vpc,driver>=470,driver<471 brand=vcs,driver>=470,driver<471 brand=vws,driver>=470,driver<471 brand=cloudgaming,driver>=470,driver<471 brand=unknown,driver>=535,driver<536 brand=grid,driver>=535,driver<536 brand=tesla,driver>=535,driver<536 brand=nvidia,driver>=535,driver<536 brand=quadro,driver>=535,driver<536 brand=quadrortx,driver>=535,driver<536 brand=nvidiartx,driver>=535,driver<536 brand=vapps,driver>=535,driver<536 brand=vpc,driver>=535,driver<536 brand=vcs,driver>=535,driver<536 brand=vws,driver>=535,driver<536 brand=cloudgaming,driver>=535,driver<536 brand=unknown,driver>=550,driver<551 brand=grid,driver>=550,driver<551 brand=tesla,driver>=550,driver<551 brand=nvidia,driver>=550,driver<551 brand=quadro,driver>=550,driver<551 brand=quadrortx,driver>=550,driver<551 brand=nvidiartx,driver>=550,driver<551 brand=vapps,driver>=550,driver<551 brand=vpc,driver>=550,driver<551 brand=vcs,driver>=550,driver<551 brand=vws,driver>=550,driver<551 brand=cloudgaming,driver>=550,driver<551 brand=unknown,driver>=560,driver<561 brand=grid,driver>=560,driver<561 brand=tesla,driver>=560,driver<561 brand=nvidia,driver>=560,driver<561 brand=quadro,driver>=560,driver<561 brand=quadrortx,driver>=560,driver<561 brand=nvidiartx,driver>=560,driver<561 brand=vapps,driver>=560,driver<561 brand=vpc,driver>=560,driver<561 brand=vcs,driver>=560,driver<561 brand=vws,driver>=560,driver<561 brand=cloudgaming,driver>=560,driver<561 brand=unknown,driver>=565,driver<566 brand=grid,driver>=565,driver<566 brand=tesla,driver>=565,driver<566 brand=nvidia,driver>=565,driver<566 brand=quadro,driver>=565,driver<566 brand=quadrortx,driver>=565,driver<566 brand=nvidiartx,driver>=565,driver<566 brand=vapps,driver>=565,driver<566 brand=vpc,driver>=565,driver<566 brand=vcs,driver>=565,driver<566 brand=vws,driver>=565,driver<566 brand=cloudgaming,driver>=565,driver<566
+NVIDIA_VISIBLE_DEVICES=void
+NV_CUDA_CUDART_DEV_VERSION=12.8.90-1
+NV_CUDA_CUDART_VERSION=12.8.90-1
+NV_CUDA_LIB_VERSION=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_DEV_PACKAGE=cuda-nsight-compute-12-8=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_VERSION=12.8.1-1
+NV_CUDNN_PACKAGE=libcudnn9-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_DEV=libcudnn9-dev-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_NAME=libcudnn9-cuda-12
+NV_LIBNCCL_DEV_PACKAGE=libnccl-dev=2.25.1-1+cuda12.8
+NV_LIBNCCL_PACKAGE=libnccl2=2.25.1-1+cuda12.8
+NV_NVPROF_DEV_PACKAGE=cuda-nvprof-12-8=12.8.90-1
+PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUNPOD_GPU_NAME=NVIDIA+GeForce+RTX+4090
+torch 2.8.0.dev20250319+cu128 | cuda build 12.8
+CUDA ок: NVIDIA GeForce RTX 4090
+
+=== 13:33:41 ставлю TTS-движок в отдельный venv (chatterbox тянет свои пины torch)
+ERROR: Cannot install chatterbox-tts==0.1.7 and numpy<3 and >=2 because these package versions have conflicting dependencies.
+ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts
+FATAL: pip install chatterbox упал
+
+=== 13:36:09 исполняю патч 85d86b6473cc5c6501a733f80ec5bf6c
+--- патч 2: chatterbox без numpy-пина, довожу до бенча
+venv-tts: numpy 1.26.4 | torch 2.6.0+cu124
+порт 8104 жив
+=== БЕНЧ v2: tts-cost (warmup скачает веса — минуты)
+SameVoice local TTS cost benchmark (batch engine -- latency IS full-audio time)
+Traceback (most recent call last):
+  File "/workspace/code/scripts/tts-cost-bench.py", line 31, in post
+    with urlopen(request, timeout=timeout) as response:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/urllib/request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/urllib/request.py", line 525, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/urllib/request.py", line 634, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/urllib/request.py", line 563, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.11/urllib/request.py", line 643, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 500: Internal Server Error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/code/scripts/tts-cost-bench.py", line 170, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/code/scripts/tts-cost-bench.py", line 96, in main
+    raw, _, warm_ms = post(f"{base}/v1/warmup", {}, args.warmup_timeout)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/code/scripts/tts-cost-bench.py", line 36, in post
+    raise RuntimeError(f"HTTP {exc.code} from {url}: {detail}") from exc
+RuntimeError: HTTP 500 from http://127.0.0.1:8104/v1/warmup: Internal Server Error
+    await super().__call__(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/fastapi/routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/fastapi/routing.py", line 1281, in handle
+    await super().handle(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/fastapi/routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/workspace/venv-tts/lib/python3.11/site-packages/fastapi/routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/workspace/venv-tts/lib/python3.11/site-packages/fastapi/routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv-tts/lib/python3.11/site-packages/fastapi/routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv-tts/lib/python3.11/site-packages/starlette/concurrency.py", line 32, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv-tts/lib/python3.11/site-packages/anyio/to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/venv-tts/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2641, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/workspace/venv-tts/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 1033, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/code/gpu/tts/app.py", line 145, in warmup
+    return engine.warmup()
+           ^^^^^^^^^^^^^^^
+  File "/workspace/code/gpu/tts/app.py", line 74, in warmup
+    load_ms = self._load()
+              ^^^^^^^^^^^^
+  File "/workspace/code/gpu/tts/app.py", line 68, in _load
+    model = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model="v3")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: ChatterboxMultilingualTTS.from_pretrained() got an unexpected keyword argument 't3_model'
+патч2: tts-бенч упал
+
+=== 13:39:54 исполняю патч 5bc921fa7d4d248d0f3249605ba04d06
+--- патч 3: свежий код без t3_model, перезапуск TTS и бенч
+патч3: приехал старый код
+
+=== 13:41:58 исполняю патч 70250910973fe1adc314f53e8e0e42f9
+--- патч 3: свежий код без t3_model, перезапуск TTS и бенч
+патч3: приехал старый код
+
+=== 13:42:21 исполняю патч 6026de704841ae935c6ed7b4805f6146
+--- патч 3: свежий код без t3_model, перезапуск TTS и бенч
+порт 8104 жив
+=== БЕНЧ v3: tts-cost (warmup скачает веса — минуты)
+SameVoice local TTS cost benchmark (batch engine -- latency IS full-audio time)
+warmup: {"ok": true, "model": "ResembleAI/chatterbox", "device": "cuda", "sample_rate": 24000, "load_ms": 26574.108893983066, "streaming": false, "watermarked": true} (26578 ms round trip)
+  ru_word    latency p50      0.0 ms | audio     0.0 ms | rtf None
+  he_word    latency p50      0.0 ms | audio     0.0 ms | rtf None
+  ru_phrase  latency p50      0.0 ms | audio     0.0 ms | rtf None
+  he_phrase  latency p50      0.0 ms | audio     0.0 ms | rtf None
+  ru_burst6  total p50  25303.5 ms
+  he_burst6  total p50  25214.1 ms
+saved: /workspace/out/results/tts-cost.json
+=== ГОТОВО (через патч 3)
+
+=== 13:53:00 исполняю патч 3d112299fc1c1828152fb0aff2d6240b
+--- патч 4: перегон tts-бенча с фиксом заголовков
+=== БЕНЧ v4: tts-cost (короткая версия, 6 итераций)
+SameVoice local TTS cost benchmark (batch engine -- latency IS full-audio time)
+warmup: {"ok": true, "model": "ResembleAI/chatterbox", "device": "cuda", "sample_rate": 24000, "load_ms": 0.0, "streaming": false, "watermarked": true} (3 ms round trip)
+  ru_word    latency p50   2998.4 ms | audio  2000.0 ms | rtf 1.499
+  he_word    latency p50   1707.4 ms | audio   760.0 ms | rtf 2.247
+  ru_phrase  latency p50   4321.2 ms | audio  3480.0 ms | rtf 1.242
+  he_phrase  latency p50   3686.6 ms | audio  2840.0 ms | rtf 1.298
+  ru_burst6  total p50  30404.1 ms
+  he_burst6  total p50  19205.2 ms
+saved: /workspace/out/results/tts-cost2.json
+=== ГОТОВО (через патч 4)

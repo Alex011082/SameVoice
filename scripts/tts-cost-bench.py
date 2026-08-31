@@ -106,8 +106,12 @@ def main() -> int:
         lat, rtt, durations = [], [], []
         for _ in range(args.iterations):
             pcm, headers, round_trip = post(f"{base}/v1/synthesize", payload, args.request_timeout)
-            server_ms = float(headers.get("X-SameVoice-Latency-Ms", "0"))
-            sr = int(headers.get("X-SameVoice-Sample-Rate", "0") or 0)
+            # uvicorn/h11 нормализует имена заголовков в нижний регистр --
+            # поиск точного CamelCase дал нули по всем кейсам (под
+            # b0jxilt07hcur3, 31.08). Ищем без учёта регистра.
+            hl = {k.lower(): v for k, v in headers.items()}
+            server_ms = float(hl.get("x-samevoice-latency-ms", "0"))
+            sr = int(hl.get("x-samevoice-sample-rate", "0") or 0)
             audio_ms = (len(pcm) / 2 / sr * 1000.0) if sr else 0.0
             lat.append(server_ms)
             rtt.append(round_trip)

@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-31T13:57:39.505472+00:00",
+  "script": "scripts/tts-cost-bench.py",
+  "engine": "ResembleAI/chatterbox (Multilingual V3, batch)",
+  "not_measured_here": [
+    "voice similarity / cloning quality (founder's ear on samples)",
+    "cloning-prompt overhead (builtin voice only; no reference WAV is shipped to a pod)",
+    "streaming TTFA (engine is batch by design)"
+  ],
+  "config": {
+    "iterations": 6,
+    "burst_size": 6,
+    "tts_url": "http://127.0.0.1:8104"
+  },
+  "warmup": {
+    "ok": true,
+    "model": "ResembleAI/chatterbox",
+    "device": "cuda",
+    "sample_rate": 24000,
+    "load_ms": 0.0,
+    "streaming": false,
+    "watermarked": true
+  },
+  "results": {
+    "ru_word": {
+      "text": "выплата",
+      "lang": "ru",
+      "chars": 7,
+      "server_latency_ms": {
+        "n": 6,
+        "p50_ms": 2998.4,
+        "p90_ms": 6788.1,
+        "p95_ms": 6996.0,
+        "min_ms": 1597.6,
+        "max_ms": 6996.0,
+        "mean_ms": 4414.6
+      },
+      "round_trip_ms": {
+        "n": 6,
+        "p50_ms": 3000.3,
+        "p90_ms": 6790.2,
+        "p95_ms": 6998.4,
+        "min_ms": 1599.3,
+        "max_ms": 6998.4,
+        "mean_ms": 4416.8
+      },
+      "audio_duration_ms_p50": 2000.0,
+      "rtf_p50": 1.499
+    },
+    "he_word": {
+      "text": "תשלום",
+      "lang": "he",
+      "chars": 5,
+      "server_latency_ms": {
+        "n": 6,
+        "p50_ms": 1707.4,
+        "p90_ms": 1798.1,
+        "p95_ms": 4297.8,
+        "min_ms": 1497.8,
+        "max_ms": 4297.8,
+        "mean_ms": 2118.3
+      },
+      "round_trip_ms": {
+        "n": 6,
+        "p50_ms": 1709.0,
+        "p90_ms": 1803.3,
+        "p95_ms": 4301.3,
+        "min_ms": 1500.5,
+        "max_ms": 4301.3,
+        "mean_ms": 2133.7
+      },
+      "audio_duration_ms_p50": 760.0,
+      "rtf_p50": 2.247
+    },
+    "ru_phrase": {
+      "text": "Я хочу узнать, когда поступит следующая выплата.",
+      "lang": "ru",
+      "chars": 48,
+      "server_latency_ms": {
+        "n": 6,
+        "p50_ms": 4321.2,
+        "p90_ms": 4711.9,
+        "p95_ms": 4816.6,
+        "min_ms": 3517.1,
+        "max_ms": 4816.6,
+        "mean_ms": 4295.4
+      },
+      "round_trip_ms": {
+        "n": 6,
+        "p50_ms": 4478.3,
+        "p90_ms": 4775.6,
+        "p95_ms": 4819.5,
+        "min_ms": 3520.5,
+        "max_ms": 4819.5,
+        "mean_ms": 4336.0
+      },
+      "audio_duration_ms_p50": 3480.0,
+      "rtf_p50": 1.242
+    },
+    "he_phrase": {
+      "text": "אני רוצה לדעת מתי ייכנס התשלום הבא.",
+      "lang": "he",
+      "chars": 35,
+      "server_latency_ms": {
+        "n": 6,
+        "p50_ms": 3686.6,
+        "p90_ms": 4099.9,
+        "p95_ms": 13400.3,
+        "min_ms": 3403.5,
+        "max_ms": 13400.3,
+        "mean_ms": 5300.0
+      },
+      "round_trip_ms": {
+        "n": 6,
+        "p50_ms": 3689.2,
+        "p90_ms": 4178.8,
+        "p95_ms": 13403.0,
+        "min_ms": 3406.0,
+        "max_ms": 13403.0,
+        "mean_ms": 5315.4
+      },
+      "audio_duration_ms_p50": 2840.0,
+      "rtf_p50": 1.298
+    },
+    "ru_burst6": {
+      "words": [
+        "выплата",
+        "платёж",
+        "пенсия",
+        "пособие",
+        "зарплата",
+        "перевод"
+      ],
+      "total_ms": {
+        "n": 3,
+        "p50_ms": 30404.1,
+        "p90_ms": 31500.9,
+        "p95_ms": 31500.9,
+        "min_ms": 24306.2,
+        "max_ms": 31500.9,
+        "mean_ms": 28737.1
+      },
+      "note": "последовательное сжигание кандидатов; батчинга в движке нет"
+    },
+    "he_burst6": {
+      "words": [
+        "תשלום",
+        "קצבה",
+        "משכורת",
+        "העברה",
+        "פנסיה",
+        "חשבון"
+      ],
+      "total_ms": {
+        "n": 3,
+        "p50_ms": 19205.2,
+        "p90_ms": 22301.5,
+        "p95_ms": 22301.5,
+        "min_ms": 14987.2,
+        "max_ms": 22301.5,
+        "mean_ms": 18831.3
+      },
+      "note": "последовательное сжигание кандидатов; батчинга в движке нет"
+    }
+  }
+}
