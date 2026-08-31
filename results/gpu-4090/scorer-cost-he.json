@@ -1,0 +1,1012 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-31T12:02:39.304469+00:00",
+  "script": "scripts/scorer-cost-bench.py",
+  "question": "Cost only: what does the prediction+pruning machinery charge one utterance on the critical path? The saving half of the question (lead over baseline STT) needs a labelled corpus and is not answered here.",
+  "not_measured_here": {
+    "metrics": [
+      "recall",
+      "retention",
+      "rank movement",
+      "promotion verdict",
+      "STT lead"
+    ],
+    "reason": "no labelled corpus exists yet; on placeholder words and synthetic audio such numbers would be noise formatted as data",
+    "measured_instead_by": [
+      "scripts/acoustic-replay-bench.py",
+      "agent/src/speakeasy_agent/benchmark_gate.py",
+      "docs/10-acoustic-replay-benchmark.md"
+    ]
+  },
+  "config": {
+    "lang": "he",
+    "iterations": 30,
+    "in_flight_levels": [
+      1,
+      2,
+      4
+    ],
+    "windows_ms": [
+      50,
+      100,
+      150,
+      200,
+      250
+    ],
+    "critical_window_ms": 150,
+    "top_k": 20,
+    "candidate_count": 20,
+    "predictor_url": "http://127.0.0.1:8101",
+    "pruner_url": "http://127.0.0.1:8105",
+    "audio": {
+      "kind": "synthetic",
+      "tone_hz": 440,
+      "amplitude": 0.2,
+      "audio_ms": 1000
+    }
+  },
+  "targets": {
+    "predictor_inference_p50_ms_max": 50.0,
+    "predictor_inference_p95_ms_max": 100.0,
+    "queue_wait_p95_ms_max": 20.0,
+    "source": "founder's stated targets for the first paid session; not measurements"
+  },
+  "health": {
+    "predictor": {
+      "ok": true,
+      "service": "predictor",
+      "model": "Qwen/Qwen3-0.6B-Base",
+      "loaded": true,
+      "device": "cuda",
+      "gpu_concurrency": 1,
+      "gpu_queue_waiting": 0
+    },
+    "pruner": {
+      "ok": true,
+      "service": "acoustic-pruner",
+      "gpu_concurrency": 1,
+      "gpu_queue_waiting": 0,
+      "engines": {
+        "ru": {
+          "model": "bond005/wav2vec2-base-ru",
+          "loaded": true,
+          "device": "cuda",
+          "load_ms": 11080.4
+        },
+        "he": {
+          "model": "imvladikon/wav2vec2-large-xlsr-53-hebrew",
+          "loaded": false,
+          "device": "unloaded",
+          "load_ms": 0.0
+        }
+      }
+    }
+  },
+  "warmup": {
+    "predictor": {
+      "round_trip_ms": 0.6,
+      "response": {
+        "ok": true,
+        "model": "Qwen/Qwen3-0.6B-Base",
+        "device": "cuda",
+        "load_ms": 0.0
+      }
+    },
+    "pruner": {
+      "round_trip_ms": 10297.8,
+      "response": {
+        "ok": true,
+        "lang": "he",
+        "model": "imvladikon/wav2vec2-large-xlsr-53-hebrew",
+        "load_ms": 10296.795446000033,
+        "device": "cuda"
+      }
+    },
+    "discarded_iterations": 3,
+    "discarded": {
+      "predictor_round_trip_ms": [
+        152.759,
+        164.381,
+        147.598
+      ],
+      "pruner_round_trip_ms": [
+        15.714,
+        13.438,
+        13.868
+      ]
+    }
+  },
+  "levels": [
+    {
+      "in_flight": 1,
+      "predictor": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "round_trip_ms": {
+          "n": 30,
+          "p50_ms": 149.5,
+          "p90_ms": 152.6,
+          "p95_ms": 156.7,
+          "min_ms": 146.1,
+          "max_ms": 160.7
+        },
+        "queue_wait_ms": {
+          "n": 30,
+          "p50_ms": 0.0,
+          "p90_ms": 0.0,
+          "p95_ms": 0.0,
+          "min_ms": 0.0,
+          "max_ms": 0.0
+        },
+        "inference_ms": {
+          "n": 30,
+          "p50_ms": 148.3,
+          "p90_ms": 151.7,
+          "p95_ms": 155.7,
+          "min_ms": 145.0,
+          "max_ms": 160.0
+        },
+        "total_ms": {
+          "n": 30,
+          "p50_ms": 148.4,
+          "p90_ms": 151.8,
+          "p95_ms": 155.7,
+          "min_ms": 145.0,
+          "max_ms": 160.1
+        }
+      },
+      "pruner_windows": [
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 11.7,
+            "p90_ms": 14.3,
+            "p95_ms": 14.8,
+            "min_ms": 11.6,
+            "max_ms": 15.9
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 0.0,
+            "p90_ms": 0.0,
+            "p95_ms": 0.0,
+            "min_ms": 0.0,
+            "max_ms": 0.1
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 10.9,
+            "p90_ms": 13.3,
+            "p95_ms": 13.9,
+            "min_ms": 10.7,
+            "max_ms": 15.0
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 11.1,
+            "p90_ms": 13.6,
+            "p95_ms": 14.1,
+            "min_ms": 10.9,
+            "max_ms": 15.2
+          },
+          "window_ms": 50
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 12.2,
+            "p90_ms": 13.1,
+            "p95_ms": 14.0,
+            "min_ms": 11.5,
+            "max_ms": 14.9
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 0.0,
+            "p90_ms": 0.0,
+            "p95_ms": 0.1,
+            "min_ms": 0.0,
+            "max_ms": 0.1
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 11.2,
+            "p90_ms": 11.9,
+            "p95_ms": 12.9,
+            "min_ms": 10.6,
+            "max_ms": 13.8
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 11.5,
+            "p90_ms": 12.2,
+            "p95_ms": 13.2,
+            "min_ms": 10.9,
+            "max_ms": 14.2
+          },
+          "window_ms": 100
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 11.9,
+            "p90_ms": 12.1,
+            "p95_ms": 12.2,
+            "min_ms": 11.4,
+            "max_ms": 12.3
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 0.0,
+            "p90_ms": 0.0,
+            "p95_ms": 0.0,
+            "min_ms": 0.0,
+            "max_ms": 0.0
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 11.0,
+            "p90_ms": 11.2,
+            "p95_ms": 11.4,
+            "min_ms": 10.6,
+            "max_ms": 11.4
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 11.3,
+            "p90_ms": 11.5,
+            "p95_ms": 11.6,
+            "min_ms": 10.8,
+            "max_ms": 11.6
+          },
+          "window_ms": 150
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 11.9,
+            "p90_ms": 12.1,
+            "p95_ms": 12.1,
+            "min_ms": 11.7,
+            "max_ms": 12.8
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 0.0,
+            "p90_ms": 0.0,
+            "p95_ms": 0.0,
+            "min_ms": 0.0,
+            "max_ms": 0.0
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 11.0,
+            "p90_ms": 11.3,
+            "p95_ms": 11.3,
+            "min_ms": 10.9,
+            "max_ms": 11.9
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 11.3,
+            "p90_ms": 11.5,
+            "p95_ms": 11.6,
+            "min_ms": 11.1,
+            "max_ms": 12.2
+          },
+          "window_ms": 200
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 11.9,
+            "p90_ms": 12.3,
+            "p95_ms": 12.5,
+            "min_ms": 11.5,
+            "max_ms": 13.1
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 0.0,
+            "p90_ms": 0.1,
+            "p95_ms": 0.1,
+            "min_ms": 0.0,
+            "max_ms": 0.1
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 10.9,
+            "p90_ms": 11.5,
+            "p95_ms": 11.6,
+            "min_ms": 10.7,
+            "max_ms": 12.2
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 11.2,
+            "p90_ms": 11.7,
+            "p95_ms": 11.9,
+            "min_ms": 10.9,
+            "max_ms": 12.5
+          },
+          "window_ms": 250
+        }
+      ],
+      "critical_path": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "predictor_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 150.8,
+          "p90_ms": 154.6,
+          "p95_ms": 154.9,
+          "min_ms": 146.3,
+          "max_ms": 156.1
+        },
+        "pruner_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 12.9,
+          "p90_ms": 14.1,
+          "p95_ms": 14.7,
+          "min_ms": 11.9,
+          "max_ms": 15.2
+        },
+        "sum_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 164.4,
+          "p90_ms": 168.1,
+          "p95_ms": 168.4,
+          "min_ms": 158.2,
+          "max_ms": 169.4
+        },
+        "window_ms": 150,
+        "sum_of_the_two_p50s_ms": 163.7,
+        "p50_of_sum_minus_sum_of_p50s_ms": 0.7
+      },
+      "verdicts": [
+        {
+          "check": "predictor inference p50",
+          "target_ms": 50.0,
+          "measured_ms": 148.3,
+          "verdict": "FAIL",
+          "in_flight": 1
+        },
+        {
+          "check": "predictor inference p95",
+          "target_ms": 100.0,
+          "measured_ms": 155.7,
+          "verdict": "FAIL",
+          "in_flight": 1
+        },
+        {
+          "check": "predictor queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 0.0,
+          "verdict": "VACUOUS",
+          "note": "1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here",
+          "in_flight": 1
+        },
+        {
+          "check": "pruner queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 0.0,
+          "verdict": "VACUOUS",
+          "note": "1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here",
+          "in_flight": 1
+        }
+      ]
+    },
+    {
+      "in_flight": 2,
+      "predictor": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "round_trip_ms": {
+          "n": 30,
+          "p50_ms": 298.0,
+          "p90_ms": 312.7,
+          "p95_ms": 316.1,
+          "min_ms": 151.2,
+          "max_ms": 322.2
+        },
+        "queue_wait_ms": {
+          "n": 30,
+          "p50_ms": 147.9,
+          "p90_ms": 157.9,
+          "p95_ms": 159.4,
+          "min_ms": 0.0,
+          "max_ms": 161.0
+        },
+        "inference_ms": {
+          "n": 30,
+          "p50_ms": 149.9,
+          "p90_ms": 160.1,
+          "p95_ms": 161.5,
+          "min_ms": 144.9,
+          "max_ms": 163.1
+        },
+        "total_ms": {
+          "n": 30,
+          "p50_ms": 296.1,
+          "p90_ms": 310.7,
+          "p95_ms": 314.2,
+          "min_ms": 149.4,
+          "max_ms": 320.5
+        }
+      },
+      "pruner_windows": [
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 25.7,
+            "p90_ms": 26.0,
+            "p95_ms": 26.1,
+            "min_ms": 15.1,
+            "max_ms": 28.5
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 11.8,
+            "p90_ms": 12.1,
+            "p95_ms": 12.1,
+            "min_ms": 0.1,
+            "max_ms": 12.8
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.9,
+            "p90_ms": 13.2,
+            "p95_ms": 13.3,
+            "min_ms": 12.5,
+            "max_ms": 13.7
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 24.9,
+            "p90_ms": 25.3,
+            "p95_ms": 25.4,
+            "min_ms": 14.0,
+            "max_ms": 26.0
+          },
+          "window_ms": 50
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 25.2,
+            "p90_ms": 26.3,
+            "p95_ms": 26.5,
+            "min_ms": 14.1,
+            "max_ms": 26.7
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 11.7,
+            "p90_ms": 12.1,
+            "p95_ms": 12.2,
+            "min_ms": 0.0,
+            "max_ms": 12.3
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.7,
+            "p90_ms": 13.1,
+            "p95_ms": 13.4,
+            "min_ms": 12.1,
+            "max_ms": 13.5
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 24.5,
+            "p90_ms": 25.3,
+            "p95_ms": 25.7,
+            "min_ms": 12.7,
+            "max_ms": 25.9
+          },
+          "window_ms": 100
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 25.4,
+            "p90_ms": 26.0,
+            "p95_ms": 26.2,
+            "min_ms": 14.1,
+            "max_ms": 26.4
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 11.6,
+            "p90_ms": 12.0,
+            "p95_ms": 12.2,
+            "min_ms": 0.0,
+            "max_ms": 12.3
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.7,
+            "p90_ms": 13.2,
+            "p95_ms": 13.2,
+            "min_ms": 12.4,
+            "max_ms": 13.4
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 24.6,
+            "p90_ms": 25.2,
+            "p95_ms": 25.5,
+            "min_ms": 12.6,
+            "max_ms": 25.7
+          },
+          "window_ms": 150
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 25.5,
+            "p90_ms": 26.0,
+            "p95_ms": 26.4,
+            "min_ms": 14.0,
+            "max_ms": 26.8
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 11.7,
+            "p90_ms": 12.1,
+            "p95_ms": 12.2,
+            "min_ms": 0.0,
+            "max_ms": 12.5
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.8,
+            "p90_ms": 13.0,
+            "p95_ms": 13.1,
+            "min_ms": 12.3,
+            "max_ms": 13.5
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 24.8,
+            "p90_ms": 25.3,
+            "p95_ms": 25.6,
+            "min_ms": 12.8,
+            "max_ms": 25.8
+          },
+          "window_ms": 200
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 25.4,
+            "p90_ms": 26.1,
+            "p95_ms": 26.2,
+            "min_ms": 14.0,
+            "max_ms": 26.6
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 11.7,
+            "p90_ms": 12.0,
+            "p95_ms": 12.2,
+            "min_ms": 0.0,
+            "max_ms": 12.6
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.8,
+            "p90_ms": 13.2,
+            "p95_ms": 13.3,
+            "min_ms": 12.3,
+            "max_ms": 13.6
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 24.7,
+            "p90_ms": 25.3,
+            "p95_ms": 25.6,
+            "min_ms": 12.5,
+            "max_ms": 25.9
+          },
+          "window_ms": 250
+        }
+      ],
+      "critical_path": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "predictor_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 293.3,
+          "p90_ms": 310.7,
+          "p95_ms": 313.7,
+          "min_ms": 147.6,
+          "max_ms": 317.7
+        },
+        "pruner_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 12.6,
+          "p90_ms": 13.7,
+          "p95_ms": 14.7,
+          "min_ms": 11.9,
+          "max_ms": 17.4
+        },
+        "sum_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 306.4,
+          "p90_ms": 325.4,
+          "p95_ms": 327.0,
+          "min_ms": 159.9,
+          "max_ms": 330.1
+        },
+        "window_ms": 150,
+        "sum_of_the_two_p50s_ms": 305.9,
+        "p50_of_sum_minus_sum_of_p50s_ms": 0.5
+      },
+      "verdicts": [
+        {
+          "check": "predictor inference p50",
+          "target_ms": 50.0,
+          "measured_ms": 149.9,
+          "verdict": "FAIL",
+          "in_flight": 2
+        },
+        {
+          "check": "predictor inference p95",
+          "target_ms": 100.0,
+          "measured_ms": 161.5,
+          "verdict": "FAIL",
+          "in_flight": 2
+        },
+        {
+          "check": "predictor queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 159.4,
+          "verdict": "FAIL",
+          "in_flight": 2
+        },
+        {
+          "check": "pruner queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 12.2,
+          "verdict": "PASS",
+          "in_flight": 2
+        }
+      ]
+    },
+    {
+      "in_flight": 4,
+      "predictor": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "round_trip_ms": {
+          "n": 30,
+          "p50_ms": 604.9,
+          "p90_ms": 661.9,
+          "p95_ms": 662.2,
+          "min_ms": 170.1,
+          "max_ms": 665.1
+        },
+        "queue_wait_ms": {
+          "n": 30,
+          "p50_ms": 451.1,
+          "p90_ms": 494.6,
+          "p95_ms": 495.4,
+          "min_ms": 0.0,
+          "max_ms": 496.3
+        },
+        "inference_ms": {
+          "n": 30,
+          "p50_ms": 151.3,
+          "p90_ms": 167.3,
+          "p95_ms": 168.6,
+          "min_ms": 147.0,
+          "max_ms": 170.0
+        },
+        "total_ms": {
+          "n": 30,
+          "p50_ms": 602.9,
+          "p90_ms": 660.0,
+          "p95_ms": 660.3,
+          "min_ms": 168.6,
+          "max_ms": 663.2
+        }
+      },
+      "pruner_windows": [
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 50.3,
+            "p90_ms": 51.4,
+            "p95_ms": 51.5,
+            "min_ms": 15.8,
+            "max_ms": 51.7
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 36.8,
+            "p90_ms": 37.5,
+            "p95_ms": 37.6,
+            "min_ms": 0.1,
+            "max_ms": 37.9
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.6,
+            "p90_ms": 13.0,
+            "p95_ms": 13.1,
+            "min_ms": 12.1,
+            "max_ms": 14.1
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 49.5,
+            "p90_ms": 50.3,
+            "p95_ms": 50.7,
+            "min_ms": 14.3,
+            "max_ms": 51.0
+          },
+          "window_ms": 50
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 50.1,
+            "p90_ms": 51.3,
+            "p95_ms": 52.2,
+            "min_ms": 13.5,
+            "max_ms": 52.5
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 36.6,
+            "p90_ms": 37.7,
+            "p95_ms": 38.3,
+            "min_ms": 0.0,
+            "max_ms": 38.6
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.5,
+            "p90_ms": 13.1,
+            "p95_ms": 13.1,
+            "min_ms": 11.5,
+            "max_ms": 13.5
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 49.3,
+            "p90_ms": 50.6,
+            "p95_ms": 51.4,
+            "min_ms": 11.7,
+            "max_ms": 51.8
+          },
+          "window_ms": 100
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 50.9,
+            "p90_ms": 51.6,
+            "p95_ms": 51.8,
+            "min_ms": 15.3,
+            "max_ms": 52.1
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 37.2,
+            "p90_ms": 37.7,
+            "p95_ms": 37.9,
+            "min_ms": 0.0,
+            "max_ms": 38.0
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.8,
+            "p90_ms": 13.2,
+            "p95_ms": 13.2,
+            "min_ms": 12.3,
+            "max_ms": 13.4
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 50.2,
+            "p90_ms": 50.8,
+            "p95_ms": 51.0,
+            "min_ms": 13.5,
+            "max_ms": 51.1
+          },
+          "window_ms": 150
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 51.1,
+            "p90_ms": 52.1,
+            "p95_ms": 52.3,
+            "min_ms": 15.4,
+            "max_ms": 52.5
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 37.3,
+            "p90_ms": 38.3,
+            "p95_ms": 38.5,
+            "min_ms": 0.1,
+            "max_ms": 38.5
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.8,
+            "p90_ms": 13.2,
+            "p95_ms": 13.3,
+            "min_ms": 12.4,
+            "max_ms": 13.4
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 50.4,
+            "p90_ms": 51.5,
+            "p95_ms": 51.6,
+            "min_ms": 13.4,
+            "max_ms": 51.8
+          },
+          "window_ms": 200
+        },
+        {
+          "requests": 30,
+          "ok": 30,
+          "failed": 0,
+          "round_trip_ms": {
+            "n": 30,
+            "p50_ms": 50.5,
+            "p90_ms": 52.2,
+            "p95_ms": 52.3,
+            "min_ms": 15.0,
+            "max_ms": 52.3
+          },
+          "queue_wait_ms": {
+            "n": 30,
+            "p50_ms": 36.9,
+            "p90_ms": 38.1,
+            "p95_ms": 38.4,
+            "min_ms": 0.0,
+            "max_ms": 38.5
+          },
+          "inference_ms": {
+            "n": 30,
+            "p50_ms": 12.7,
+            "p90_ms": 13.2,
+            "p95_ms": 13.3,
+            "min_ms": 12.2,
+            "max_ms": 13.5
+          },
+          "total_ms": {
+            "n": 30,
+            "p50_ms": 49.8,
+            "p90_ms": 51.5,
+            "p95_ms": 51.6,
+            "min_ms": 13.3,
+            "max_ms": 51.7
+          },
+          "window_ms": 250
+        }
+      ],
+      "critical_path": {
+        "requests": 30,
+        "ok": 30,
+        "failed": 0,
+        "predictor_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 613.1,
+          "p90_ms": 647.9,
+          "p95_ms": 650.1,
+          "min_ms": 162.3,
+          "max_ms": 653.6
+        },
+        "pruner_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 12.6,
+          "p90_ms": 13.6,
+          "p95_ms": 13.6,
+          "min_ms": 11.7,
+          "max_ms": 13.7
+        },
+        "sum_round_trip_ms": {
+          "n": 30,
+          "p50_ms": 625.2,
+          "p90_ms": 660.2,
+          "p95_ms": 662.8,
+          "min_ms": 174.3,
+          "max_ms": 666.9
+        },
+        "window_ms": 150,
+        "sum_of_the_two_p50s_ms": 625.7,
+        "p50_of_sum_minus_sum_of_p50s_ms": -0.5
+      },
+      "verdicts": [
+        {
+          "check": "predictor inference p50",
+          "target_ms": 50.0,
+          "measured_ms": 151.3,
+          "verdict": "FAIL",
+          "in_flight": 4
+        },
+        {
+          "check": "predictor inference p95",
+          "target_ms": 100.0,
+          "measured_ms": 168.6,
+          "verdict": "FAIL",
+          "in_flight": 4
+        },
+        {
+          "check": "predictor queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 495.4,
+          "verdict": "FAIL",
+          "in_flight": 4
+        },
+        {
+          "check": "pruner queue wait p95",
+          "target_ms": 20.0,
+          "measured_ms": 37.9,
+          "verdict": "FAIL",
+          "in_flight": 4
+        }
+      ]
+    }
+  ],
+  "caveats": [
+    "Correctness is not measured here. No recall, retention or rank number exists in this artifact; those need the labelled manifest of docs/10-acoustic-replay-benchmark.md and are produced by scripts/acoustic-replay-bench.py.",
+    "The critical-path pair is a HYPOTHETICAL inline design, not a measurement of today's agent. Today the pruner is not on the critical path at all: acoustic_shadow.py:_maybe_start_scoring spawns a background task and _score loops over ACOUSTIC_PRUNER_SHADOW_WINDOWS_MS, so one scored attempt costs ONE /v1/prune PER WINDOW (five by default, docker/runpod-gpu.env.example:65) and blocks nothing. Read the pair below as 'what one predict + one prune would cost if the pruner were moved onto the path', and multiply the pruner column by the number of windows for what the shadow actually spends per attempt today.",
+    "The predictor and the pruner are pinned to the same physical card. In the per-service phases only one of them is driven at a time; in the critical-path phase both are, so at 2+ in flight those numbers describe the pair, not either service alone (gpu/queueing.py).",
+    "Round trips are loopback, measured from inside the Pod. They contain no wide-area network time and are not an end-user latency.",
+    "Audio is synthetic. Whether real speech costs the pruner measurably more per window is не измерено; re-run with --wav to find out."
+  ]
+}

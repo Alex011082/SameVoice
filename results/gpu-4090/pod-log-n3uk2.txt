@@ -1,0 +1,647 @@
+
+=== 12:01:13 старт bootstrap, окружение:
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+/usr/bin/python3
+/usr/local/bin/pip
+/usr/bin/curl
+/usr/bin/wget
+
+=== 12:01:13 поднимаю http-отдачу лога (порт 8000)
+
+=== 12:01:13 проверяю GPU
+NVIDIA GeForce RTX 4090, 24564 MiB, 580.173.02
+-- диагностика CUDA:
+crw-rw-rw- 1 nobody nogroup 195, 254 Aug 31 10:05 /dev/nvidia-modeset
+crw-rw-rw- 1 nobody nogroup 234,   0 Aug 31 10:05 /dev/nvidia-uvm
+crw-rw-rw- 1 nobody nogroup 234,   1 Aug 31 10:05 /dev/nvidia-uvm-tools
+crw-rw-rw- 1 nobody nogroup 195,   4 Aug 31 10:05 /dev/nvidia4
+crw-rw-rw- 1 nobody nogroup 195, 255 Aug 31 10:05 /dev/nvidiactl
+
+/dev/nvidia-caps:
+total 0
+drwxr-xr-x 2 root root  40 Aug 31 12:01 .
+drwxr-xr-x 7 root root 480 Aug 31 12:01 ..
+CUDA_VERSION=12.8.1
+LD_LIBRARY_PATH=/usr/local/cuda/lib64
+LIBRARY_PATH=/usr/local/cuda/lib64/stubs
+NVIDIA_CTK_LIBCUDA_DIR=/usr/lib/x86_64-linux-gnu
+NVIDIA_DRIVER_CAPABILITIES=compute,display,graphics,utility,video
+NVIDIA_PRODUCT_NAME=CUDA
+NVIDIA_REQUIRE_CUDA=cuda>=12.8 brand=unknown,driver>=470,driver<471 brand=grid,driver>=470,driver<471 brand=tesla,driver>=470,driver<471 brand=nvidia,driver>=470,driver<471 brand=quadro,driver>=470,driver<471 brand=quadrortx,driver>=470,driver<471 brand=nvidiartx,driver>=470,driver<471 brand=vapps,driver>=470,driver<471 brand=vpc,driver>=470,driver<471 brand=vcs,driver>=470,driver<471 brand=vws,driver>=470,driver<471 brand=cloudgaming,driver>=470,driver<471 brand=unknown,driver>=535,driver<536 brand=grid,driver>=535,driver<536 brand=tesla,driver>=535,driver<536 brand=nvidia,driver>=535,driver<536 brand=quadro,driver>=535,driver<536 brand=quadrortx,driver>=535,driver<536 brand=nvidiartx,driver>=535,driver<536 brand=vapps,driver>=535,driver<536 brand=vpc,driver>=535,driver<536 brand=vcs,driver>=535,driver<536 brand=vws,driver>=535,driver<536 brand=cloudgaming,driver>=535,driver<536 brand=unknown,driver>=550,driver<551 brand=grid,driver>=550,driver<551 brand=tesla,driver>=550,driver<551 brand=nvidia,driver>=550,driver<551 brand=quadro,driver>=550,driver<551 brand=quadrortx,driver>=550,driver<551 brand=nvidiartx,driver>=550,driver<551 brand=vapps,driver>=550,driver<551 brand=vpc,driver>=550,driver<551 brand=vcs,driver>=550,driver<551 brand=vws,driver>=550,driver<551 brand=cloudgaming,driver>=550,driver<551 brand=unknown,driver>=560,driver<561 brand=grid,driver>=560,driver<561 brand=tesla,driver>=560,driver<561 brand=nvidia,driver>=560,driver<561 brand=quadro,driver>=560,driver<561 brand=quadrortx,driver>=560,driver<561 brand=nvidiartx,driver>=560,driver<561 brand=vapps,driver>=560,driver<561 brand=vpc,driver>=560,driver<561 brand=vcs,driver>=560,driver<561 brand=vws,driver>=560,driver<561 brand=cloudgaming,driver>=560,driver<561 brand=unknown,driver>=565,driver<566 brand=grid,driver>=565,driver<566 brand=tesla,driver>=565,driver<566 brand=nvidia,driver>=565,driver<566 brand=quadro,driver>=565,driver<566 brand=quadrortx,driver>=565,driver<566 brand=nvidiartx,driver>=565,driver<566 brand=vapps,driver>=565,driver<566 brand=vpc,driver>=565,driver<566 brand=vcs,driver>=565,driver<566 brand=vws,driver>=565,driver<566 brand=cloudgaming,driver>=565,driver<566
+NVIDIA_VISIBLE_DEVICES=void
+NV_CUDA_CUDART_DEV_VERSION=12.8.90-1
+NV_CUDA_CUDART_VERSION=12.8.90-1
+NV_CUDA_LIB_VERSION=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_DEV_PACKAGE=cuda-nsight-compute-12-8=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_VERSION=12.8.1-1
+NV_CUDNN_PACKAGE=libcudnn9-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_DEV=libcudnn9-dev-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_NAME=libcudnn9-cuda-12
+NV_LIBNCCL_DEV_PACKAGE=libnccl-dev=2.25.1-1+cuda12.8
+NV_LIBNCCL_PACKAGE=libnccl2=2.25.1-1+cuda12.8
+NV_NVPROF_DEV_PACKAGE=cuda-nvprof-12-8=12.8.90-1
+PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUNPOD_GPU_NAME=NVIDIA+GeForce+RTX+4090
+torch 2.8.0.dev20250319+cu128 | cuda build 12.8
+CUDA ок: NVIDIA GeForce RTX 4090
+
+=== 12:01:18 доустанавливаю лёгкие зависимости (torch НЕ трогаю)
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python3 -m pip install --upgrade pip
+
+=== 12:01:29 раскладываю код
+
+=== 12:01:30 запускаю сервисы
+порт 8101 жив
+порт 8105 жив
+
+=== 12:01:32 БЕНЧ: scorer-cost RU (модели скачаются при warmup — это минуты)
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=ru iterations=30 in-flight=[1, 2, 4]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-cost-ru.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       147.9 p90=       169.8 p95=       171.6 max=       190.2
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=       146.7 p90=       168.8 p95=       170.8 max=       189.3
+    total_ms                 n=30   p50=       146.7 p90=       168.8 p95=       170.8 max=       189.3
+  pruner /v1/prune +50 ms
+    round_trip_ms            n=30   p50=         7.2 p90=         7.9 p95=         8.0 max=        20.4
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.1
+    inference_ms             n=30   p50=         6.3 p90=         6.8 p95=         7.0 max=        18.9
+    total_ms                 n=30   p50=         6.5 p90=         7.0 p95=         7.2 max=        19.1
+  pruner /v1/prune +100 ms
+    round_trip_ms            n=30   p50=         7.3 p90=         8.0 p95=         8.1 max=        12.2
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.1
+    inference_ms             n=30   p50=         6.3 p90=         7.1 p95=         7.3 max=        11.4
+    total_ms                 n=30   p50=         6.5 p90=         7.3 p95=         7.4 max=        11.6
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=         7.8 p90=         7.9 p95=         8.0 max=         8.1
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=         6.7 p90=         6.8 p95=         6.8 max=         6.9
+    total_ms                 n=30   p50=         7.0 p90=         7.1 p95=         7.2 max=         7.2
+  pruner /v1/prune +200 ms
+    round_trip_ms            n=30   p50=         7.1 p90=         7.5 p95=         7.7 max=        14.2
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=         6.1 p90=         6.7 p95=         6.7 max=        13.5
+    total_ms                 n=30   p50=         6.4 p90=         6.9 p95=         6.9 max=        13.7
+  pruner /v1/prune +250 ms
+    round_trip_ms            n=30   p50=         7.2 p90=         7.8 p95=         7.8 max=        18.2
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=         6.2 p90=         6.7 p95=         6.8 max=        17.0
+    total_ms                 n=30   p50=         6.4 p90=         7.0 p95=         7.0 max=        17.3
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       147.0 p90=       148.8 p95=       149.4 max=       150.5
+    pruner_round_trip_ms     n=30   p50=         8.1 p90=         8.5 p95=         8.7 max=         9.5
+    sum_round_trip_ms        n=30   p50=       155.0 p90=       157.4 p95=       158.1 max=       158.7
+    sum of the two p50s      155.1 ms   (p50 of the measured sums: 155.0 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 146.7 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 170.8 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       294.4 p90=       303.5 p95=       304.8 max=       305.3
+    queue_wait_ms            n=30   p50=       145.3 p90=       149.0 p95=       151.8 max=       153.1
+    inference_ms             n=30   p50=       147.6 p90=       150.9 p95=       153.7 max=       155.2
+    total_ms                 n=30   p50=       292.9 p90=       301.8 p95=       303.1 max=       303.7
+  pruner /v1/prune +50 ms
+    round_trip_ms            n=30   p50=        13.7 p90=        13.9 p95=        13.9 max=        17.1
+    queue_wait_ms            n=30   p50=         5.8 p90=         5.9 p95=         6.0 max=         7.8
+    inference_ms             n=30   p50=         6.9 p90=         7.1 p95=         7.2 max=         8.0
+    total_ms                 n=30   p50=        12.9 p90=        13.1 p95=        13.2 max=        15.4
+  pruner /v1/prune +100 ms
+    round_trip_ms            n=30   p50=        13.4 p90=        13.8 p95=        14.3 max=        14.8
+    queue_wait_ms            n=30   p50=         5.7 p90=         5.8 p95=         5.9 max=         7.1
+    inference_ms             n=30   p50=         6.8 p90=         7.0 p95=         7.0 max=         8.1
+    total_ms                 n=30   p50=        12.7 p90=        13.0 p95=        13.5 max=        14.0
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        13.7 p90=        15.0 p95=        15.1 max=        15.4
+    queue_wait_ms            n=30   p50=         5.7 p90=         6.2 p95=         6.7 max=         7.1
+    inference_ms             n=30   p50=         6.9 p90=         7.2 p95=         7.5 max=         8.7
+    total_ms                 n=30   p50=        12.9 p90=        14.0 p95=        14.1 max=        14.7
+  pruner /v1/prune +200 ms
+    round_trip_ms            n=30   p50=        13.8 p90=        14.0 p95=        14.1 max=        14.9
+    queue_wait_ms            n=30   p50=         5.8 p90=         6.0 p95=         6.1 max=         6.5
+    inference_ms             n=30   p50=         7.0 p90=         7.2 p95=         7.2 max=         7.5
+    total_ms                 n=30   p50=        12.9 p90=        13.2 p95=        13.3 max=        13.6
+  pruner /v1/prune +250 ms
+    round_trip_ms            n=30   p50=        13.8 p90=        15.0 p95=        15.1 max=        15.7
+    queue_wait_ms            n=30   p50=         5.9 p90=         6.5 p95=         6.6 max=         6.7
+    inference_ms             n=30   p50=         7.0 p90=         7.7 p95=         7.7 max=         7.8
+    total_ms                 n=30   p50=        13.1 p90=        14.2 p95=        14.3 max=        14.5
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       287.1 p90=       294.9 p95=       296.1 max=       302.3
+    pruner_round_trip_ms     n=30   p50=         8.0 p90=         8.3 p95=         8.3 max=         9.3
+    sum_round_trip_ms        n=30   p50=       295.1 p90=       302.9 p95=       304.2 max=       310.5
+    sum of the two p50s      295.1 ms   (p50 of the measured sums: 295.1 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 147.6 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 153.7 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 151.8 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 6.7 ms
+
+=== 4 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       590.7 p90=       603.0 p95=       608.2 max=       610.5
+    queue_wait_ms            n=30   p50=       441.2 p90=       450.9 p95=       456.7 max=       459.6
+    inference_ms             n=30   p50=       147.4 p90=       151.1 p95=       153.0 max=       158.6
+    total_ms                 n=30   p50=       588.8 p90=       601.2 p95=       606.6 max=       609.0
+  pruner /v1/prune +50 ms
+    round_trip_ms            n=30   p50=        26.9 p90=        27.5 p95=        27.5 max=        29.6
+    queue_wait_ms            n=30   p50=        19.4 p90=        19.7 p95=        19.9 max=        21.0
+    inference_ms             n=30   p50=         6.8 p90=         7.0 p95=         7.0 max=         7.7
+    total_ms                 n=30   p50=        26.3 p90=        26.7 p95=        26.8 max=        28.0
+  pruner /v1/prune +100 ms
+    round_trip_ms            n=30   p50=        26.4 p90=        27.1 p95=        27.3 max=        27.9
+    queue_wait_ms            n=30   p50=        19.1 p90=        19.6 p95=        19.6 max=        19.8
+    inference_ms             n=30   p50=         6.7 p90=         6.9 p95=         6.9 max=         7.0
+    total_ms                 n=30   p50=        25.8 p90=        26.4 p95=        26.6 max=        26.7
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        26.9 p90=        27.3 p95=        27.4 max=        27.6
+    queue_wait_ms            n=30   p50=        19.2 p90=        19.6 p95=        19.6 max=        19.8
+    inference_ms             n=30   p50=         6.8 p90=         6.9 p95=         6.9 max=         7.0
+    total_ms                 n=30   p50=        26.2 p90=        26.6 p95=        26.7 max=        26.8
+  pruner /v1/prune +200 ms
+    round_trip_ms            n=30   p50=        27.0 p90=        28.1 p95=        28.2 max=        28.6
+    queue_wait_ms            n=30   p50=        19.5 p90=        20.0 p95=        20.4 max=        20.5
+    inference_ms             n=30   p50=         6.8 p90=         7.0 p95=         7.1 max=         7.5
+    total_ms                 n=30   p50=        26.4 p90=        27.3 p95=        27.5 max=        27.6
+  pruner /v1/prune +250 ms
+    round_trip_ms            n=30   p50=        26.9 p90=        27.3 p95=        27.3 max=        27.4
+    queue_wait_ms            n=30   p50=        19.4 p90=        19.7 p95=        19.7 max=        19.7
+    inference_ms             n=30   p50=         6.8 p90=         6.9 p95=         7.0 max=         7.1
+    total_ms                 n=30   p50=        26.3 p90=        26.6 p95=        26.7 max=        26.7
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       611.1 p90=       637.9 p95=       643.3 max=       652.1
+    pruner_round_trip_ms     n=30   p50=         8.7 p90=        10.9 p95=        11.4 max=        11.8
+    sum_round_trip_ms        n=30   p50=       619.6 p90=       647.0 p95=       652.0 max=       660.9
+    sum of the two p50s      619.8 ms   (p50 of the measured sums: 619.6 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 147.4 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 153.0 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 456.7 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 19.6 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 146.7 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 170.8 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 147.6 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 153.7 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 151.8 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 6.7 ms
+  [4 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 147.4 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 153.0 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 456.7 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 19.6 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-cost-ru.json
+
+=== 12:02:28 БЕНЧ: scorer-cost HE
+SameVoice scorer cost benchmark (cost only -- no correctness metric)
+  lang=he iterations=30 in-flight=[1, 2, 4]
+  audio: {'kind': 'synthetic', 'tone_hz': 440, 'amplitude': 0.2, 'audio_ms': 1000}
+  output: /workspace/out/results/scorer-cost-he.json
+
+=== 1 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       149.5 p90=       152.6 p95=       156.7 max=       160.7
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=       148.3 p90=       151.7 p95=       155.7 max=       160.0
+    total_ms                 n=30   p50=       148.4 p90=       151.8 p95=       155.7 max=       160.1
+  pruner /v1/prune +50 ms
+    round_trip_ms            n=30   p50=        11.7 p90=        14.3 p95=        14.8 max=        15.9
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.1
+    inference_ms             n=30   p50=        10.9 p90=        13.3 p95=        13.9 max=        15.0
+    total_ms                 n=30   p50=        11.1 p90=        13.6 p95=        14.1 max=        15.2
+  pruner /v1/prune +100 ms
+    round_trip_ms            n=30   p50=        12.2 p90=        13.1 p95=        14.0 max=        14.9
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=        11.2 p90=        11.9 p95=        12.9 max=        13.8
+    total_ms                 n=30   p50=        11.5 p90=        12.2 p95=        13.2 max=        14.2
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        11.9 p90=        12.1 p95=        12.2 max=        12.3
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=        11.0 p90=        11.2 p95=        11.4 max=        11.4
+    total_ms                 n=30   p50=        11.3 p90=        11.5 p95=        11.6 max=        11.6
+  pruner /v1/prune +200 ms
+    round_trip_ms            n=30   p50=        11.9 p90=        12.1 p95=        12.1 max=        12.8
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.0 p95=         0.0 max=         0.0
+    inference_ms             n=30   p50=        11.0 p90=        11.3 p95=        11.3 max=        11.9
+    total_ms                 n=30   p50=        11.3 p90=        11.5 p95=        11.6 max=        12.2
+  pruner /v1/prune +250 ms
+    round_trip_ms            n=30   p50=        11.9 p90=        12.3 p95=        12.5 max=        13.1
+    queue_wait_ms            n=30   p50=         0.0 p90=         0.1 p95=         0.1 max=         0.1
+    inference_ms             n=30   p50=        10.9 p90=        11.5 p95=        11.6 max=        12.2
+    total_ms                 n=30   p50=        11.2 p90=        11.7 p95=        11.9 max=        12.5
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       150.8 p90=       154.6 p95=       154.9 max=       156.1
+    pruner_round_trip_ms     n=30   p50=        12.9 p90=        14.1 p95=        14.7 max=        15.2
+    sum_round_trip_ms        n=30   p50=       164.4 p90=       168.1 p95=       168.4 max=       169.4
+    sum of the two p50s      163.7 ms   (p50 of the measured sums: 164.4 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 148.3 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 155.7 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+
+=== 2 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       298.0 p90=       312.7 p95=       316.1 max=       322.2
+    queue_wait_ms            n=30   p50=       147.9 p90=       157.9 p95=       159.4 max=       161.0
+    inference_ms             n=30   p50=       149.9 p90=       160.1 p95=       161.5 max=       163.1
+    total_ms                 n=30   p50=       296.1 p90=       310.7 p95=       314.2 max=       320.5
+  pruner /v1/prune +50 ms
+    round_trip_ms            n=30   p50=        25.7 p90=        26.0 p95=        26.1 max=        28.5
+    queue_wait_ms            n=30   p50=        11.8 p90=        12.1 p95=        12.1 max=        12.8
+    inference_ms             n=30   p50=        12.9 p90=        13.2 p95=        13.3 max=        13.7
+    total_ms                 n=30   p50=        24.9 p90=        25.3 p95=        25.4 max=        26.0
+  pruner /v1/prune +100 ms
+    round_trip_ms            n=30   p50=        25.2 p90=        26.3 p95=        26.5 max=        26.7
+    queue_wait_ms            n=30   p50=        11.7 p90=        12.1 p95=        12.2 max=        12.3
+    inference_ms             n=30   p50=        12.7 p90=        13.1 p95=        13.4 max=        13.5
+    total_ms                 n=30   p50=        24.5 p90=        25.3 p95=        25.7 max=        25.9
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        25.4 p90=        26.0 p95=        26.2 max=        26.4
+    queue_wait_ms            n=30   p50=        11.6 p90=        12.0 p95=        12.2 max=        12.3
+    inference_ms             n=30   p50=        12.7 p90=        13.2 p95=        13.2 max=        13.4
+    total_ms                 n=30   p50=        24.6 p90=        25.2 p95=        25.5 max=        25.7
+  pruner /v1/prune +200 ms
+    round_trip_ms            n=30   p50=        25.5 p90=        26.0 p95=        26.4 max=        26.8
+    queue_wait_ms            n=30   p50=        11.7 p90=        12.1 p95=        12.2 max=        12.5
+    inference_ms             n=30   p50=        12.8 p90=        13.0 p95=        13.1 max=        13.5
+    total_ms                 n=30   p50=        24.8 p90=        25.3 p95=        25.6 max=        25.8
+  pruner /v1/prune +250 ms
+    round_trip_ms            n=30   p50=        25.4 p90=        26.1 p95=        26.2 max=        26.6
+    queue_wait_ms            n=30   p50=        11.7 p90=        12.0 p95=        12.2 max=        12.6
+    inference_ms             n=30   p50=        12.8 p90=        13.2 p95=        13.3 max=        13.6
+    total_ms                 n=30   p50=        24.7 p90=        25.3 p95=        25.6 max=        25.9
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       293.3 p90=       310.7 p95=       313.7 max=       317.7
+    pruner_round_trip_ms     n=30   p50=        12.6 p90=        13.7 p95=        14.7 max=        17.4
+    sum_round_trip_ms        n=30   p50=       306.4 p90=       325.4 p95=       327.0 max=       330.1
+    sum of the two p50s      305.9 ms   (p50 of the measured sums: 306.4 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 149.9 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 161.5 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 159.4 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 12.2 ms
+
+=== 4 in flight ===
+  predictor /v1/predict
+    round_trip_ms            n=30   p50=       604.9 p90=       661.9 p95=       662.2 max=       665.1
+    queue_wait_ms            n=30   p50=       451.1 p90=       494.6 p95=       495.4 max=       496.3
+    inference_ms             n=30   p50=       151.3 p90=       167.3 p95=       168.6 max=       170.0
+    total_ms                 n=30   p50=       602.9 p90=       660.0 p95=       660.3 max=       663.2
+  pruner /v1/prune +50 ms
+    round_trip_ms            n=30   p50=        50.3 p90=        51.4 p95=        51.5 max=        51.7
+    queue_wait_ms            n=30   p50=        36.8 p90=        37.5 p95=        37.6 max=        37.9
+    inference_ms             n=30   p50=        12.6 p90=        13.0 p95=        13.1 max=        14.1
+    total_ms                 n=30   p50=        49.5 p90=        50.3 p95=        50.7 max=        51.0
+  pruner /v1/prune +100 ms
+    round_trip_ms            n=30   p50=        50.1 p90=        51.3 p95=        52.2 max=        52.5
+    queue_wait_ms            n=30   p50=        36.6 p90=        37.7 p95=        38.3 max=        38.6
+    inference_ms             n=30   p50=        12.5 p90=        13.1 p95=        13.1 max=        13.5
+    total_ms                 n=30   p50=        49.3 p90=        50.6 p95=        51.4 max=        51.8
+  pruner /v1/prune +150 ms
+    round_trip_ms            n=30   p50=        50.9 p90=        51.6 p95=        51.8 max=        52.1
+    queue_wait_ms            n=30   p50=        37.2 p90=        37.7 p95=        37.9 max=        38.0
+    inference_ms             n=30   p50=        12.8 p90=        13.2 p95=        13.2 max=        13.4
+    total_ms                 n=30   p50=        50.2 p90=        50.8 p95=        51.0 max=        51.1
+  pruner /v1/prune +200 ms
+    round_trip_ms            n=30   p50=        51.1 p90=        52.1 p95=        52.3 max=        52.5
+    queue_wait_ms            n=30   p50=        37.3 p90=        38.3 p95=        38.5 max=        38.5
+    inference_ms             n=30   p50=        12.8 p90=        13.2 p95=        13.3 max=        13.4
+    total_ms                 n=30   p50=        50.4 p90=        51.5 p95=        51.6 max=        51.8
+  pruner /v1/prune +250 ms
+    round_trip_ms            n=30   p50=        50.5 p90=        52.2 p95=        52.3 max=        52.3
+    queue_wait_ms            n=30   p50=        36.9 p90=        38.1 p95=        38.4 max=        38.5
+    inference_ms             n=30   p50=        12.7 p90=        13.2 p95=        13.3 max=        13.5
+    total_ms                 n=30   p50=        49.8 p90=        51.5 p95=        51.6 max=        51.7
+  critical path (predictor + pruner +150 ms, per trial)
+    predictor_round_trip_ms  n=30   p50=       613.1 p90=       647.9 p95=       650.1 max=       653.6
+    pruner_round_trip_ms     n=30   p50=        12.6 p90=        13.6 p95=        13.6 max=        13.7
+    sum_round_trip_ms        n=30   p50=       625.2 p90=       660.2 p95=       662.8 max=       666.9
+    sum of the two p50s      625.7 ms   (p50 of the measured sums: 625.2 ms)
+
+  FAIL         predictor inference p50    target <= 50 ms | measured 151.3 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 168.6 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 495.4 ms
+  FAIL         pruner queue wait p95      target <= 20 ms | measured 37.9 ms
+
+=== target checks, every level ===
+  [1 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 148.3 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 155.7 ms
+  VACUOUS      predictor queue wait p95   target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  VACUOUS      pruner queue wait p95      target <= 20 ms | measured 0.0 ms
+      1 in flight against gpu_concurrency=1: nothing can queue, so this check cannot fail here
+  [2 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 149.9 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 161.5 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 159.4 ms
+  PASS         pruner queue wait p95      target <= 20 ms | measured 12.2 ms
+  [4 in flight]
+  FAIL         predictor inference p50    target <= 50 ms | measured 151.3 ms
+  FAIL         predictor inference p95    target <= 100 ms | measured 168.6 ms
+  FAIL         predictor queue wait p95   target <= 20 ms | measured 495.4 ms
+  FAIL         pruner queue wait p95      target <= 20 ms | measured 37.9 ms
+
+Correctness (recall/retention/rank) is absent from this artifact by design: no labelled corpus exists yet. It is measured by scripts/acoustic-replay-bench.py.
+saved: /workspace/out/results/scorer-cost-he.json
+
+=== 12:03:13 БЕНЧ: stage1 predictor+MT (не фатально)
+warming predictor (first run may download model weights)...
+{"ok": true, "model": "Qwen/Qwen3-0.6B-Base", "device": "cuda", "load_ms": 0.0}
+warming local MT directions (first run may download model weights)...
+{"loaded": ["Helsinki-NLP/opus-mt-he-ru", "Helsinki-NLP/opus-mt-ru-he"], "load_ms": 20742.472169999928}
+benchmarking predict_ru x7...
+benchmarking predict_he x7...
+benchmarking mt_ru_he x7...
+benchmarking mt_he_ru x7...
+{
+  "schema_version": 1,
+  "created_at": "2026-08-31T12:03:37.025819+00:00",
+  "iterations": 7,
+  "warmup": {
+    "predictor_loopback_ms": 2.534,
+    "predictor": {
+      "ok": true,
+      "model": "Qwen/Qwen3-0.6B-Base",
+      "device": "cuda",
+      "load_ms": 0.0
+    },
+    "mt_loopback_ms": 20748.79,
+    "mt": {
+      "loaded": [
+        "Helsinki-NLP/opus-mt-he-ru",
+        "Helsinki-NLP/opus-mt-ru-he"
+      ],
+      "load_ms": 20742.472169999928
+    }
+  },
+  "results": {
+    "predict_ru": {
+      "loopback": {
+        "p50_ms": 150.394,
+        "p90_ms": 154.309,
+        "p95_ms": 155.591,
+        "min_ms": 149.183,
+        "max_ms": 155.591
+      },
+      "last_response": {
+        "candidates": [
+          {
+            "word": "2019",
+            "probability": 0.05885218472277183,
+            "log_score": -1.272904396057129
+          },
+          {
+            "word": "2018",
+            "probability": 0.05788199756011744,
+            "log_score": -1.2895269393920898
+          },
+          {
+            "word": "выпущена",
+            "probability": 0.057454379783301555,
+            "log_score": -1.296942114830017
+          },
+          {
+            "word": "2023",
+            "probability": 0.05475876769211636,
+            "log_score": -1.3449958562850952
+          },
+          {
+            "word": "2022",
+            "probability": 0.05468439532250145,
+            "log_score": -1.3463549613952637
+          },
+          {
+            "word": "2020",
+            "probability": 0.054623288839580855,
+            "log_score": -1.3474730253219604
+          },
+          {
+            "word": "2021",
+            "probability": 0.05424161601214344,
+            "log_score": -1.3544849157333374
+          },
+          {
+            "word": "2024",
+            "probability": 0.05386348974555799,
+            "log_score": -1.361480474472046
+          },
+          {
+            "word": "2017",
+            "probability": 0.05306638148802091,
+            "log_score": -1.376389741897583
+          },
+          {
+            "word": "2016",
+            "probability": 0.049801702334240194,
+            "log_score": -1.4398841857910156
+          },
+          {
+            "word": "2025",
+            "probability": 0.04874974541623756,
+            "log_score": -1.461233377456665
+          },
+          {
+            "word": "2015",
+            "probability": 0.04797266061995737,
+            "log_score": -1.477302074432373
+          },
+          {
+            "word": "в",
+            "probability": 0.04701267270621229,
+            "log_score": -1.49751615524292
+          },
+          {
+            "word": "скидка",
+            "probability": 0.04586152056524724,
+            "log_score": -1.5223069190979004
+          },
+          {
+            "word": "появляться",
+            "probability": 0.0453078397231372,
+            "log_score": -1.534453272819519
+          },
+          {
+            "word": "10000",
+            "probability": 0.04426154015729027,
+            "log_score": -1.5578172206878662
+          },
+          {
+            "word": "2014",
+            "probability": 0.044123304086306804,
+            "log_score": -1.5609452724456787
+          },
+          {
+            "word": "выпадать",
+            "probability": 0.043827420902104335,
+            "log_score": -1.567673683166504
+          },
+          {
+            "word": "2008",
+            "probability": 0.041925186380452964,
+            "log_score": -1.6120465993881226
+          },
+          {
+            "word": "2013",
+            "probability": 0.04172990594270199,
+            "log_score": -1.6167153120040894
+          }
+        ],
+        "model": "Qwen/Qwen3-0.6B-Base",
+        "latency_ms": 148.8323270004912,
+        "load_ms": 0.0,
+        "beam_count": 40,
+        "queue_wait_ms": 0.005,
+        "inference_ms": 149.252,
+        "total_ms": 149.277
+      },
+      "server_inference": {
+        "p50_ms": 148.896,
+        "p90_ms": 149.631,
+        "p95_ms": 154.288,
+        "min_ms": 147.632,
+        "max_ms": 154.288
+      }
+    },
+    "predict_he": {
+      "loopback": {
+        "p50_ms": 152.675,
+        "p90_ms": 155.435,
+        "p95_ms": 156.785,
+        "min_ms": 147.571,
+        "max_ms": 156.785
+      },
+      "last_response": {
+        "candidates": [
+          {
+            "word": "הבגרות",
+            "probability": 0.15551544208706836,
+            "log_score": -1.3851464986801147
+          },
+          {
+            "word": "מועד",
+            "probability": 0.14481075001243646,
+            "log_score": -1.4564638137817383
+          },
+          {
+            "word": "תחילת",
+            "probability": 0.14065234102225865,
+            "log_score": -1.4856003522872925
+          },
+          {
+            "word": "10000",
+            "probability": 0.12902380028846439,
+            "log_score": -1.571894645690918
+          },
+          {
+            "word": "יום",
+            "probability": 0.12072604388248663,
+            "log_score": -1.6383676528930664
+          },
+          {
+            "word": "מלחמת",
+            "probability": 0.10437956799087793,
+            "log_score": -1.7838575839996338
+          },
+          {
+            "word": "סוף",
+            "probability": 0.10366520654561795,
+            "log_score": -1.7907249927520752
+          },
+          {
+            "word": "מלחמה",
+            "probability": 0.10122684817078949,
+            "log_score": -1.8145275115966797
+          }
+        ],
+        "model": "Qwen/Qwen3-0.6B-Base",
+        "latency_ms": 152.99437700014096,
+        "load_ms": 0.0,
+        "beam_count": 40,
+        "queue_wait_ms": 0.004,
+        "inference_ms": 153.357,
+        "total_ms": 153.375
+      },
+      "server_inference": {
+        "p50_ms": 151.548,
+        "p90_ms": 153.833,
+        "p95_ms": 155.68,
+        "min_ms": 146.214,
+        "max_ms": 155.68
+      }
+    },
+    "mt_ru_he": {
+      "loopback": {
+        "p50_ms": 44.728,
+        "p90_ms": 46.256,
+        "p95_ms": 462.615,
+        "min_ms": 41.071,
+        "max_ms": 462.615
+      },
+      "last_response": {
+        "text": "אני רוצה לדעת מתי יגיע התשלום הבא.",
+        "model": "Helsinki-NLP/opus-mt-ru-he",
+        "latency_ms": 41.670659000374144,
+        "load_ms": 0.0
+      },
+      "server_inference": {
+        "p50_ms": 43.76,
+        "p90_ms": 45.336,
+        "p95_ms": 460.545,
+        "min_ms": 40.124,
+        "max_ms": 460.545
+      }
+    },
+    "mt_he_ru": {
+      "loopback": {
+        "p50_ms": 47.945,
+        "p90_ms": 51.935,
+        "p95_ms": 51.999,
+        "min_ms": 44.347,
+        "max_ms": 51.999
+      },
+      "last_response": {
+        "text": "Я хочу знать, когда придет следующий платеж.",
+        "model": "Helsinki-NLP/opus-mt-he-ru",
+        "latency_ms": 50.82468899945525,
+        "load_ms": 0.0
+      },
+      "server_inference": {
+        "p50_ms": 47.129,
+        "p90_ms": 50.825,
+        "p95_ms": 51.136,
+        "min_ms": 43.461,
+        "max_ms": 51.136
+      }
+    }
+  }
+}
+saved: /workspace/out/results/stage1-think-20260831T120337Z.json
+
+=== 12:03:37 ГОТОВО
+4054 MiB

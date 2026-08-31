@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-31T11:58:06.201962+00:00",
+  "iterations": 7,
+  "warmup": {
+    "predictor_loopback_ms": 3.238,
+    "predictor": {
+      "ok": true,
+      "model": "Qwen/Qwen3-0.6B-Base",
+      "device": "cuda",
+      "load_ms": 0.0
+    },
+    "mt_loopback_ms": 19685.182,
+    "mt": {
+      "loaded": [
+        "Helsinki-NLP/opus-mt-he-ru",
+        "Helsinki-NLP/opus-mt-ru-he"
+      ],
+      "load_ms": 19671.666831709445
+    }
+  },
+  "results": {
+    "predict_ru": {
+      "loopback": {
+        "p50_ms": 179.882,
+        "p90_ms": 184.194,
+        "p95_ms": 203.183,
+        "min_ms": 177.655,
+        "max_ms": 203.183
+      },
+      "last_response": {
+        "candidates": [
+          {
+            "word": "2019",
+            "probability": 0.05885218472277183,
+            "log_score": -1.272904396057129
+          },
+          {
+            "word": "2018",
+            "probability": 0.05788199756011744,
+            "log_score": -1.2895269393920898
+          },
+          {
+            "word": "выпущена",
+            "probability": 0.057454379783301555,
+            "log_score": -1.296942114830017
+          },
+          {
+            "word": "2023",
+            "probability": 0.05475876769211636,
+            "log_score": -1.3449958562850952
+          },
+          {
+            "word": "2022",
+            "probability": 0.05468439532250145,
+            "log_score": -1.3463549613952637
+          },
+          {
+            "word": "2020",
+            "probability": 0.054623288839580855,
+            "log_score": -1.3474730253219604
+          },
+          {
+            "word": "2021",
+            "probability": 0.05424161601214344,
+            "log_score": -1.3544849157333374
+          },
+          {
+            "word": "2024",
+            "probability": 0.05386348974555799,
+            "log_score": -1.361480474472046
+          },
+          {
+            "word": "2017",
+            "probability": 0.05306638148802091,
+            "log_score": -1.376389741897583
+          },
+          {
+            "word": "2016",
+            "probability": 0.049801702334240194,
+            "log_score": -1.4398841857910156
+          },
+          {
+            "word": "2025",
+            "probability": 0.04874974541623756,
+            "log_score": -1.461233377456665
+          },
+          {
+            "word": "2015",
+            "probability": 0.04797266061995737,
+            "log_score": -1.477302074432373
+          },
+          {
+            "word": "в",
+            "probability": 0.04701267270621229,
+            "log_score": -1.49751615524292
+          },
+          {
+            "word": "скидка",
+            "probability": 0.04586152056524724,
+            "log_score": -1.5223069190979004
+          },
+          {
+            "word": "появляться",
+            "probability": 0.0453078397231372,
+            "log_score": -1.534453272819519
+          },
+          {
+            "word": "10000",
+            "probability": 0.04426154015729027,
+            "log_score": -1.5578172206878662
+          },
+          {
+            "word": "2014",
+            "probability": 0.044123304086306804,
+            "log_score": -1.5609452724456787
+          },
+          {
+            "word": "выпадать",
+            "probability": 0.043827420902104335,
+            "log_score": -1.567673683166504
+          },
+          {
+            "word": "2008",
+            "probability": 0.041925186380452964,
+            "log_score": -1.6120465993881226
+          },
+          {
+            "word": "2013",
+            "probability": 0.04172990594270199,
+            "log_score": -1.6167153120040894
+          }
+        ],
+        "model": "Qwen/Qwen3-0.6B-Base",
+        "latency_ms": 182.1764688938856,
+        "load_ms": 0.0,
+        "beam_count": 40,
+        "queue_wait_ms": 0.01,
+        "inference_ms": 182.743,
+        "total_ms": 182.776
+      },
+      "server_inference": {
+        "p50_ms": 177.508,
+        "p90_ms": 182.176,
+        "p95_ms": 197.725,
+        "min_ms": 175.487,
+        "max_ms": 197.725
+      }
+    },
+    "predict_he": {
+      "loopback": {
+        "p50_ms": 179.459,
+        "p90_ms": 188.959,
+        "p95_ms": 193.44,
+        "min_ms": 176.818,
+        "max_ms": 193.44
+      },
+      "last_response": {
+        "candidates": [
+          {
+            "word": "הבגרות",
+            "probability": 0.15551544208706836,
+            "log_score": -1.3851464986801147
+          },
+          {
+            "word": "מועד",
+            "probability": 0.14481075001243646,
+            "log_score": -1.4564638137817383
+          },
+          {
+            "word": "תחילת",
+            "probability": 0.14065234102225865,
+            "log_score": -1.4856003522872925
+          },
+          {
+            "word": "10000",
+            "probability": 0.12902380028846439,
+            "log_score": -1.571894645690918
+          },
+          {
+            "word": "יום",
+            "probability": 0.12072604388248663,
+            "log_score": -1.6383676528930664
+          },
+          {
+            "word": "מלחמת",
+            "probability": 0.10437956799087793,
+            "log_score": -1.7838575839996338
+          },
+          {
+            "word": "סוף",
+            "probability": 0.10366520654561795,
+            "log_score": -1.7907249927520752
+          },
+          {
+            "word": "מלחמה",
+            "probability": 0.10122684817078949,
+            "log_score": -1.8145275115966797
+          }
+        ],
+        "model": "Qwen/Qwen3-0.6B-Base",
+        "latency_ms": 174.54457469284534,
+        "load_ms": 0.0,
+        "beam_count": 40,
+        "queue_wait_ms": 0.01,
+        "inference_ms": 175.148,
+        "total_ms": 175.197
+      },
+      "server_inference": {
+        "p50_ms": 176.972,
+        "p90_ms": 186.294,
+        "p95_ms": 191.05,
+        "min_ms": 174.545,
+        "max_ms": 191.05
+      }
+    },
+    "mt_ru_he": {
+      "loopback": {
+        "p50_ms": 46.434,
+        "p90_ms": 48.125,
+        "p95_ms": 580.673,
+        "min_ms": 46.079,
+        "max_ms": 580.673
+      },
+      "last_response": {
+        "text": "אני רוצה לדעת מתי יגיע התשלום הבא.",
+        "model": "Helsinki-NLP/opus-mt-ru-he",
+        "latency_ms": 44.27978489547968,
+        "load_ms": 0.0
+      },
+      "server_inference": {
+        "p50_ms": 44.427,
+        "p90_ms": 45.675,
+        "p95_ms": 575.533,
+        "min_ms": 44.263,
+        "max_ms": 575.533
+      }
+    },
+    "mt_he_ru": {
+      "loopback": {
+        "p50_ms": 50.303,
+        "p90_ms": 50.429,
+        "p95_ms": 50.434,
+        "min_ms": 49.823,
+        "max_ms": 50.434
+      },
+      "last_response": {
+        "text": "Я хочу знать, когда придет следующий платеж.",
+        "model": "Helsinki-NLP/opus-mt-he-ru",
+        "latency_ms": 48.273603431880474,
+        "load_ms": 0.0
+      },
+      "server_inference": {
+        "p50_ms": 48.185,
+        "p90_ms": 48.512,
+        "p95_ms": 48.524,
+        "min_ms": 48.042,
+        "max_ms": 48.524
+      }
+    }
+  }
+}
