@@ -1,0 +1,134 @@
+
+=== 16:19:11 старт bootstrap, окружение:
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+/usr/bin/python3
+/usr/local/bin/pip
+/usr/bin/curl
+/usr/bin/wget
+
+=== 16:19:11 поднимаю http-отдачу лога (порт 8000)
+
+=== 16:19:11 проверяю GPU
+NVIDIA GeForce RTX 4090, 24564 MiB, 610.43.02
+-- диагностика CUDA:
+crw-rw-rw- 1 nobody nogroup 195, 254 Jul  9 09:08 /dev/nvidia-modeset
+crw-rw-rw- 1 nobody nogroup 507,   0 Jul  9 09:08 /dev/nvidia-uvm
+crw-rw-rw- 1 nobody nogroup 507,   1 Jul  9 09:08 /dev/nvidia-uvm-tools
+crw-rw-rw- 1 nobody nogroup 195,   1 Jul  9 09:08 /dev/nvidia1
+crw-rw-rw- 1 nobody nogroup 195, 255 Jul  9 09:08 /dev/nvidiactl
+
+/dev/nvidia-caps:
+total 0
+drwxr-xr-x 2 root root  40 Aug 31 16:19 .
+drwxr-xr-x 7 root root 480 Aug 31 16:19 ..
+CUDA_VERSION=12.8.1
+LD_LIBRARY_PATH=/usr/local/cuda/lib64
+LIBRARY_PATH=/usr/local/cuda/lib64/stubs
+NVIDIA_CTK_LIBCUDA_DIR=/usr/lib/x86_64-linux-gnu
+NVIDIA_DRIVER_CAPABILITIES=compute,utility
+NVIDIA_PRODUCT_NAME=CUDA
+NVIDIA_REQUIRE_CUDA=cuda>=12.8 brand=unknown,driver>=470,driver<471 brand=grid,driver>=470,driver<471 brand=tesla,driver>=470,driver<471 brand=nvidia,driver>=470,driver<471 brand=quadro,driver>=470,driver<471 brand=quadrortx,driver>=470,driver<471 brand=nvidiartx,driver>=470,driver<471 brand=vapps,driver>=470,driver<471 brand=vpc,driver>=470,driver<471 brand=vcs,driver>=470,driver<471 brand=vws,driver>=470,driver<471 brand=cloudgaming,driver>=470,driver<471 brand=unknown,driver>=535,driver<536 brand=grid,driver>=535,driver<536 brand=tesla,driver>=535,driver<536 brand=nvidia,driver>=535,driver<536 brand=quadro,driver>=535,driver<536 brand=quadrortx,driver>=535,driver<536 brand=nvidiartx,driver>=535,driver<536 brand=vapps,driver>=535,driver<536 brand=vpc,driver>=535,driver<536 brand=vcs,driver>=535,driver<536 brand=vws,driver>=535,driver<536 brand=cloudgaming,driver>=535,driver<536 brand=unknown,driver>=550,driver<551 brand=grid,driver>=550,driver<551 brand=tesla,driver>=550,driver<551 brand=nvidia,driver>=550,driver<551 brand=quadro,driver>=550,driver<551 brand=quadrortx,driver>=550,driver<551 brand=nvidiartx,driver>=550,driver<551 brand=vapps,driver>=550,driver<551 brand=vpc,driver>=550,driver<551 brand=vcs,driver>=550,driver<551 brand=vws,driver>=550,driver<551 brand=cloudgaming,driver>=550,driver<551 brand=unknown,driver>=560,driver<561 brand=grid,driver>=560,driver<561 brand=tesla,driver>=560,driver<561 brand=nvidia,driver>=560,driver<561 brand=quadro,driver>=560,driver<561 brand=quadrortx,driver>=560,driver<561 brand=nvidiartx,driver>=560,driver<561 brand=vapps,driver>=560,driver<561 brand=vpc,driver>=560,driver<561 brand=vcs,driver>=560,driver<561 brand=vws,driver>=560,driver<561 brand=cloudgaming,driver>=560,driver<561 brand=unknown,driver>=565,driver<566 brand=grid,driver>=565,driver<566 brand=tesla,driver>=565,driver<566 brand=nvidia,driver>=565,driver<566 brand=quadro,driver>=565,driver<566 brand=quadrortx,driver>=565,driver<566 brand=nvidiartx,driver>=565,driver<566 brand=vapps,driver>=565,driver<566 brand=vpc,driver>=565,driver<566 brand=vcs,driver>=565,driver<566 brand=vws,driver>=565,driver<566 brand=cloudgaming,driver>=565,driver<566
+NVIDIA_VISIBLE_DEVICES=void
+NV_CUDA_CUDART_DEV_VERSION=12.8.90-1
+NV_CUDA_CUDART_VERSION=12.8.90-1
+NV_CUDA_LIB_VERSION=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_DEV_PACKAGE=cuda-nsight-compute-12-8=12.8.1-1
+NV_CUDA_NSIGHT_COMPUTE_VERSION=12.8.1-1
+NV_CUDNN_PACKAGE=libcudnn9-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_DEV=libcudnn9-dev-cuda-12=9.8.0.87-1
+NV_CUDNN_PACKAGE_NAME=libcudnn9-cuda-12
+NV_LIBNCCL_DEV_PACKAGE=libnccl-dev=2.25.1-1+cuda12.8
+NV_LIBNCCL_PACKAGE=libnccl2=2.25.1-1+cuda12.8
+NV_NVPROF_DEV_PACKAGE=cuda-nvprof-12-8=12.8.90-1
+PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUNPOD_GPU_NAME=NVIDIA+GeForce+RTX+4090
+torch 2.8.0.dev20250319+cu128 | cuda build 12.8
+CUDA ок: NVIDIA GeForce RTX 4090
+
+=== 16:19:16 зависимости THINK
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python3 -m pip install --upgrade pip
+
+=== 16:19:27 раскладываю код
+
+=== 16:19:28 предиктор: 1.7B-инструктивная, чат
+
+=== 16:19:30 E-повтор: контекст БЕЗ памяти (парная база на этом же хосте)
+модель: Qwen/Qwen3-1.7B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    ранг 1   посмотреть
+  ru-m1-003    ранг 10  машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    ранг 2   готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    ранг 8   перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    ранг 5   приедешь
+  ru-m1-011    мимо     адрес
+  ru-m1-013    мимо     подтвердить
+  ru-m1-014    мимо     освободишься
+  ru-m1-015    мимо     пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    ранг 3   забыл
+  ru-m1-019    ранг 8   душа
+  ru-m1-020    мимо     вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    ранг 3   объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    мимо     сегодня
+  ru-m1-027    мимо     пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    ранг 3   договорились
+  ru-m1-030    мимо     соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    мимо     завтра
+  ru-m1-033    мимо     батарейки
+  ru-m1-034    мимо     отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0312, "top3": 0.1562, "top5": 0.1875, "top10": 0.2812, "top20": 0.2812, "top50": 0.2812} | попаданий 9/32
+saved: /workspace/out/results/recall-E-ru-rerun.json
+
+=== 16:20:01 F: контекст + ПАМЯТЬ из загруженных разговоров
+модель: Qwen/Qwen3-1.7B | режим: chat | контекст: да | строк: 32
+  ru-m1-002    ранг 3   посмотреть
+  ru-m1-003    мимо     машина
+  ru-m1-004    мимо     садится
+  ru-m1-005    мимо     двенадцатое
+  ru-m1-006    ранг 7   готовы
+  ru-m1-007    мимо     забил
+  ru-m1-008    ранг 8   перезвоню
+  ru-m1-009    мимо     тысяча
+  ru-m1-010    ранг 19  приедешь
+  ru-m1-011    ранг 20  адрес
+  ru-m1-013    ранг 1   подтвердить
+  ru-m1-014    мимо     освободишься
+  ru-m1-015    мимо     пятнадцатое
+  ru-m1-016    мимо     записал
+  ru-m1-017    ранг 6   забыл
+  ru-m1-019    ранг 3   душа
+  ru-m1-020    мимо     вторник
+  ru-m1-021    мимо     пятьсот
+  ru-m1-022    мимо     извинялся
+  ru-m1-023    ранг 14  объясню
+  ru-m1-024    мимо     подъеду
+  ru-m1-025    мимо     пробки
+  ru-m1-026    мимо     сегодня
+  ru-m1-027    мимо     пойду
+  ru-m1-028    мимо     дорогая
+  ru-m1-029    ранг 3   договорились
+  ru-m1-030    мимо     соседки
+  ru-m1-031    мимо     лучше
+  ru-m1-032    мимо     завтра
+  ru-m1-033    ранг 1   батарейки
+  ru-m1-034    мимо     отправил
+  ru-m1-035    мимо     привезу
+recall: {"top1": 0.0625, "top3": 0.1562, "top5": 0.1562, "top10": 0.25, "top20": 0.3438, "top50": 0.3438} | попаданий 11/32
+saved: /workspace/out/results/recall-F-ru-mem.json
+
+=== 16:20:17 ГОТОВО
+7230 MiB
