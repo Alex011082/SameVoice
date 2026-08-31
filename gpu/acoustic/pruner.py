@@ -220,7 +220,13 @@ class CtcEvidenceEngine:
         assert processor is not None and model is not None
 
         inputs = processor(pcm, sampling_rate=SAMPLE_RATE, return_tensors="pt")
-        input_values = inputs.input_values.to(self._device)
+        # Вход обязан прийти в dtype модели. На CUDA модель лежит в float16
+        # (см. load()), а процессор отдаёт float32 — без приведения каждый
+        # запрос падает 503: "Input type (torch.cuda.FloatTensor) and weight
+        # type (torch.cuda.HalfTensor) should be the same". На CPU это не
+        # воспроизводится вовсе (модель float32), поэтому сухой прогон 31.08
+        # был зелёным, а под eizvbi6bza72um завалил все 900 запросов.
+        input_values = inputs.input_values.to(self._device, dtype=model.dtype)
         attention_mask = getattr(inputs, "attention_mask", None)
         if attention_mask is not None:
             attention_mask = attention_mask.to(self._device)
