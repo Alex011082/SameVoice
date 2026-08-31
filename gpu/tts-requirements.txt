@@ -3,4 +3,6 @@
 fastapi>=0.116,<1
 uvicorn[standard]>=0.35,<1
 chatterbox-tts>=0.1.7,<0.2
-numpy>=2,<3
+# numpy НЕ пиновать: chatterbox-tts требует numpy<2, наш пин >=2 дал
+# ResolutionImpossible на поде b0jxilt07hcur3 (31.08). Версию выбирает движок.
+numpy
