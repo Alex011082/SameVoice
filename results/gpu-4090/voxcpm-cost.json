@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "created_at": "2026-08-31T14:18:29.421785+00:00",
+  "created_at": "2026-08-31T14:36:57.261804+00:00",
   "script": "scripts/voxcpm-cost-bench.py",
   "engine": "openbmb/VoxCPM2 (streaming, load_denoiser=False)",
   "sample_rate": 24000,
-  "load_ms": 57077.9,
+  "load_ms": 127021.8,
   "ttfa_gate": {
     "threshold_p90_ms": 250.0,
-    "measured_p90_ms": 66.8,
+    "measured_p90_ms": 51.8,
     "passed": true,
     "source": "eval/open-hebrew-tts-findings.md"
   },
@@ -26,96 +26,96 @@
       "lang": "ru",
       "ttfa_ms": {
         "n": 6,
-        "p50_ms": 62.4,
-        "p90_ms": 65.8,
-        "p95_ms": 66.1,
-        "min_ms": 60.0,
-        "max_ms": 66.1,
-        "mean_ms": 63.6
+        "p50_ms": 50.7,
+        "p90_ms": 51.8,
+        "p95_ms": 52.0,
+        "min_ms": 50.3,
+        "max_ms": 52.0,
+        "mean_ms": 51.0
       },
       "total_ms": {
         "n": 6,
-        "p50_ms": 478.4,
-        "p90_ms": 619.4,
-        "p95_ms": 619.9,
-        "min_ms": 465.3,
-        "max_ms": 619.9,
-        "mean_ms": 544.7
+        "p50_ms": 443.9,
+        "p90_ms": 509.3,
+        "p95_ms": 577.3,
+        "min_ms": 380.3,
+        "max_ms": 577.3,
+        "mean_ms": 466.8
       },
-      "audio_duration_ms_p50": 1120.0,
-      "rtf_p50": 0.427
+      "audio_duration_ms_p50": 2240.0,
+      "rtf_p50": 0.198
     },
     "he_word": {
       "text": "תשלום",
       "lang": "he",
       "ttfa_ms": {
         "n": 6,
-        "p50_ms": 64.2,
-        "p90_ms": 66.8,
-        "p95_ms": 70.8,
-        "min_ms": 59.1,
-        "max_ms": 70.8,
-        "mean_ms": 64.8
+        "p50_ms": 50.5,
+        "p90_ms": 50.7,
+        "p95_ms": 50.9,
+        "min_ms": 50.4,
+        "max_ms": 50.9,
+        "mean_ms": 50.6
       },
       "total_ms": {
         "n": 6,
-        "p50_ms": 541.1,
-        "p90_ms": 670.2,
-        "p95_ms": 676.1,
-        "min_ms": 472.3,
-        "max_ms": 676.1,
-        "mean_ms": 574.7
+        "p50_ms": 444.3,
+        "p90_ms": 575.9,
+        "p95_ms": 640.2,
+        "min_ms": 443.6,
+        "max_ms": 640.2,
+        "mean_ms": 509.7
       },
-      "audio_duration_ms_p50": 1280.0,
-      "rtf_p50": 0.423
+      "audio_duration_ms_p50": 2240.0,
+      "rtf_p50": 0.198
     },
     "ru_phrase": {
       "text": "Я хочу узнать, когда поступит следующая выплата.",
       "lang": "ru",
       "ttfa_ms": {
         "n": 6,
-        "p50_ms": 62.7,
-        "p90_ms": 66.2,
-        "p95_ms": 68.6,
-        "min_ms": 60.5,
-        "max_ms": 68.6,
-        "mean_ms": 64.3
+        "p50_ms": 50.0,
+        "p90_ms": 50.9,
+        "p95_ms": 51.5,
+        "min_ms": 49.7,
+        "max_ms": 51.5,
+        "mean_ms": 50.5
       },
       "total_ms": {
         "n": 6,
-        "p50_ms": 1003.2,
-        "p90_ms": 1082.4,
-        "p95_ms": 1099.8,
-        "min_ms": 871.9,
-        "max_ms": 1099.8,
-        "mean_ms": 1011.8
+        "p50_ms": 1028.6,
+        "p90_ms": 1223.4,
+        "p95_ms": 1298.2,
+        "min_ms": 955.6,
+        "max_ms": 1298.2,
+        "mean_ms": 1084.0
       },
-      "audio_duration_ms_p50": 2400.0,
-      "rtf_p50": 0.418
+      "audio_duration_ms_p50": 5120.0,
+      "rtf_p50": 0.201
     },
     "he_phrase": {
       "text": "אני רוצה לדעת מתי ייכנס התשלום הבא.",
       "lang": "he",
       "ttfa_ms": {
         "n": 6,
-        "p50_ms": 61.9,
-        "p90_ms": 64.2,
-        "p95_ms": 65.4,
-        "min_ms": 58.8,
-        "max_ms": 65.4,
-        "mean_ms": 62.2
+        "p50_ms": 50.1,
+        "p90_ms": 51.0,
+        "p95_ms": 51.8,
+        "min_ms": 49.9,
+        "max_ms": 51.8,
+        "mean_ms": 50.5
       },
       "total_ms": {
         "n": 6,
-        "p50_ms": 1008.6,
-        "p90_ms": 1157.6,
-        "p95_ms": 1491.6,
-        "min_ms": 741.1,
-        "max_ms": 1491.6,
-        "mean_ms": 1059.3
+        "p50_ms": 893.3,
+        "p90_ms": 968.3,
+        "p95_ms": 1032.6,
+        "min_ms": 697.7,
+        "max_ms": 1032.6,
+        "mean_ms": 895.8
       },
-      "audio_duration_ms_p50": 2400.0,
-      "rtf_p50": 0.42
+      "audio_duration_ms_p50": 4480.0,
+      "rtf_p50": 0.199
     },
     "ru_burst6": {
       "words": [
@@ -128,21 +128,21 @@
       ],
       "sequential_total_ms": {
         "n": 3,
-        "p50_ms": 3071.8,
-        "p90_ms": 3156.2,
-        "p95_ms": 3156.2,
-        "min_ms": 2998.8,
-        "max_ms": 3156.2,
-        "mean_ms": 3075.6
+        "p50_ms": 2671.2,
+        "p90_ms": 2678.1,
+        "p95_ms": 2678.1,
+        "min_ms": 2667.1,
+        "max_ms": 2678.1,
+        "mean_ms": 2672.1
       },
       "overlap2_total_ms": {
         "n": 3,
-        "p50_ms": 3072.8,
-        "p90_ms": 3163.0,
-        "p95_ms": 3163.0,
-        "min_ms": 2943.2,
-        "max_ms": 3163.0,
-        "mean_ms": 3059.6
+        "p50_ms": 2722.5,
+        "p90_ms": 3157.6,
+        "p95_ms": 3157.6,
+        "min_ms": 2658.9,
+        "max_ms": 3157.6,
+        "mean_ms": 2846.3
       }
     },
     "he_burst6": {
@@ -156,21 +156,21 @@
       ],
       "sequential_total_ms": {
         "n": 3,
-        "p50_ms": 3089.6,
-        "p90_ms": 3401.3,
-        "p95_ms": 3401.3,
-        "min_ms": 2958.0,
-        "max_ms": 3401.3,
-        "mean_ms": 3149.6
+        "p50_ms": 2798.1,
+        "p90_ms": 2883.5,
+        "p95_ms": 2883.5,
+        "min_ms": 2721.5,
+        "max_ms": 2883.5,
+        "mean_ms": 2801.0
       },
       "overlap2_total_ms": {
         "n": 3,
-        "p50_ms": 2968.0,
-        "p90_ms": 3238.7,
-        "p95_ms": 3238.7,
-        "min_ms": 2875.9,
-        "max_ms": 3238.7,
-        "mean_ms": 3027.5
+        "p50_ms": 2929.2,
+        "p90_ms": 2956.6,
+        "p95_ms": 2956.6,
+        "min_ms": 2858.5,
+        "max_ms": 2956.6,
+        "mean_ms": 2914.8
       }
     }
   }

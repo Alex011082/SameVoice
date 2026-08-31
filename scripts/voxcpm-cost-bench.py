@@ -67,6 +67,8 @@ def main() -> int:
     parser.add_argument("--warmup-iterations", type=int, default=2)
     parser.add_argument("--burst-size", type=int, default=6)
     parser.add_argument("--output", default="/workspace/out/results/voxcpm-cost.json")
+    parser.add_argument("--samples-dir", default="",
+                        help="куда сгенерировать WAV-образцы на прослушивание (пусто = не генерировать)")
     args = parser.parse_args()
 
     print("SameVoice VoxCPM2 cost benchmark (streaming engine — TTFA is real)")
@@ -88,6 +90,33 @@ def main() -> int:
     _lang_kw = "language" in _params
     print(f"generate_streaming принимает language: {_lang_kw}")
 
+    # Тип кусков и частота — ПО ФАКТУ, не по надежде. 31.08 куски оказались
+    # не байтами: len(piece) считал сэмплы, длительность занижалась вдвое, а
+    # образцы, записанные как s16-байты, звучали чистым шумом («там не голос,
+    # там шум» — основатель). Возможно, тем же артефактом был и вердикт 24.08
+    # о плохом стриминге.
+    import numpy as np
+
+    probe = next(iter(model.generate_streaming(text="проверка")))
+    print(f"кусок стрима: type={type(probe).__name__}, "
+          f"dtype={getattr(probe, 'dtype', '—')}, ndim={getattr(probe, 'ndim', '—')}")
+    sr_attrs = {a: getattr(model, a) for a in dir(model)
+                if not a.startswith('_') and ('rate' in a.lower() or a in ('sr', 'sample_rate'))
+                and isinstance(getattr(model, a, None), (int, float))}
+    print(f"атрибуты частоты у модели: {sr_attrs}")
+    engine_sr = int(next(iter(sr_attrs.values()), SAMPLE_RATE))
+    print(f"использую частоту: {engine_sr} Гц")
+
+    def piece_samples(piece) -> int:
+        if isinstance(piece, (bytes, bytearray)):
+            return len(piece) // 2
+        return int(np.asarray(piece).size)
+
+    def piece_f32(piece):
+        if isinstance(piece, (bytes, bytearray)):
+            return np.frombuffer(piece, dtype="<i2").astype(np.float32) / 32767.0
+        return np.asarray(piece, dtype=np.float32).reshape(-1)
+
     def run_once(text: str, lang: str) -> tuple[float, float, float]:
         """(ttfa_ms, total_ms, audio_ms) одного стримингового синтеза."""
         t0 = time.perf_counter()
@@ -97,9 +126,9 @@ def main() -> int:
         for piece in model.generate_streaming(text=text, **kwargs):
             if first_at is None:
                 first_at = (time.perf_counter() - t0) * 1000.0
-            n += len(piece)
+            n += piece_samples(piece)
         total_ms = (time.perf_counter() - t0) * 1000.0
-        audio_ms = n / 2 / SAMPLE_RATE * 1000.0
+        audio_ms = n / engine_sr * 1000.0
         return first_at or 0.0, total_ms, audio_ms
 
     results: dict[str, object] = {}
@@ -191,6 +220,26 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(artifact, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"saved: {out}")
+
+    if args.samples_dir:
+        import wave
+
+        sdir = Path(args.samples_dir)
+        sdir.mkdir(parents=True, exist_ok=True)
+        extra = [("ru_long", "ru", "Мы уже всё решили, так что завтра я просто приеду к тебе после работы, и мы спокойно поговорим."),
+                 ("he_seams", "he", "את בכלל לא שומעת אותי, כשאת פשוט מדברת בשקט")]
+        todo = [(c["name"], c["lang"], c["text"]) for c in CASES if "phrase" in c["name"]] + extra
+        for name, lang, text in todo:
+            kwargs = {"language": lang} if _lang_kw else {}
+            chunks = [piece_f32(p) for p in model.generate_streaming(text=text, **kwargs)]
+            audio = np.concatenate(chunks) if chunks else np.zeros(1, np.float32)
+            pcm = (np.clip(audio, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+            with wave.open(str(sdir / f"voxcpm_{name}.wav"), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(engine_sr)
+                w.writeframes(pcm)
+            print(f"образец {name}: {len(pcm) / 2 / engine_sr:.2f} s @ {engine_sr} Гц")
     return 0
 
 

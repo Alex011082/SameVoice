@@ -48,7 +48,10 @@ variables = {"input": {
     "imageName": "runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04",
     "ports": "8000/http",
     "dockerArgs": cmd,
-    "env": [{"key": "HF_HOME", "value": "/workspace/hf"}],
+    "env": [{"key": "HF_HOME", "value": "/workspace/hf"}] + [
+        {"key": k[len("POD_ENV_"):], "value": v}
+        for k, v in os.environ.items() if k.startswith("POD_ENV_")
+    ],
 }}
 payload = json.dumps({"query": mutation, "variables": variables})
 proc = subprocess.run(
