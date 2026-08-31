@@ -6,7 +6,12 @@ import {
   startPhoneVerification,
   verifyPhoneCode,
 } from "../phoneVerification.js";
-import { createUserFromPhone, getUserByPhone } from "../store.js";
+import {
+  createUserFromPhone,
+  getUserByPhone,
+  stage0TestIdentityIdList,
+  STAGE0_AUTO_JOIN_TEST_IDENTITIES,
+} from "../store.js";
 import { apiError } from "../types.js";
 
 const startBody = z.object({ phone: z.string().min(1).max(40) }).strict();
@@ -80,6 +85,21 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       lang: parsed.data.lang,
       gender: parsed.data.gender,
     });
+    // The auto-join is the one side effect of registering that nobody asked
+    // for, so it is stated where an operator will actually see it. The phone
+    // number is deliberately NOT logged: it is the credential this whole route
+    // is built around.
+    req.log.info(
+      {
+        userId: user.id,
+        lang: user.lang,
+        gender: user.gender,
+        autoJoinedTestIdentities: STAGE0_AUTO_JOIN_TEST_IDENTITIES
+          ? stage0TestIdentityIdList()
+          : [],
+      },
+      "phone user registered",
+    );
     return reply.code(201).send({ created: true, user });
   });
 };

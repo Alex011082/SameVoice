@@ -1,4 +1,11 @@
-import { RING_TERMINAL, type CallMode, type RingPollResponse, type RingView } from './types';
+import { byGender } from './russian';
+import {
+  RING_TERMINAL,
+  type CallMode,
+  type Gender,
+  type RingPollResponse,
+  type RingView,
+} from './types';
 
 /**
  * Pure state machine for ringing, both directions.
@@ -409,10 +416,17 @@ export function ringPollDelayMs(state: RingState, opts: { hidden: boolean }): nu
 
 // --- text -----------------------------------------------------------------
 
-export function ringClosedText(state: RingState, callerName: string): string {
+/** Имя и род собеседника: русское прошедшее время согласуется по роду. */
+export interface Named {
+  displayName: string;
+  gender: Gender;
+}
+
+export function ringClosedText(state: RingState, caller: Named): string {
+  const callerName = caller.displayName;
   switch (state.closed) {
     case 'caller_cancelled':
-      return `${callerName} перестал звонить.`;
+      return `${callerName} ${byGender(caller.gender, 'перестал', 'перестала')} звонить.`;
     case 'declined':
       return `Вы отклонили: ${callerName}.`;
     case 'accepted':
@@ -426,13 +440,16 @@ export function ringClosedText(state: RingState, callerName: string): string {
 
 export function outgoingText(state: RingState): string {
   const name = state.outgoing?.to.displayName ?? 'абонент';
+  // Род берётся у того же участника, что и имя; без звонка в работе род
+  // неизвестен, и немаркированная мужская форма — единственный выбор.
+  const gender: Gender = state.outgoing?.to.gender ?? 'u';
   switch (state.outgoingPhase) {
     case 'ringing': {
       const left = state.outgoing?.secondsRemaining ?? 0;
       return left > 0 ? `Звоним: ${name}… ${left} с` : `Звоним: ${name}…`;
     }
     case 'answered':
-      return `${name} ответил.`;
+      return `${name} ${byGender(gender, 'ответил', 'ответила')}.`;
     case 'joining':
       return `Соединяем с ${name}…`;
     case 'cancelling':
@@ -440,9 +457,9 @@ export function outgoingText(state: RingState): string {
     case 'closed':
       switch (state.outgoingClosed) {
         case 'declined':
-          return `${name} отклонил звонок.`;
+          return `${name} ${byGender(gender, 'отклонил', 'отклонила')} звонок.`;
         case 'timeout':
-          return `${name} не ответил.`;
+          return `${name} не ${byGender(gender, 'ответил', 'ответила')}.`;
         case 'cancelled':
           return 'Звонок отменён.';
         case 'joined':
