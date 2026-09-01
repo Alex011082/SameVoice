@@ -393,6 +393,42 @@ http.createServer(async (req, res) => {
       reconcile();
       return send(res, 200, { booking: rec });
     }
+    if (p === '/readiness' && req.method === 'GET') {
+      /* Сколько ждать ИМЕННО ЭТОЙ броне. Четыре минуты — редкий случай:
+       * если бронь попала в горячее гнездо, ждать нечего вовсе, а если под
+       * уже греется под соседнюю бронь, осталось столько, сколько осталось.
+       * Экран прогрева обязан показывать это число, а не среднее по больнице. */
+      const id = u.searchParams.get('bookingId');
+      const bk = bookings.find((x) => x.id === id);
+      if (!bk) return send(res, 404, { error: 'нет такой брони' });
+      if (bk.state !== 'confirmed') return send(res, 200, { state: 'not-confirmed', etaSeconds: null });
+
+      const now = Date.now();
+      const windows = plan(bookings.filter((x) => x.state === 'confirmed'), PARAMS);
+      const w = windows.find((x) => x.items.some((i) => i.id === bk.id));
+      if (!w) return send(res, 200, { state: 'unknown', etaSeconds: null });
+
+      const pod = pods.find((x) => String(x.windowStart) === String(w.start) && x.state !== 'gone');
+      const warmMs = PARAMS.warmMinutes * MIN;
+
+      if (pod && pod.state === 'ready') {
+        return send(res, 200, { state: 'hot', etaSeconds: 0, podId: pod.id,
+          startsInSeconds: Math.max(0, Math.round((bk.startsAt - now) / 1000)),
+          sharedWith: w.items.length - 1 });
+      }
+      if (pod && (pod.state === 'warming' || pod.state === 'creating')) {
+        const spent = now - (pod.createdAt || now);
+        return send(res, 200, { state: 'warming',
+          etaSeconds: Math.max(0, Math.round((warmMs - spent) / 1000)),
+          podId: pod.id || null, sharedWith: w.items.length - 1 });
+      }
+      // Пода ещё нет: он поднимется в warmAt и будет готов через warmMs после.
+      const readyAt = Math.max(now, w.warmAt) + warmMs;
+      return send(res, 200, { state: now >= w.warmAt ? 'starting' : 'scheduled',
+        etaSeconds: Math.round((readyAt - now) / 1000),
+        warmStartsInSeconds: Math.max(0, Math.round((w.warmAt - now) / 1000)),
+        sharedWith: w.items.length - 1 });
+    }
     if (p === '/engine-for' && req.method === 'GET') {
       /* Кто обслуживает ЭТУ пару прямо сейчас. Отвечаем только про готовый
        * под активного гнезда: греющийся под звонку не поможет, а адрес
