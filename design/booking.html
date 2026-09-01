@@ -70,7 +70,8 @@ h1{font:800 34px/1.08 var(--f-disp);margin:12px 0 6px;letter-spacing:-.01em;
 .who .lang{font:300 11px var(--f-text);color:var(--dim);letter-spacing:.16em}
 
 /* дни */
-.days{display:flex;gap:8px;margin:22px 0 16px;overflow-x:auto;padding-bottom:4px}
+.days{display:flex;gap:8px;margin:22px 0 16px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.days::-webkit-scrollbar{display:none}
 .day{flex:none;padding:10px 14px;border-radius:14px;border:1px solid rgba(160,150,255,.16);
   font:400 12px var(--f-text);color:var(--ink2);transition:all var(--d-fast) var(--ease);white-space:nowrap}
 .day b{display:block;font:600 15px var(--f-disp);color:var(--ink);margin-top:2px}
@@ -88,6 +89,14 @@ h1{font:800 34px/1.08 var(--f-disp);margin:12px 0 6px;letter-spacing:-.01em;
   background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--grad) border-box;
   box-shadow:0 0 22px -8px rgba(90,170,255,.7)}
 .tm:disabled{opacity:.3}
+/* слот, где карта уже будет горячей: человеку — без ожидания, нам — без
+   второго пода. Дешёвый для системы выбор делаем самым заметным. */
+.tm.warm{border-color:rgba(255,180,80,.45);color:#ffd9a3;
+  box-shadow:0 0 18px -8px rgba(255,170,60,.8)}
+.tm.warm::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:linear-gradient(135deg,#ffca6a,#ff7a3d);margin-right:7px;vertical-align:middle;
+  box-shadow:0 0 8px rgba(255,150,60,.9)}
+.tm.warm.on{color:var(--ink)}
 .tz{font:300 12px var(--f-text);color:var(--chip);margin-top:8px;font-style:italic}
 
 /* контекст */
@@ -151,6 +160,7 @@ h1{font:800 34px/1.08 var(--f-disp);margin:12px 0 6px;letter-spacing:-.01em;
         <div class="thread"><canvas id="threadcv"></canvas></div>
         <div class="times" id="times"></div>
         <p class="tz" id="tz">у Ронит это будет 19:00 — тот же час, её время</p>
+        <p class="hint" style="margin-top:6px">огонёк — карта уже будет горячей</p>
         <div class="spacer"></div>
         <button class="cta wide" id="propose" disabled>предложить</button>
         <p class="hint" style="text-align:center;margin-top:12px">она подтвердит — и мы позвоним обоим</p>
@@ -334,24 +344,35 @@ h1{font:800 34px/1.08 var(--f-disp);margin:12px 0 6px;letter-spacing:-.01em;
       daysEl.appendChild(b);
     })(d);
   }
+  /* окна, где карта уже горячая по чужим броням (в бою придёт с сервера) */
+  var WARM = {'13:45':1,'14:00':1,'19:00':1,'19:30':1,'20:00':1};
   function buildTimes(){
     timesEl.replaceChildren();
     var now=new Date(), startH = state.day===0 ? now.getHours()+1 : 8;
     for(var h=Math.max(8,startH); h<23; h++){
       [0,30].forEach(function(m){
         var b=document.createElement('button');
-        b.className='tm'; b.textContent=('0'+h).slice(-2)+':'+('0'+m).slice(-2);
+        var label=('0'+h).slice(-2)+':'+('0'+m).slice(-2);
+        b.className='tm'+(WARM[label]?' warm':''); b.textContent=label;
+        if (WARM[label]) b.title='карта уже будет горячей — позвоним сразу';
         b.addEventListener('click',function(){
           state.time=b.textContent;
           [].forEach.call(timesEl.children,function(x){x.classList.remove('on');});
           b.classList.add('on');
           document.getElementById('propose').disabled=false;
-          document.getElementById('tz').textContent='у Ронит это будет '+state.time+' — тот же час, её время';
+          var warm = !!WARM[state.time];
+          document.getElementById('tz').textContent = warm
+            ? 'в это время у нас уже тепло — позвоним сразу, без ожидания'
+            : 'у Ронит это будет '+state.time+' — тот же час, её время';
+          document.getElementById('tz').style.color = warm ? '#ffd9a3' : '';
         });
         timesEl.appendChild(b);
       });
     }
     state.time=null; document.getElementById('propose').disabled=true;
+    /* прокручиваем к первому тёплому слоту: человек сразу видит выгодное время */
+    var firstWarm = timesEl.querySelector('.tm.warm');
+    if (firstWarm) timesEl.scrollLeft = Math.max(0, firstWarm.offsetLeft - 60);
   }
   buildTimes();
   document.getElementById('propose').addEventListener('click',function(){ show('ctx'); });
