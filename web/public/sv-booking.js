@@ -110,7 +110,16 @@
     '.sv-up{display:flex;align-items:center;gap:12px;padding:12px 2px}',
     '.sv-up-time{font:700 22px var(--font-display);font-variant-numeric:tabular-nums;',
     '  background:var(--voice);-webkit-background-clip:text;background-clip:text;color:transparent}',
-    '.sv-up-who{flex:1;font:400 14px var(--font);color:var(--fg-dim)}'
+    '.sv-up-who{flex:1;font:400 14px var(--font);color:var(--fg-dim);min-width:0}',
+    '.sv-up{flex-wrap:wrap}',
+    '.sv-up-acts{display:flex;gap:8px;flex:0 0 auto}',
+    '.sv-up-btn{min-height:38px;padding:9px 14px;border-radius:var(--pill);',
+    '  font:400 11px var(--font);letter-spacing:.12em;color:var(--fg-dim);',
+    '  border:1px solid var(--line);background:none;transition:color .2s,border-color .2s}',
+    '.sv-up-btn:active{color:var(--fg);border-color:var(--line-strong)}',
+    '.sv-up-btn.yes{color:var(--fg);border-color:transparent;',
+    '  background:linear-gradient(var(--bg-lift),var(--bg-lift)) padding-box,var(--voice) border-box}',
+    '.sv-up-btn:disabled{opacity:.5}'
   ].join('\n');
   document.head.appendChild(css);
 
@@ -429,7 +438,7 @@
       box.replaceChildren();
       var lbl = document.createElement('span');
       lbl.className = 'sv-lbl';
-      lbl.textContent = 'договорено';
+      lbl.textContent = 'встречи';
       box.appendChild(lbl);
       mine.forEach(function (b) {
         var row = document.createElement('div');
@@ -438,11 +447,40 @@
         var t = document.createElement('span');
         t.className = 'sv-up-time';
         t.textContent = ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2);
+
         var who = document.createElement('span');
         who.className = 'sv-up-who';
-        who.textContent = (b.state === 'proposed' ? 'ждём ответа · ' : '') +
-          dt.getDate() + '.' + ('0' + (dt.getMonth() + 1)).slice(-2);
+        var date = dt.getDate() + '.' + ('0' + (dt.getMonth() + 1)).slice(-2);
+        // Чей сейчас ход, видно с первого взгляда: приглашённому — «вас зовут»,
+        // инициатору — «ждём ответа». Без этого непонятно, чего ждать.
+        var менязовут = b.state === 'proposed' && me && b.withUserId === me;
+        who.textContent = b.state === 'confirmed' ? 'договорено · ' + date
+          : менязовут ? 'вас зовут поговорить · ' + date
+          : 'ждём ответа · ' + date;
         row.append(t, who);
+
+        var acts = document.createElement('div');
+        acts.className = 'sv-up-acts';
+        function act(label, kind, cls) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sv-up-btn' + (cls ? ' ' + cls : '');
+          btn.textContent = label;
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            api('/bookings/' + encodeURIComponent(b.id) + '/' + kind, { method: 'POST' })
+              .then(function (r) {
+                if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || r.status); });
+                loadUpcoming();
+              })
+              .catch(function (e) { btn.disabled = false; btn.textContent = String(e.message || e).slice(0, 24); });
+          });
+          acts.appendChild(btn);
+        }
+        if (менязовут) { act('принять', 'confirm', 'yes'); act('отказаться', 'cancel'); }
+        else { act('отменить', 'cancel'); }
+        row.appendChild(acts);
+
         box.appendChild(row);
         watchWarmup(b);
       });
