@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SameVoice — Берег</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============ БЕРЕГ: солнце и море ============
+     Два тепла: SameVoice = морская сторона (лагуна),
+     обычный номер = солнечная сторона (янтарь).
+     Контакты — галька на берегу.                    */
+
+  :root{
+    --sun:      #FFAE3B;
+    --sun-hot:  #F0761F;
+    --sun-soft: #FFD394;
+    --sea:      #0FA7A0;
+    --sea-deep: #0A7E7E;
+    --sea-soft: #9FE0D6;
+    --ink:      #33241A;
+    --ink-soft: #8A6A50;
+    --milk:     #FFFDF7;
+    --disp: 'Comfortaa','Rubik','Arial Rounded MT Bold','Trebuchet MS',sans-serif;
+    --body: 'Rubik','Helvetica Neue',Arial,sans-serif;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    font-family:var(--body);
+    color:var(--ink);
+    background:
+      radial-gradient(60vmax 60vmax at 78% -12%, rgba(255,174,59,.35), transparent 60%),
+      radial-gradient(70vmax 50vmax at 18% 108%, rgba(15,167,160,.28), transparent 60%),
+      linear-gradient(165deg,#FFF0D2 0%, #FBE3BC 45%, #CFEDE4 100%);
+    display:grid;
+    place-items:center;
+    min-height:100vh;
+    overflow:hidden;
+  }
+
+  /* ---------- телефонная рамка ---------- */
+  #stage{ position:relative; width:390px; height:844px; }
+  @media (min-width:520px) and (min-height:900px){
+    #stage{
+      border-radius:56px;
+      box-shadow: 0 40px 90px rgba(70,40,10,.35), 0 6px 18px rgba(70,40,10,.22);
+      border:11px solid #37281E;
+      overflow:hidden;
+      background:#37281E;
+    }
+    #stage::after{ /* динамик */
+      content:''; position:absolute; top:12px; left:50%; transform:translateX(-50%);
+      width:98px; height:7px; border-radius:5px; background:rgba(255,244,220,.16);
+      z-index:120; pointer-events:none;
+    }
+  }
+  @media not ((min-width:520px) and (min-height:900px)){
+    #stage{ width:100vw; height:100vh;height:100dvh; }
+  }
+  .stage-hint{
+    position:fixed; bottom:22px; left:0; right:0; text-align:center;
+    font-size:14px; color:rgba(70,45,20,.55); letter-spacing:.02em; pointer-events:none;
+  }
+  @media not ((min-width:600px) and (min-height:920px)){ .stage-hint{ display:none; } }
+
+  #app{
+    position:absolute; inset:0; overflow:hidden;
+    background:
+      radial-gradient(320px 220px at 84% -40px, rgba(255,174,59,.45), transparent 70%),
+      linear-gradient(180deg,#FFF3D6 0%, #FFEAC2 42%, #E7F5EE 78%, #D5EFE7 100%);
+    user-select:none; -webkit-user-select:none;
+  }
+
+  /* ============ ЭКРАН 1: БЕРЕГ ============ */
+  #home{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    padding:30px 0 0;
+  }
+  .brand{
+    padding:0 24px 2px; font-family:var(--disp); font-weight:700; font-size:15px;
+    letter-spacing:.06em;
+  }
+  .brand b{ color:var(--sun-hot); font-weight:700; }
+  .brand i{ color:var(--sea-deep); font-style:normal; }
+
+  .hello{ display:flex; align-items:center; gap:12px; padding:10px 24px 4px; }
+  .hello h1{
+    font-family:var(--disp); font-weight:700; font-size:26px; line-height:1.08;
+    letter-spacing:-.01em; white-space:nowrap;
+  }
+  .hello .he{
+    font-size:15px; color:var(--ink-soft); font-weight:500; white-space:nowrap;
+  }
+  .sunmark{ width:44px; height:44px; flex:none; margin-bottom:-2px; }
+  .sunmark .rays{ transform-origin:50% 50%; animation:spin 26s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+
+  .hint{
+    display:flex; align-items:center; gap:8px;
+    padding:6px 24px 12px; font-size:14.5px; color:var(--ink-soft); font-weight:500;
+  }
+  .hint svg{ flex:none; }
+  .hint .harr{ animation:nudge 2.6s ease-in-out infinite; }
+  @keyframes nudge{ 0%,100%{transform:translateX(0)} 50%{transform:translateX(7px)} }
+
+  .list{
+    flex:1; overflow-y:auto; overscroll-behavior:contain;
+    padding:8px 18px 110px; scrollbar-width:none;
+  }
+  .list::-webkit-scrollbar{ display:none; }
+
+  /* ---------- карточка-галька ---------- */
+  .cardwrap{ position:relative; margin:0 0 16px; }
+  .calldisc{
+    position:absolute; left:10px; top:50%; width:74px; height:74px;
+    transform:translateY(-50%) scale(0); border-radius:50%;
+    display:grid; place-items:center; color:#fff;
+    transition:transform .25s cubic-bezier(.34,1.4,.5,1);
+    z-index:0;
+  }
+  .card{
+    position:relative; z-index:1;
+    display:grid; grid-template-columns:70px 1fr 58px; gap:14px; align-items:center;
+    padding:16px 14px 14px 16px;
+    touch-action:pan-y; cursor:grab;
+    transition:transform .3s cubic-bezier(.3,1.3,.45,1), box-shadow .3s ease;
+    will-change:transform;
+  }
+  .card.dragging{ transition:none; cursor:grabbing; }
+  .card.pressed{ box-shadow:0 10px 26px rgba(80,50,15,.16); }
+
+  /* галька: неровные скругления, лёгкий наклон через одну */
+  .cardwrap:nth-child(odd)  .card{ border-radius:30px 40px 26px 44px / 38px 28px 42px 26px; transform:rotate(-.4deg); }
+  .cardwrap:nth-child(even) .card{ border-radius:42px 26px 40px 28px / 28px 40px 26px 42px; transform:rotate(.5deg); }
+
+  .card.sv{
+    background:linear-gradient(135deg,#F4FCF9 0%, #E1F4EE 100%);
+    border:2px solid rgba(15,167,160,.30);
+    box-shadow:0 6px 18px rgba(10,126,126,.10);
+  }
+  .card.tel{
+    background:linear-gradient(135deg,#FFF9EC 0%, #FFEECD 100%);
+    border:2px solid rgba(240,118,31,.30);
+    box-shadow:0 6px 18px rgba(240,118,31,.10);
+  }
+
+  /* аватары: морская капля vs солнечный круг */
+  .ava{
+    width:68px; height:68px; display:grid; place-items:center; position:relative;
+    font-family:var(--disp); font-weight:700; font-size:29px; color:#fff;
+    text-shadow:0 2px 6px rgba(0,60,60,.25);
+  }
+  .card.sv .ava{
+    border-radius:47% 53% 55% 45% / 55% 47% 53% 45%;
+    animation:blob 7s ease-in-out infinite;
+  }
+  @keyframes blob{
+    0%,100%{ border-radius:47% 53% 55% 45% / 55% 47% 53% 45%; }
+    50%    { border-radius:55% 45% 47% 53% / 45% 55% 45% 55%; }
+  }
+  .card.tel .ava{ border-radius:50%; text-shadow:0 2px 6px rgba(140,60,0,.3); }
+  .card.tel .ava::after{ /* лучи-набор: пунктирное кольцо диска */
+    content:''; position:absolute; inset:-7px; border-radius:50%;
+    border:2.5px dashed rgba(240,118,31,.55);
+    animation:spin 30s linear infinite;
+  }
+
+  .cmid{ min-width:0; }
+  .nrow{ display:flex; align-items:baseline; gap:9px; }
+  .cname{ font-family:var(--disp); font-weight:700; font-size:22.5px; letter-spacing:0; }
+  .cname-he{ font-size:16px; color:var(--ink-soft); font-weight:500; }
+
+  /* линия связи: волна (море) или пунктир-номер (солнце) */
+  .link-line{ margin-top:3px; height:16px; display:flex; align-items:center; gap:8px; overflow:hidden; }
+  .seawave{ width:78px; height:12px; color:var(--sea); overflow:visible; flex:none; }
+  .seawave path{ animation:wavemove 2.6s linear infinite; }
+  @keyframes wavemove{ to{ transform:translateX(-30px);} }
+  .card.pressed .seawave path{ animation-duration:1s; }
+  .tel-num{
+    font-size:13.5px; font-weight:600; color:#B4651B; letter-spacing:.01em;
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .tel-dots{ flex:none; width:22px; border-top:3px dotted rgba(240,118,31,.55); }
+
+  /* чипы памяти пары = темы перед звонком */
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+  .chip{
+    position:relative; border:0; font:inherit; cursor:pointer;
+    font-size:13.5px; font-weight:500; color:var(--ink);
+    padding:6px 12px 6px 24px; border-radius:20px 14px 20px 14px;
+    background:rgba(255,255,255,.72);
+    box-shadow:inset 0 0 0 1.5px rgba(51,36,26,.13);
+    transition:all .22s ease;
+  }
+  .chip::before{ /* зёрнышко памяти -> солнышко темы */
+    content:''; position:absolute; left:10px; top:50%; transform:translateY(-50%);
+    width:7px; height:7px; border-radius:50%;
+    background:rgba(51,36,26,.25); transition:all .22s ease;
+  }
+  .chip.on{
+    background:linear-gradient(120deg,#FFE2AC,#FFD08A);
+    box-shadow:inset 0 0 0 2px var(--sun-hot), 0 3px 10px rgba(240,118,31,.25);
+    color:#7A3D08;
+  }
+  .chip.on::before{
+    background:var(--sun-hot); width:9px; height:9px;
+    box-shadow:0 0 0 3px rgba(240,118,31,.25);
+  }
+  .chip:active{ transform:scale(.94); }
+
+  /* кнопка-трубка */
+  .callbtn{
+    width:56px; height:56px; border:0; cursor:pointer; color:#fff;
+    display:grid; place-items:center; position:relative;
+    transition:transform .2s cubic-bezier(.34,1.5,.5,1);
+  }
+  .card.sv  .callbtn{ border-radius:46% 54% 52% 48% / 52% 48% 54% 46%; }
+  .card.tel .callbtn{ border-radius:50%; }
+  .callbtn:active{ transform:scale(.9); }
+  .callbtn svg{ filter:drop-shadow(0 2px 3px rgba(0,0,0,.2)); }
+
+  /* появление карточек */
+  .cardwrap{ animation:arrive .6s cubic-bezier(.25,1.2,.4,1) both; }
+  .cardwrap:nth-child(1){ animation-delay:.05s } .cardwrap:nth-child(2){ animation-delay:.12s }
+  .cardwrap:nth-child(3){ animation-delay:.19s } .cardwrap:nth-child(4){ animation-delay:.26s }
+  .cardwrap:nth-child(5){ animation-delay:.33s } .cardwrap:nth-child(6){ animation-delay:.40s }
+  @keyframes arrive{ from{ opacity:0; transform:translateY(26px);} to{ opacity:1; transform:none;} }
+
+  .card.nudged{ animation:peek .55s cubic-bezier(.3,1.4,.5,1); }
+  @keyframes peek{ 0%{transform:translateX(0)} 40%{transform:translateX(34px)} 100%{transform:translateX(0)} }
+
+  /* ============ ЭКРАН 2: ЗВОНОК ============ */
+  #call{
+    position:absolute; inset:0; z-index:20;
+    display:flex; flex-direction:column;
+    background:
+      radial-gradient(300px 190px at 50% 108%, rgba(255,150,50,.50), transparent 70%),
+      radial-gradient(420px 300px at 50% -80px, rgba(23,130,140,.6), transparent 70%),
+      linear-gradient(180deg,#0E3540 0%, #0D4A4A 55%, #1A5A50 100%);
+    color:#FFF6E6;
+    transform:translateY(103%);
+    transition:transform .5s cubic-bezier(.3,1,.3,1);
+  }
+  #app.in-call #call{ transform:translateY(0); }
+  #call.snap{ transition:none; }
+  #call.drop{ transition:transform .45s cubic-bezier(.5,0,.75,.4); }
+
+  .call-top{ text-align:center; padding:46px 24px 4px; }
+  .call-name{ font-family:var(--disp); font-weight:700; font-size:30px; }
+  .call-name-he{ font-size:17px; color:rgba(255,246,230,.66); margin-top:2px; font-weight:500; }
+  .call-timer{
+    margin-top:8px; font-weight:600; font-size:17px; letter-spacing:.14em;
+    color:var(--sun-soft); font-variant-numeric:tabular-nums;
+  }
+  .call-chips{ display:flex; justify-content:center; flex-wrap:wrap; gap:7px; margin-top:12px; min-height:0; }
+  .cchip{
+    font-size:13px; font-weight:500; color:#FFE9C4;
+    padding:5px 12px; border-radius:16px 11px 16px 11px;
+    background:rgba(255,220,160,.13);
+    box-shadow:inset 0 0 0 1.5px rgba(255,211,148,.4);
+  }
+
+  .wavezone{ position:relative; flex:1; min-height:0; touch-action:none; cursor:ns-resize; }
+  #wave{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  /* регулятор громкости пальцем вверх/вниз */
+  .volwrap{
+    position:absolute; right:16px; top:50%; transform:translateY(-50%);
+    height:180px; width:34px; display:flex; justify-content:center;
+    opacity:0; transition:opacity .3s ease; pointer-events:none;
+  }
+  .volwrap.show{ opacity:1; }
+  .voltrack{ width:5px; height:100%; border-radius:3px; background:rgba(255,246,230,.22); position:relative; }
+  .volsun{
+    position:absolute; left:50%; transform:translate(-50%,50%);
+    width:26px; height:26px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #FFD790, var(--sun-hot));
+    box-shadow:0 0 18px rgba(255,174,59,.75); bottom:50%;
+  }
+
+  /* направление перевода */
+  .dirstrip{
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    padding:2px 20px 0;
+  }
+  .token{
+    display:flex; align-items:center; gap:8px;
+    padding:8px 13px; border-radius:22px 15px 22px 15px;
+    background:rgba(255,246,230,.09);
+    box-shadow:inset 0 0 0 1.5px rgba(255,246,230,.18);
+    transition:all .45s ease; transform:scale(.96);
+  }
+  .token .tk-name{ font-family:var(--disp); font-weight:700; font-size:15.5px; }
+  .token .tk-lang{
+    font-size:11.5px; font-weight:700; letter-spacing:.08em; padding:3px 8px;
+    border-radius:10px; background:rgba(255,246,230,.14); color:rgba(255,246,230,.8);
+    transition:all .4s ease;
+  }
+  .token.talking{
+    background:rgba(255,214,140,.16);
+    box-shadow:inset 0 0 0 2px rgba(255,197,110,.65), 0 0 22px rgba(255,174,59,.28);
+    transform:scale(1.05);
+  }
+  .token .tk-lang.hearing{
+    background:var(--sun-hot); color:#FFF6E6;
+    box-shadow:0 0 14px rgba(240,118,31,.6);
+  }
+  .flow{ display:flex; gap:6px; direction:ltr; }
+  .flow i{
+    width:7px; height:7px; border-radius:50%; background:var(--sun-soft);
+    opacity:.25; animation:flowdot 1.15s linear infinite;
+  }
+  .flow i:nth-child(2){ animation-delay:.14s } .flow i:nth-child(3){ animation-delay:.28s }
+  .flow i:nth-child(4){ animation-delay:.42s } .flow i:nth-child(5){ animation-delay:.56s }
+  @keyframes flowdot{ 0%{opacity:.15; transform:translateX(-7px) scale(.7)} 45%{opacity:1; transform:translateX(0) scale(1.05)} 100%{opacity:.15; transform:translateX(7px) scale(.7)} }
+  .dirstrip.to-me .flow{ transform:scaleX(-1); }
+
+  /* субтитры: крупно — что слышит собеседник/ты */
+  .captions{ min-height:96px; padding:12px 26px 6px; text-align:center; }
+  .cap-big{
+    font-size:21px; font-weight:600; line-height:1.3; color:#FFF6E6;
+    animation:capin .5s ease both;
+  }
+  .cap-small{
+    margin-top:6px; font-size:14.5px; color:rgba(255,246,230,.55);
+    animation:capin .5s .1s ease both;
+  }
+  @keyframes capin{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:none;} }
+
+  /* положить трубку — потянуть нить вниз */
+  .hangup{
+    align-self:center; margin:6px 0 26px; display:flex; flex-direction:column;
+    align-items:center; gap:2px; touch-action:none; cursor:grab; z-index:5;
+  }
+  .hangup .cord{ width:3px; height:20px; border-radius:2px; background:rgba(255,246,230,.35); }
+  .hangup .knob{
+    display:flex; align-items:center; gap:9px; padding:11px 20px;
+    border-radius:26px 18px 26px 18px;
+    background:rgba(255,110,70,.16);
+    box-shadow:inset 0 0 0 2px rgba(255,140,90,.5);
+    font-size:15.5px; font-weight:600; color:#FFD9C2;
+  }
+  .hangup .knob svg{ animation:pulldown 2.2s ease-in-out infinite; }
+  @keyframes pulldown{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(4px)} }
+
+  /* круг-раскрытие перехода */
+  #reveal{
+    position:absolute; z-index:40; width:72px; height:72px; border-radius:50%;
+    transform:scale(0); pointer-events:none;
+  }
+  #reveal.grow{ transition:transform .42s cubic-bezier(.5,0,.6,1); transform:scale(16); }
+  #reveal.fade{ transition:opacity .4s ease; opacity:0; }
+
+  /* ---------- reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{ animation-duration:.01s !important; animation-iteration-count:1 !important; }
+    #call{ transition-duration:.01s; }
+    .card, .callbtn{ transition-duration:.01s; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="app">
+
+    <!-- ================= БЕРЕГ ================= -->
+    <section id="home">
+      <div class="brand"><b>same</b><i>voice</i></div>
+      <div class="hello">
+        <svg class="sunmark" viewBox="0 0 44 44" aria-hidden="true">
+          <g class="rays" stroke="#F0761F" stroke-width="3" stroke-linecap="round">
+            <line x1="22" y1="3"  x2="22" y2="9"/><line x1="22" y1="35" x2="22" y2="41"/>
+            <line x1="3"  y1="22" x2="9"  y2="22"/><line x1="35" y1="22" x2="41" y2="22"/>
+            <line x1="8.6" y1="8.6" x2="12.8" y2="12.8"/><line x1="31.2" y1="31.2" x2="35.4" y2="35.4"/>
+            <line x1="35.4" y1="8.6" x2="31.2" y2="12.8"/><line x1="12.8" y1="31.2" x2="8.6" y2="35.4"/>
+          </g>
+          <circle cx="22" cy="22" r="9.5" fill="#FFAE3B"/>
+          <circle cx="22" cy="22" r="9.5" fill="none" stroke="#F0761F" stroke-width="2"/>
+        </svg>
+        <h1 id="greetRu">Добрый день!</h1>
+        <span class="he" id="greetHe" dir="rtl" lang="he">צהריים טובים</span>
+      </div>
+      <div class="hint">
+        <svg class="harr" width="26" height="14" viewBox="0 0 26 14" aria-hidden="true">
+          <path d="M1 7 H21 M15 1.5 L21.5 7 L15 12.5" fill="none" stroke="#8A6A50" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        потяни карточку — и говорите
+      </div>
+      <div class="list" id="list"></div>
+    </section>
+
+    <!-- ================= ЗВОНОК ================= -->
+    <section id="call">
+      <div class="call-top">
+        <div class="call-name" id="callName">—</div>
+        <div class="call-name-he" id="callNameHe"></div>
+        <div class="call-timer" id="callTimer">00:00</div>
+        <div class="call-chips" id="callChips"></div>
+      </div>
+
+      <div class="wavezone" id="wavezone">
+        <canvas id="wave"></canvas>
+        <div class="volwrap" id="volwrap"><div class="voltrack"><div class="volsun" id="volsun"></div></div></div>
+      </div>
+
+      <div class="dirstrip" id="dirstrip">
+        <div class="token" id="tokMe">
+          <span class="tk-name">ты</span>
+          <span class="tk-lang" id="langMe">РУ</span>
+        </div>
+        <div class="flow" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="token" id="tokThem">
+          <span class="tk-name" id="tokThemName">—</span>
+          <span class="tk-lang" id="langThem">עב</span>
+        </div>
+      </div>
+
+      <div class="captions">
+        <div class="cap-big" id="capBig"></div>
+        <div class="cap-small" id="capSmall"></div>
+      </div>
+
+      <div class="hangup" id="hangup">
+        <div class="cord"></div>
+        <div class="knob">
+          <svg width="16" height="18" viewBox="0 0 16 18" aria-hidden="true">
+            <path d="M8 1 V13 M2.5 8.5 L8 14.5 L13.5 8.5" fill="none" stroke="#FFD9C2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          положить трубку
+        </div>
+      </div>
+    </section>
+
+    <div id="reveal"></div>
+  </div>
+</div>
+<div class="stage-hint">потяни карточку вправо — позвонить &nbsp;·&nbsp; на звонке: палец вверх/вниз — громкость, потяни нить — положить трубку</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var TAU = Math.PI*2;
+
+  /* ================= данные ================= */
+  var ME_COLOR = '#FFB13D';
+
+  var CONTACTS = [
+    { id:'mama', name:'мама', nameHe:'', letter:'М', type:'sv', lang:'ru',
+      hue1:'#2BB3A3', hue2:'#0F7E72',
+      timbre:{ f:[0.9,1.8,2.9], sp:[1.1,1.7,2.5] },
+      chips:['врач в четверг','огурцы на балконе'],
+      phrases:[
+        {who:'them', ru:'Ну как вы там? Дождь у вас?'},
+        {who:'me',   ru:'Всё хорошо, мам. Тепло, море рядом.'},
+        {who:'them', ru:'А огурцы мои взошли! Все до одного.'},
+        {who:'me',   ru:'Пришли фото — покажу Дане.'}
+      ]},
+    { id:'tzipi', name:'Ципи', nameHe:'ציפי', letter:'צ', type:'sv', lang:'he',
+      hue1:'#19A9C9', hue2:'#0E7FA0',
+      timbre:{ f:[1.3,2.6,4.2], sp:[1.7,2.6,3.6] },
+      chips:['соседка сверху','учишь с ней иврит'],
+      phrases:[
+        {who:'them', ru:'Приходи на ужин в пятницу', he:'בואי לארוחת ערב ביום שישי'},
+        {who:'me',   ru:'Спасибо! Что принести?', he:'תודה! מה להביא?'},
+        {who:'them', ru:'Только саму себя, дорогая', he:'רק את עצמך, מתוקה'},
+        {who:'me',   ru:'Тогда до пятницы!', he:'אז עד יום שישי!'}
+      ]},
+    { id:'amin', name:'Амин', nameHe:'', letter:'А', type:'tel', lang:'he',
+      tel:'+972 52-384-7160',
+      hue1:'#F5A623', hue2:'#E07A12',
+      timbre:{ f:[1.0,2.1,3.4], sp:[1.5,2.2,3.1] },
+      chips:['прораб','смета в пятницу'],
+      phrases:[
+        {who:'me',   ru:'Амин, смета будет к пятнице?', he:'אמין, ההצעה תהיה מוכנה עד שישי?'},
+        {who:'them', ru:'Да, пришлю завтра утром', he:'כן, אשלח מחר בבוקר'},
+        {who:'me',   ru:'Отлично, жду. Спасибо!', he:'מצוין, אני מחכה. תודה!'}
+      ]},
+    { id:'igor', name:'Игорь', nameHe:'', letter:'И', type:'sv', lang:'ru',
+      hue1:'#22A98A', hue2:'#0F7E6B',
+      timbre:{ f:[0.95,2.0,3.1], sp:[1.3,2.0,2.8] },
+      chips:['сосед по ульпану','говорили про садик'],
+      phrases:[
+        {who:'them', ru:'Слушай, про садик узнал — есть место!'},
+        {who:'me',   ru:'Серьёзно? Отличная новость!'},
+        {who:'them', ru:'Завтра сходим вместе, покажу.'}
+      ]},
+    { id:'ronit', name:'Ронит', nameHe:'רונית', letter:'ר', type:'tel', lang:'he',
+      tel:'+972 54-777-0913',
+      hue1:'#F6C445', hue2:'#E08F1E',
+      timbre:{ f:[1.25,2.5,4.0], sp:[1.6,2.5,3.4] },
+      chips:['купат холим','анализы во вторник'],
+      phrases:[
+        {who:'them', ru:'Анализы в норме, всё хорошо', he:'התוצאות תקינות, הכול בסדר'},
+        {who:'me',   ru:'Спасибо большое, Ронит!', he:'תודה רבה, רונית!'},
+        {who:'them', ru:'Приходите на приём через месяц', he:'תבואו לביקורת בעוד חודש'}
+      ]},
+    { id:'danya', name:'Даня', nameHe:'', letter:'Д', type:'sv', lang:'ru',
+      hue1:'#0FB9C9', hue2:'#0A8CA3',
+      timbre:{ f:[1.15,2.3,3.7], sp:[1.5,2.3,3.2] },
+      chips:['сын','экзамен по вождению'],
+      phrases:[
+        {who:'them', ru:'Пап, я сдал вождение!'},
+        {who:'me',   ru:'Красавец! Вечером отметим.'},
+        {who:'them', ru:'Куплю торт по дороге.'}
+      ]}
+  ];
+
+  /* ================= утилиты ================= */
+  function el(id){ return document.getElementById(id); }
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+  function hexRgb(h){
+    return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+  }
+  function mix(h1,h2,k,alpha){
+    var a=hexRgb(h1), b=hexRgb(h2);
+    var r=Math.round(a[0]+(b[0]-a[0])*k), g=Math.round(a[1]+(b[1]-a[1])*k), bl=Math.round(a[2]+(b[2]-a[2])*k);
+    return 'rgba('+r+','+g+','+bl+','+(alpha==null?1:alpha)+')';
+  }
+
+  /* ================= приветствие по часам ================= */
+  (function(){
+    var h = new Date().getHours(), ru, he;
+    if(h<5){ ru='Доброй ночи'; he='לילה טוב'; }
+    else if(h<12){ ru='Доброе утро!'; he='בוקר טוב'; }
+    else if(h<18){ ru='Добрый день!'; he='צהריים טובים'; }
+    else { ru='Добрый вечер!'; he='ערב טוב'; }
+    el('greetRu').textContent = ru;
+    el('greetHe').textContent = he;
+  })();
+
+  /* ================= построение списка ================= */
+  var ICON_SV = '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5 C4 5 3.6 6.4 4.6 8.2 c1.8 3.4 4.4 6.4 7.2 8.4 1.8 1.3 3.4 1 4.9-.5 l.9-.9 c.6-.6.6-1.5 0-2.1 l-2.1-2.1 c-.6-.6-1.5-.6-2.1 0 l-.6.6 c-1.6-1.2-3-2.7-4.2-4.5 l.6-.6 c.6-.6.6-1.5 0-2.1 L7.1 2.3 c-.6-.6-1.5-.6-2.1 0 z" fill="currentColor"/><path d="M15 4 q2 2.2 0 4.4 M18 2.6 q3.2 3.6 0 7.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  var ICON_TEL = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5 C4 5 3.6 6.4 4.6 8.2 c1.8 3.4 4.4 6.4 7.2 8.4 1.8 1.3 3.4 1 4.9-.5 l.9-.9 c.6-.6.6-1.5 0-2.1 l-2.1-2.1 c-.6-.6-1.5-.6-2.1 0 l-.6.6 c-1.6-1.2-3-2.7-4.2-4.5 l.6-.6 c.6-.6.6-1.5 0-2.1 L7.1 2.3 c-.6-.6-1.5-.6-2.1 0 z" fill="currentColor"/></svg>';
+  var WAVE_SVG = '<svg class="seawave" viewBox="0 0 78 12" aria-hidden="true"><path d="M-6 6 Q1.5 0 9 6 T24 6 T39 6 T54 6 T69 6 T84 6 T99 6 T114 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+
+  var listEl = el('list');
+  CONTACTS.forEach(function(c){
+    var wrap = document.createElement('div');
+    wrap.className = 'cardwrap';
+
+    var disc = document.createElement('div');
+    disc.className = 'calldisc';
+    disc.style.background = 'radial-gradient(circle at 35% 30%, '+c.hue1+', '+c.hue2+')';
+    disc.innerHTML = c.type==='sv' ? ICON_SV : ICON_TEL;
+    wrap.appendChild(disc);
+
+    var card = document.createElement('div');
+    card.className = 'card '+c.type;
+
+    var ava = '<div class="ava" style="background:radial-gradient(circle at 32% 28%, '+c.hue1+', '+c.hue2+')">'+c.letter+'</div>';
+
+    var nameRow = '<div class="nrow"><span class="cname">'+c.name+'</span>'+
+      (c.nameHe ? '<bdi class="cname-he" dir="rtl" lang="he">'+c.nameHe+'</bdi>' : '')+'</div>';
+
+    var link = c.type==='sv'
+      ? '<div class="link-line" style="color:'+c.hue2+'">'+WAVE_SVG+'</div>'
+      : '<div class="link-line"><span class="tel-dots"></span><span class="tel-num">'+c.tel+'</span></div>';
+
+    var chips = '<div class="chips">'+ c.chips.map(function(t){
+        return '<button class="chip" type="button">'+t+'</button>';
+      }).join('') +'</div>';
+
+    var btnGrad = 'background:radial-gradient(circle at 35% 30%, '+c.hue1+', '+c.hue2+')';
+    var btn = '<button class="callbtn" type="button" aria-label="Позвонить: '+c.name+'" style="'+btnGrad+'">'+
+      (c.type==='sv' ? ICON_SV : ICON_TEL)+'</button>';
+
+    card.innerHTML = ava + '<div class="cmid">'+nameRow+link+chips+'</div>' + btn;
+    wrap.appendChild(card);
+    listEl.appendChild(wrap);
+
+    setupCard(card, disc, c);
+  });
+
+  /* чипы: выбор темы перед звонком */
+  listEl.addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if(!chip) return;
+    chip.classList.toggle('on');
+    e.stopPropagation();
+  });
+
+  /* ================= жест: потяни карточку — позвонить ================= */
+  function setupCard(card, disc, contact){
+    var startX=0, startY=0, dx=0, dragging=false, active=false;
+    var MAXX = 150, CALL_AT = 104;
+
+    card.addEventListener('pointerdown', function(e){
+      if(e.target.closest('.chip')) return;
+      active = true; dragging = false; dx = 0;
+      startX = e.clientX; startY = e.clientY;
+      card.classList.add('pressed');
+      try{ card.setPointerCapture(e.pointerId); }catch(_){}
+    });
+
+    card.addEventListener('pointermove', function(e){
+      if(!active) return;
+      var mx = e.clientX-startX, my = e.clientY-startY;
+      if(!dragging){
+        if(Math.abs(mx)>9 && Math.abs(mx)>Math.abs(my)*1.2){
+          dragging = true; card.classList.add('dragging');
+        } else if(Math.abs(my)>12){ cancel(); return; }
+        else return;
+      }
+      dx = mx>0 ? Math.min(mx*0.92, MAXX) : mx*0.12;
+      card.style.transform = 'translateX('+dx+'px)';
+      var p = clamp(dx/CALL_AT, 0, 1);
+      disc.style.transform = 'translateY(-50%) scale('+(p*1.02)+')';
+    });
+
+    function release(e){
+      if(!active) return;
+      var wasDrag = dragging, fdx = dx;
+      cancel();
+      if(wasDrag){
+        if(fdx>=CALL_AT){
+          var r = disc.getBoundingClientRect();
+          startCall(contact, r.left+r.width/2, r.top+r.height/2);
+        }
+      } else if(e && e.target && e.target.closest('.callbtn')){
+        var b = e.target.closest('.callbtn').getBoundingClientRect();
+        startCall(contact, b.left+b.width/2, b.top+b.height/2);
+      } else if(e && e.type==='pointerup'){
+        card.classList.remove('nudged'); void card.offsetWidth;
+        card.classList.add('nudged'); /* подсказка жеста */
+      }
+    }
+    function cancel(){
+      active=false; dragging=false;
+      card.classList.remove('pressed','dragging');
+      card.style.transform='';
+      disc.style.transform='translateY(-50%) scale(0)';
+    }
+    card.addEventListener('pointerup', release);
+    card.addEventListener('pointercancel', function(){ cancel(); });
+    card.addEventListener('animationend', function(){ card.classList.remove('nudged'); });
+  }
+
+  /* ================= звонок ================= */
+  var app = el('app'), callEl = el('call'), reveal = el('reveal');
+  var capBig = el('capBig'), capSmall = el('capSmall');
+  var tokMe = el('tokMe'), tokThem = el('tokThem');
+  var langMe = el('langMe'), langThem = el('langThem');
+  var dirstrip = el('dirstrip');
+  var cv = el('wave'), ctx = cv.getContext('2d');
+  var wavezone = el('wavezone');
+
+  var call = null;   /* активный звонок */
+  var timerInt = null;
+  var cw=0, chh=0;
+
+  function sizeCanvas(){
+    var r = wavezone.getBoundingClientRect();
+    var dpr = window.devicePixelRatio||1;
+    cw = r.width; chh = r.height;
+    cv.width = Math.max(1, Math.round(cw*dpr));
+    cv.height = Math.max(1, Math.round(chh*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', sizeCanvas);
+
+  function startCall(c, px, py){
+    if(call) return;
+    /* круг-раскрытие от места жеста */
+    var stageR = app.getBoundingClientRect();
+    reveal.style.left = (px-stageR.left-36)+'px';
+    reveal.style.top  = (py-stageR.top-36)+'px';
+    reveal.style.background = 'radial-gradient(circle at 40% 35%, '+c.hue1+', '+c.hue2+')';
+    reveal.classList.remove('grow','fade');
+    void reveal.offsetWidth;
+    reveal.classList.add('grow');
+
+    /* шапка звонка */
+    el('callName').textContent = c.name;
+    var heEl = el('callNameHe');
+    if(c.nameHe){ heEl.textContent = c.nameHe; heEl.dir='rtl'; heEl.style.display=''; }
+    else { heEl.textContent=''; heEl.style.display='none'; }
+    el('tokThemName').textContent = c.nameHe || c.name;
+    el('tokThemName').dir = c.nameHe ? 'rtl' : 'ltr';
+    langThem.textContent = c.lang==='he' ? 'עב' : 'РУ';
+
+    /* выбранные темы едут в звонок */
+    var cc = el('callChips'); cc.innerHTML='';
+    var cardChips = [];
+    listEl.querySelectorAll('.cardwrap').forEach(function(w,i){
+      if(CONTACTS[i]===c){
+        w.querySelectorAll('.chip.on').forEach(function(ch){ cardChips.push(ch.textContent); });
+      }
+    });
+    cardChips.slice(0,3).forEach(function(t){
+      var s=document.createElement('span'); s.className='cchip'; s.textContent=t; cc.appendChild(s);
+    });
+
+    call = {
+      c:c, t0:performance.now()/1000,
+      idx:-1, mode:'gap', segUntil:performance.now()/1000 + (RM?0.4:1.1),
+      speaking:false, speaker:'them',
+      env:0, s:0.5, vol:1
+    };
+
+    var delay = RM ? 60 : 430;
+    setTimeout(function(){
+      callEl.classList.add('snap');
+      app.classList.add('in-call');
+      void callEl.offsetWidth;
+      callEl.classList.remove('snap');
+      sizeCanvas();
+      reveal.classList.add('fade');
+      setTimeout(function(){ reveal.classList.remove('grow','fade'); }, 450);
+    }, delay);
+
+    el('callTimer').textContent = '00:00';
+    if(timerInt) clearInterval(timerInt);
+    timerInt = setInterval(function(){
+      if(!call) return;
+      var s = Math.floor(performance.now()/1000 - call.t0);
+      var mm = ('0'+Math.floor(s/60)).slice(-2), ss = ('0'+(s%60)).slice(-2);
+      el('callTimer').textContent = mm+':'+ss;
+    }, 500);
+
+    capBig.textContent=''; capSmall.textContent='';
+    setSpeakerUI(null);
+  }
+
+  function endCall(fromDrag){
+    if(!call) return;
+    call = null;
+    clearInterval(timerInt); timerInt=null;
+    callEl.classList.add('drop');
+    app.classList.remove('in-call');
+    callEl.style.transform='';
+    setTimeout(function(){ callEl.classList.remove('drop'); }, 500);
+  }
+
+  /* ---------- фразы, направление, субтитры ---------- */
+  function nextPhrase(now){
+    var c = call.c, ph;
+    call.idx = (call.idx+1) % c.phrases.length;
+    ph = c.phrases[call.idx];
+    call.speaker = ph.who;
+    call.mode = 'speak'; call.speaking = true;
+    var len = (ph.ru||ph.he||'').length;
+    call.segUntil = now + clamp(1.4 + len*0.075, 2.2, 4.6);
+    setSpeakerUI(ph);
+    setCaptions(ph, c);
+  }
+
+  function setSpeakerUI(ph){
+    var meTalks = ph && ph.who==='me';
+    var themTalks = ph && ph.who==='them';
+    tokMe.classList.toggle('talking', !!meTalks);
+    tokThem.classList.toggle('talking', !!themTalks);
+    dirstrip.classList.toggle('to-me', !!themTalks);
+    /* у слушающего подсвечен ЕГО язык: на нём и звучит перевод */
+    langThem.classList.toggle('hearing', !!meTalks);
+    langMe.classList.toggle('hearing', !!themTalks);
+  }
+
+  function setCaptions(ph, c){
+    var big='', bigDir='ltr', small='', smallDir='ltr';
+    if(c.lang==='ru' || !ph.he){
+      big = ph.ru; bigDir='ltr';
+    } else if(ph.who==='them'){
+      big = ph.ru; bigDir='ltr';       /* ты слышишь по-русски */
+      small = ph.he; smallDir='rtl';   /* сказано на иврите */
+    } else {
+      big = ph.he; bigDir='rtl';       /* собеседник слышит иврит */
+      small = ph.ru; smallDir='ltr';   /* сказано по-русски */
+    }
+    capBig.textContent = big; capBig.dir = bigDir;
+    capBig.lang = bigDir==='rtl' ? 'he' : 'ru';
+    capSmall.textContent = small; capSmall.dir = smallDir;
+    capSmall.lang = smallDir==='rtl' ? 'he' : 'ru';
+    capBig.style.animation='none'; capSmall.style.animation='none';
+    void capBig.offsetWidth;
+    capBig.style.animation=''; capSmall.style.animation='';
+  }
+
+  /* ---------- волна ---------- */
+  function drawWave(now){
+    ctx.clearRect(0,0,cw,chh);
+    if(!call || cw<10) return;
+
+    var c = call.c;
+    var speakT = call.speaking ? 1 : 0.06;
+    call.env += (speakT-call.env)*(RM?0.2:0.07);
+    var sT = call.speaker==='them' ? 1 : 0;
+    call.s += (sT-call.s)*(RM?0.2:0.05);
+
+    var t = RM ? now*0.35 : now;
+    var mod  = 0.55 + 0.45*Math.sin(t*8.1 + Math.sin(t*3.7)*2.4);
+    var word = Math.sin(t*2.2+1) > -0.72 ? 1 : 0.3;
+    var envm = call.env*(0.4 + 0.6*mod*word);
+    var base = chh*0.20*call.vol;
+    var amp  = base*envm + chh*0.014;
+    var dir  = call.s>0.5 ? -1 : 1;
+    var mid  = chh*0.5;
+    var tb = c.timbre;
+    var col1 = mix(ME_COLOR, c.hue1, call.s, 1);
+    var colG = mix(ME_COLOR, c.hue1, call.s, 0.16);
+
+    /* мягкое свечение под волной */
+    var gr = ctx.createRadialGradient(cw/2, mid, 10, cw/2, mid, cw*0.55);
+    gr.addColorStop(0, colG); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0,0,cw,chh);
+
+    var layers = [
+      {a:1.0, w:3.4, al:0.95, ph:0},
+      {a:0.62, w:2.2, al:0.45, ph:1.9},
+      {a:0.38, w:1.4, al:0.25, ph:3.7}
+    ];
+    for(var L=0; L<3; L++){
+      var lay = layers[L];
+      ctx.beginPath();
+      for(var x=0; x<=cw; x+=3){
+        var u = x/cw;
+        var win = Math.pow(Math.sin(Math.PI*u), 1.25);
+        var y = mid + win*amp*lay.a*(
+          Math.sin(u*tb.f[0]*TAU + dir*t*tb.sp[0]*1.6 + lay.ph)*0.62 +
+          Math.sin(u*tb.f[1]*TAU + dir*t*tb.sp[1]*1.6 + lay.ph*1.4)*0.28 +
+          Math.sin(u*tb.f[2]*TAU - dir*t*tb.sp[2]*1.2 + lay.ph*0.8)*0.16
+        );
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle = mix(ME_COLOR, c.hue1, call.s, lay.al);
+      ctx.lineWidth = lay.w;
+      ctx.lineCap = 'round';
+      if(L===0 && !RM){ ctx.shadowColor = col1; ctx.shadowBlur = 16; }
+      else ctx.shadowBlur = 0;
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function frame(ts){
+    window.requestAnimationFrame(frame);
+    if(!call) return;
+    var now = ts/1000;
+    if(now >= call.segUntil){
+      if(call.mode==='speak'){
+        call.mode='gap'; call.speaking=false;
+        call.segUntil = now + (RM?0.5:0.7+Math.random()*0.8);
+        setSpeakerUI(null);
+      } else {
+        nextPhrase(now);
+      }
+    }
+    drawWave(now);
+  }
+  window.requestAnimationFrame(frame);
+
+  /* ---------- палец вверх/вниз = громкость перевода ---------- */
+  (function(){
+    var volwrap = el('volwrap'), volsun = el('volsun');
+    var vActive=false, v0=1, y0=0, hideT=null;
+    function place(){
+      var p = (call.vol-0.25)/(1.6-0.25);
+      volsun.style.bottom = (p*100)+'%';
+    }
+    wavezone.addEventListener('pointerdown', function(e){
+      if(!call) return;
+      vActive=true; v0=call.vol; y0=e.clientY;
+      try{ wavezone.setPointerCapture(e.pointerId); }catch(_){}
+      place(); volwrap.classList.add('show');
+      if(hideT) clearTimeout(hideT);
+    });
+    wavezone.addEventListener('pointermove', function(e){
+      if(!vActive || !call) return;
+      call.vol = clamp(v0 + (y0-e.clientY)/220, 0.25, 1.6);
+      place();
+    });
+    function up(){
+      if(!vActive) return;
+      vActive=false;
+      hideT = setTimeout(function(){ volwrap.classList.remove('show'); }, 700);
+    }
+    wavezone.addEventListener('pointerup', up);
+    wavezone.addEventListener('pointercancel', up);
+  })();
+
+  /* ---------- потяни нить вниз = положить трубку ---------- */
+  (function(){
+    var hang = el('hangup');
+    var hActive=false, y0=0, dy=0, moved=false;
+    var DROP_AT = 120;
+    hang.addEventListener('pointerdown', function(e){
+      if(!call) return;
+      hActive=true; moved=false; y0=e.clientY; dy=0;
+      try{ hang.setPointerCapture(e.pointerId); }catch(_){}
+      callEl.classList.add('snap');
+    });
+    hang.addEventListener('pointermove', function(e){
+      if(!hActive) return;
+      dy = Math.max(0, e.clientY-y0);
+      if(dy>6) moved=true;
+      callEl.style.transform = 'translateY('+Math.min(dy*0.85, 250)+'px)';
+    });
+    function finish(){
+      if(!hActive) return;
+      hActive=false;
+      callEl.classList.remove('snap');
+      if(dy>=DROP_AT || !moved){       /* докинул вниз — или просто клик */
+        endCall(true);
+      } else {
+        callEl.style.transform='';
+      }
+    }
+    hang.addEventListener('pointerup', finish);
+    hang.addEventListener('pointercancel', function(){
+      hActive=false; callEl.classList.remove('snap'); callEl.style.transform='';
+    });
+  })();
+
+  sizeCanvas();
+})();
+</script>
+</body>
+</html>
