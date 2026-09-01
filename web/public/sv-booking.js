@@ -24,9 +24,14 @@
     return fetch('/orch' + path, Object.assign({ credentials: 'include', headers }, opts || {}));
   }
 
+  var myLang = null;
   fetch('/api/auth/session', { credentials: 'include' })
     .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) { me = j && j.user ? (j.user.id || j.user.userId) : null; })
+    .then(function (j) {
+      if (!j || !j.user) return;
+      me = j.user.id || j.user.userId;
+      myLang = j.user.lang || null;
+    })
     .catch(function () {});
 
   /* --------------------------------------------------------------- стили */
@@ -173,6 +178,9 @@
       '  <div class="sv-exact"><span>или своё время</span>' +
       '    <input type="time" step="60" data-exact aria-label="произвольное время"></div>' +
       '  <p class="sv-note" data-tz>огонёк — карта уже будет горячей, ждать не придётся</p>' +
+      '  <span class="sv-lbl">на каком языке буду говорить я</span>' +
+      '  <div class="sv-row" data-langs></div>' +
+      '  <p class="sv-note" data-langnote></p>' +
       '  <span class="sv-lbl">о чём</span>' +
       '  <div class="sv-row" data-themes></div>' +
       '  <span class="sv-lbl">кто будет упомянут</span>' +
@@ -285,6 +293,32 @@
     }
     buildTimes();
 
+    /* Язык говорящего решает, будет ли перевод вообще: если оба на одном
+       языке, переводить нечего. Здесь человек выбирает, на каком языке ОН
+       будет говорить в этом разговоре. Выбор меняет язык в его профиле —
+       это то же самое поле, которым пользуется движок, и врать ему нельзя. */
+    var langsEl = wrap.querySelector('[data-langs]');
+    var langNote = wrap.querySelector('[data-langnote]');
+    var LANGS = [{ id: 'ru', label: 'Русский' }, { id: 'he', label: 'עברית' }];
+    state.lang = myLang || 'ru';
+    function paintLangs() {
+      langsEl.replaceChildren();
+      LANGS.forEach(function (L) {
+        var b = document.createElement('button');
+        b.className = 'sv-chip' + (state.lang === L.id ? ' on' : '');
+        b.textContent = L.label;
+        if (L.id === 'he') b.lang = 'he';
+        b.addEventListener('click', function () { state.lang = L.id; paintLangs(); });
+        langsEl.appendChild(b);
+      });
+      var changed = myLang && state.lang !== myLang;
+      langNote.textContent = changed
+        ? 'ваш язык в профиле сменится на этот — иначе движок не будет знать, что переводить'
+        : 'если оба говорят на одном языке, перевод не включится: выберите разные';
+      langNote.className = 'sv-note' + (changed ? ' tight' : '');
+    }
+    paintLangs();
+
     var themesEl = wrap.querySelector('[data-themes]');
     ['работа', 'семья', 'деньги', 'ремонт', 'врач', 'документы', 'дети'].forEach(function (name) {
       var b = document.createElement('button');
@@ -335,16 +369,27 @@
       var dt = whenOf(state.time);
       sendBtn.disabled = true;
       sendBtn.textContent = 'отправляю…';
-      api('/bookings', {
+      var langStep = (me && state.lang && state.lang !== myLang)
+        ? fetch('/api/users/' + encodeURIComponent(me), {
+            method: 'PATCH', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lang: state.lang }),
+          }).then(function (r) {
+            if (!r.ok) throw new Error('язык не сменился: ' + r.status);
+            myLang = state.lang;
+          })
+        : Promise.resolve();
+
+      langStep.then(function () { return api('/bookings', {
         method: 'POST',
         body: JSON.stringify({
           startsAt: dt.getTime(),
           withUserId: userId,
           context: { themes: Object.keys(state.themes), notes: state.notes },
-          initiator: { autoCall: state.autoCall },
+          initiator: { autoCall: state.autoCall, lang: state.lang },
           invitee: { userId: userId },
         }),
-      }).then(function (r) {
+      }); }).then(function (r) {
         if (!r.ok) throw new Error('сервер отказал: ' + r.status);
         return r.json();
       }).then(function () {
