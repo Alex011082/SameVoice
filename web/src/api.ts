@@ -17,11 +17,30 @@ import type {
 } from './types';
 import { parseRingPoll, parseRingView } from './types';
 
-const DEFAULT_BASE = 'http://127.0.0.1:8787';
+/**
+ * Resolves the API base from VITE_BACKEND_URL. Trailing slashes are stripped,
+ * so "/" becomes "" — every fetch is relative and lands on the page's own
+ * origin (in prod Caddy proxies /api and /healthz to the backend). Pure so
+ * the stripping is unit-testable (web/test/backend-url.test.ts).
+ */
+export function resolveBackendUrl(raw: string | undefined, fallback: string): string {
+  return (raw ?? fallback).replace(/\/+$/, '');
+}
 
-export const BACKEND_URL: string = (import.meta.env.VITE_BACKEND_URL ?? DEFAULT_BASE).replace(
-  /\/+$/,
-  '',
+/**
+ * The localhost fallback applies ONLY to the dev server; a production build
+ * falls back to same-origin. The 31.08.2026 deploy was built without
+ * VITE_BACKEND_URL, baked http://127.0.0.1:8787 into the bundle, and every
+ * phone that opened samevoice.0110.digital talked to itself.
+ *
+ * The ternary must stay directly on `import.meta.env.DEV` (not behind a
+ * runtime parameter): the build replaces DEV with false, the branch becomes
+ * dead code, and the address vanishes from the bundle entirely — which is
+ * exactly what scripts/check-web-dist.sh verifies after every prod build.
+ */
+export const BACKEND_URL: string = resolveBackendUrl(
+  import.meta.env.VITE_BACKEND_URL,
+  import.meta.env.DEV ? 'http://127.0.0.1:8787' : '',
 );
 
 /**
