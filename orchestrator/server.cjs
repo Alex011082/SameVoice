@@ -5,8 +5,14 @@
  * поднимает под к началу каждого гнезда, переключает боевого агента на
  * готовый под, гасит поды, когда гнездо кончилось и разговор стих.
  *
- * Чего НЕ делает и почему: не рассылает уведомления (нет канала — СМС
- * подключается отдельно) и не умеет одновременно обслуживать два пода
+ * Уведомления: пуш в браузер обоим участникам (приглашение, подтверждение,
+ * напоминания по личному выбору каждого, 2-3 сигнала перед разговором) и
+ * автосозвон — если ОБА его включили, сервер сам создаёт звонок и соединяет
+ * их, как телефонистка. Если хоть один не включил — обоим уходит сигнал
+ * «пора», и человек нажимает сам: звонить тому, кто на это не соглашался,
+ * нельзя.
+ *
+ * Чего НЕ делает и почему: не умеет одновременно обслуживать два пода
  * ЖИВЫМИ звонками. Причина честная: агент берёт адрес движка из глобальных
  * переменных окружения (RUNPOD_STT_URL/RUNPOD_MT_URL), то есть в каждый
  * момент говорит с одним подом. Пока это так, оркестратор переключает агента
@@ -22,6 +28,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { plan, decide, MIN } = require('./planner.cjs');
+const { schedule, due } = require('./notifications.cjs');
 
 const DIR = process.env.ORCH_DIR || '/opt/samevoice/orchestrator';
 const DATA = path.join(DIR, 'data');
@@ -60,6 +67,8 @@ function save(name, value) {
 }
 
 let bookings = load('bookings.json', []);
+let subs = load('subscriptions.json', {});      // userId -> [подписки браузеров]
+let sent = new Set(load('sent.json', []));      // id уже отправленных событий
 let pods = load('pods.json', []);
 const log = [];
 function note(msg) {
@@ -132,6 +141,96 @@ async function podReady(pod) {
     const j = await r.json();
     return j && j.service === 'engine';
   } catch (e) { return false; }
+}
+
+/* -------------------------------------------------------------- уведомления */
+
+let push = null;
+try {
+  push = require('web-push');
+  if (env.VAPID_PUBLIC && env.VAPID_PRIVATE) {
+    push.setVapidDetails(env.VAPID_SUBJECT || 'mailto:hello@samevoice.0110.digital',
+      env.VAPID_PUBLIC, env.VAPID_PRIVATE);
+  } else { push = null; note('пуш выключен: нет ключей VAPID'); }
+} catch (e) { note('пуш выключен: нет библиотеки web-push'); }
+
+const TEXTS = {
+  invite: (e) => ({ title: 'Предлагают поговорить', body: hhmm(e.payload.startsAt) + ' — подтвердить?' }),
+  confirmed: (e) => ({ title: 'Договорились', body: 'Разговор в ' + hhmm(e.payload.startsAt) }),
+  reminder: (e) => ({ title: 'Скоро разговор',
+    body: 'через ' + e.payload.minutesBefore + ' мин · в ' + hhmm(e.payload.startsAt) }),
+  signal: (e) => ({ title: 'Через ' + e.payload.minutesBefore + ' мин', body: 'Готовьтесь, сейчас начнём' }),
+  handoff: (e) => ({ title: 'Пора звонить', body: 'Нажмите, чтобы соединиться' }),
+  cancelled: (e) => ({ title: 'Встреча отменена', body: 'Разговор в ' + hhmm(e.payload.startsAt) + ' не состоится' }),
+};
+
+function hhmm(ms) {
+  const d = new Date(ms);
+  return ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2) + ' UTC';
+}
+
+async function sendPush(userId, message) {
+  const list = subs[userId] || [];
+  if (!push || !list.length) return 0;
+  let ok = 0;
+  const alive = [];
+  for (const s of list) {
+    try {
+      await push.sendNotification(s, JSON.stringify(message));
+      ok++; alive.push(s);
+    } catch (e) {
+      // 404/410 — подписка мертва (браузер снесён, разрешение отозвано)
+      if (e.statusCode === 404 || e.statusCode === 410) note(`подписка ${userId} протухла — убираю`);
+      else { alive.push(s); note(`пуш ${userId} не ушёл: ${e.statusCode || e.message}`); }
+    }
+  }
+  if (alive.length !== list.length) { subs[userId] = alive; save('subscriptions.json', subs); }
+  return ok;
+}
+
+/** Автосозвон: сервер сам создаёт звонок обоим — как телефонистка. */
+async function autoCall(payload) {
+  const r = await fetch('http://127.0.0.1:8787/api/calls', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callerId: payload.callerId, calleeId: payload.calleeId, ring: true }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((body && body.error && body.error.message) || ('HTTP ' + r.status));
+  return body;
+}
+
+async function deliver() {
+  const now = Date.now();
+  for (const b of bookings) {
+    let events;
+    try { events = schedule(b); } catch (e) { note(`расписание ${b.id}: ${e.message}`); continue; }
+    for (const e of due(events, now, sent)) {
+      const stamp = b.id + '/' + e.id;
+      if (sent.has(stamp)) continue;
+      try {
+        if (e.kind === 'autocall') {
+          const res = await autoCall(e.payload);
+          note(`автосозвон по ${b.id}: звонок ${res.call ? res.call.id : '?'} создан, звоним обоим`);
+          for (const u of [e.payload.callerId, e.payload.calleeId]) {
+            await sendPush(u, { title: 'Соединяю', body: 'Снимите трубку', tag: b.id, kind: 'autocall' });
+          }
+        } else {
+          const make = TEXTS[e.kind];
+          if (make && e.to) {
+            const n = await sendPush(e.to, Object.assign(make(e), { tag: b.id, kind: e.kind, bookingId: b.id }));
+            if (!n) note(`некому доставить ${e.kind} для ${e.to} (нет подписки)`);
+          }
+        }
+        sent.add(stamp);
+      } catch (err) {
+        note(`событие ${e.kind} по ${b.id} не отправлено: ${err.message}`);
+        sent.add(stamp);   // не долбим бесконечно: одна попытка на событие
+      }
+    }
+  }
+  if (sent.size > 5000) sent = new Set([...sent].slice(-2000));
+  save('sent.json', [...sent]);
 }
 
 /* ------------------------------------------------------------- согласование */
@@ -214,6 +313,7 @@ async function reconcile() {
 
     pods = pods.filter((p) => p.state !== 'gone' || Date.now() - (p.goneAt || 0) < 30 * MIN);
     save('pods.json', pods);
+    await deliver();
   } catch (e) {
     note('сбой согласования: ' + (e.message || e));
   } finally {
@@ -268,6 +368,8 @@ http.createServer(async (req, res) => {
         createdAt: Date.now(), startsAt,
         durationMinutes: b.durationMinutes || PARAMS.durationMinutes,
         byUserId: b.byUserId || null, withUserId: b.withUserId || null,
+        initiator: Object.assign({ userId: b.byUserId || null }, b.initiator || {}),
+        invitee: Object.assign({ userId: b.withUserId || null }, b.invitee || {}),
         context: { themes: (b.context && b.context.themes) || [], notes: (b.context && b.context.notes) || [] },
         state: b.autoConfirm ? 'confirmed' : 'proposed',
       };
@@ -281,10 +383,28 @@ http.createServer(async (req, res) => {
       const rec = bookings.find((b) => b.id === m[1]);
       if (!rec) return send(res, 404, { error: 'нет такой брони' });
       rec.state = m[2] === 'confirm' ? 'confirmed' : 'cancelled';
+      if (rec.state === 'confirmed') rec.confirmedAt = Date.now(); else rec.cancelledAt = Date.now();
       save('bookings.json', bookings);
       note(`бронь ${rec.id}: ${rec.state}`);
       reconcile();
       return send(res, 200, { booking: rec });
+    }
+    if (p === '/push/key' && req.method === 'GET') return send(res, 200, { key: env.VAPID_PUBLIC || null });
+    if (p === '/push/subscribe' && req.method === 'POST') {
+      const b = await body(req);
+      if (!b.userId || !b.subscription || !b.subscription.endpoint) {
+        return send(res, 400, { error: 'нужны userId и subscription' });
+      }
+      const list = subs[b.userId] || [];
+      if (!list.some((s) => s.endpoint === b.subscription.endpoint)) list.push(b.subscription);
+      subs[b.userId] = list; save('subscriptions.json', subs);
+      note(`подписка на пуш: ${b.userId} (всего ${list.length})`);
+      return send(res, 200, { ok: true, count: list.length });
+    }
+    if (p === '/push/test' && req.method === 'POST') {
+      const b = await body(req);
+      const n = await sendPush(b.userId, { title: 'SameVoice', body: b.text || 'Проверка связи', kind: 'test' });
+      return send(res, 200, { delivered: n });
     }
     if (p === '/plan' && req.method === 'GET') return send(res, 200, planView());
     if (p === '/status' && req.method === 'GET') {
