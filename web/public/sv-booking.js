@@ -119,7 +119,20 @@
     '.sv-up-btn:active{color:var(--fg);border-color:var(--line-strong)}',
     '.sv-up-btn.yes{color:var(--fg);border-color:transparent;',
     '  background:linear-gradient(var(--bg-lift),var(--bg-lift)) padding-box,var(--voice) border-box}',
-    '.sv-up-btn:disabled{opacity:.5}'
+    '.sv-up-btn:disabled{opacity:.5}',
+    '.sv-invite{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:24px;',
+    '  background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(12px);',
+    '  animation:sv-fade .25s ease}',
+    '.sv-invite-card{width:min(100%,420px);text-align:center;padding:32px 26px;',
+    '  border:1px solid var(--line);border-radius:var(--r-lg);background:var(--bg-lift);',
+    '  animation:sv-rise .4s var(--ease);display:flex;flex-direction:column;gap:10px;align-items:center}',
+    '.sv-invite-eyebrow{font:300 10px var(--font);letter-spacing:.22em;text-transform:uppercase;color:var(--fg-faint)}',
+    '.sv-invite-name{font:700 clamp(30px,9vw,40px) var(--font-display);letter-spacing:-.02em;line-height:1.05}',
+    '.sv-invite-when{font:600 20px var(--font-display);font-variant-numeric:tabular-nums;',
+    '  background:var(--voice);-webkit-background-clip:text;background-clip:text;color:transparent}',
+    '.sv-invite-ctx{font:300 13px/1.5 var(--font);color:var(--fg-dim);margin:0}',
+    '.sv-invite-acts{display:flex;gap:12px;margin-top:12px;width:100%}',
+    '.sv-invite-acts .btn{flex:1}'
   ].join('\n');
   document.head.appendChild(css);
 
@@ -150,8 +163,104 @@
   }
 
   /* ------------------------------------------------------------ лист */
+  var names = {};          // userId -> имя, из собственных контактов
+  var seenBookings = null; // что мы уже показывали, чтобы не звенеть дважды
   var warmSlots = {};      // 'HH:MM' -> true, если карта уже будет горячей
   var warmLeadMin = 5;     // сколько нужно на подъём карты (спросим у сервера)
+
+  function loadNames() {
+    if (!me) return Promise.resolve();
+    return fetch('/api/users/' + encodeURIComponent(me) + '/contacts', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        (d && d.contacts ? d.contacts : []).forEach(function (c) {
+          names[c.userId] = c.displayName;
+        });
+      }).catch(function () {});
+  }
+
+  function nameOf(id) { return names[id] || 'Собеседник'; }
+
+  /* Если имя ещё не подгрузилось (приглашение пришло раньше контактов),
+     доспрашиваем его точечно и вписываем в уже открытую карточку. */
+  function ensureName(id, apply) {
+    if (names[id]) { apply(names[id]); return; }
+    fetch('/api/users/' + encodeURIComponent(id), { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var nm = d && d.user && d.user.displayName;
+        if (nm) { names[id] = nm; apply(nm); }
+      }).catch(function () {});
+  }
+
+  /* Звон приглашения: короткий восходящий аккорд. Браузер даёт звучать только
+     после того, как человек хоть раз коснулся страницы, поэтому неудача здесь
+     нормальна и молча проглатывается. */
+  function chime() {
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      var ctx = chime.ctx || (chime.ctx = new A());
+      if (ctx.state === 'suspended') ctx.resume();
+      var t0 = ctx.currentTime;
+      [523, 659, 784].forEach(function (f, i) {
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f; o.type = 'sine';
+        o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.0001, t0 + i * 0.16);
+        g.gain.exponentialRampToValueAtTime(0.22, t0 + i * 0.16 + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.16 + 0.5);
+        o.start(t0 + i * 0.16); o.stop(t0 + i * 0.16 + 0.55);
+      });
+    } catch (e) { /* звук — не повод ронять приложение */ }
+  }
+
+  /* Карточка приглашения: кто зовёт, когда и о чём. Появляется поверх всего,
+     потому что это событие, а не строка в списке. */
+  function showInvite(b, ring) {
+    if (document.querySelector('.sv-invite[data-id="' + b.id + '"]')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'sv-invite';
+    wrap.dataset.id = b.id;
+    var dt = new Date(b.startsAt);
+    var when = ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2) +
+      ' · ' + dt.getDate() + '.' + ('0' + (dt.getMonth() + 1)).slice(-2);
+    var ctxLine = '';
+    if (b.context && (b.context.themes || []).length) ctxLine = (b.context.themes || []).join(' · ');
+    if (b.context && (b.context.notes || []).length) {
+      ctxLine += (ctxLine ? ' — ' : '') + (b.context.notes || []).join('; ');
+    }
+    wrap.innerHTML =
+      '<div class="sv-invite-card">' +
+      '  <span class="sv-invite-eyebrow">зовёт поговорить</span>' +
+      '  <strong class="sv-invite-name"></strong>' +
+      '  <div class="sv-invite-when"></div>' +
+      (ctxLine ? '  <p class="sv-invite-ctx"></p>' : '') +
+      '  <div class="sv-invite-acts">' +
+      '    <button class="btn" data-yes>принять</button>' +
+      '    <button class="btn btn-ghost" data-no>отказаться</button>' +
+      '  </div></div>';
+    var nameEl = wrap.querySelector('.sv-invite-name');
+    nameEl.textContent = nameOf(b.byUserId);
+    ensureName(b.byUserId, function (nm) { nameEl.textContent = nm; });
+    wrap.querySelector('.sv-invite-when').textContent = when;
+    if (ctxLine) wrap.querySelector('.sv-invite-ctx').textContent = ctxLine;
+    document.body.appendChild(wrap);
+    if (ring) chime();
+
+    function answer(kind, btn) {
+      btn.disabled = true;
+      api('/bookings/' + encodeURIComponent(b.id) + '/' + kind, { method: 'POST' })
+        .then(function (r) {
+          if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || r.status); });
+          wrap.remove();
+          loadUpcoming();
+        })
+        .catch(function (e) { btn.disabled = false; btn.textContent = String(e.message || e).slice(0, 22); });
+    }
+    wrap.querySelector('[data-yes]').addEventListener('click', function () { answer('confirm', this); });
+    wrap.querySelector('[data-no]').addEventListener('click', function () { answer('cancel', this); });
+  }
 
   function loadWarm() {
     return api('/plan').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
@@ -427,7 +536,11 @@
         return b.state === 'confirmed' || b.state === 'proposed';
       }).filter(function (b) { return b.startsAt > Date.now() - 3600000; })
         .sort(function (a, b) { return a.startsAt - b.startsAt; }).slice(0, 4);
-      if (!mine.length) { if (box) box.remove(); return; }
+      if (!mine.length) {
+        if (box) box.remove();
+        seenBookings = [];   // пустота — тоже знание: следующее станет «новым»
+        return;
+      }
       if (!box) {
         box = document.createElement('div');
         box.className = 'sv-upcoming';
@@ -440,6 +553,19 @@
       lbl.className = 'sv-lbl';
       lbl.textContent = 'встречи';
       box.appendChild(lbl);
+      // Неотвеченное приглашение — всегда карточкой: оно ждёт решения.
+      // Звеним только на НОВОЕ, пришедшее при открытой странице: старое при
+      // загрузке показываем молча, чтобы не пугать звоном каждое обновление.
+      var ids = mine.map(function (b) { return b.id + ':' + b.state; });
+      var первыйПроход = seenBookings === null;
+      mine.forEach(function (b) {
+        if (b.state !== 'proposed' || !me || b.withUserId !== me) return;
+        var знакомое = !первыйПроход && seenBookings.indexOf(b.id + ':proposed') >= 0;
+        if (знакомое) return;
+        showInvite(b, !первыйПроход);
+      });
+      seenBookings = ids;
+
       mine.forEach(function (b) {
         var row = document.createElement('div');
         row.className = 'sv-up';
@@ -648,9 +774,10 @@
 
   /* -------------------------------------------------------------- запуск */
   function boot() {
-    loadWarm().then(function () { mountButtons(); loadUpcoming(); });
+    loadNames().then(loadWarm).then(function () { mountButtons(); loadUpcoming(); });
     new MutationObserver(function () { mountButtons(); }).observe(document.body, { childList: true, subtree: true });
-    setInterval(function () { loadWarm(); loadUpcoming(); }, 60000);
+    // Раз в двадцать секунд: приглашение должно догонять человека быстро.
+    setInterval(function () { loadNames(); loadWarm(); loadUpcoming(); }, 20000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
