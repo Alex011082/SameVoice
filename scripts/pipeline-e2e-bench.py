@@ -134,10 +134,17 @@ async def stream_utterance(wav_path: Path):
 
 
 def run_reference(events, speech_ms, tmp: Path, idx: int) -> dict:
-    """Старая логика: финал -> перевод целиком -> озвучка целиком."""
+    """Старая логика: дождаться ВСЕХ финалов -> перевод целиком -> озвучка.
+
+    Nemotron отдаёт финалы посегментно (и режет их по затяжкам «эээ»), поэтому
+    реплика целиком = склейка всех финалов, а момент готовности текста —
+    ПОСЛЕДНИЙ финал. Первая версия скрипта брала только последний сегмент и
+    льстила референсу дважды: короче текст и раньше готов.
+    """
     finals = [(t, x) for t, k, x in events if k == "final" and x.strip()]
     if finals:
-        t_final, text = finals[-1]
+        t_final = finals[-1][0]
+        text = " ".join(x for _, x in finals)
     else:  # финала не было — берём последний partial (честно помечаем)
         t_final, text = next(((t, x) for t, k, x in reversed(events) if x.strip()),
                              (speech_ms, ""))

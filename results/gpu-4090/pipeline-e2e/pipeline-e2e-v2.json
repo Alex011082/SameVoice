@@ -1,0 +1,378 @@
+{
+ "utterances": [
+  {
+   "id": "utt-00",
+   "truthText": "Слушай, я эээ… я не успею к семи, давай эмм… давай перенесём на восемь.",
+   "events": 12,
+   "reference": {
+    "sttText": "Слушай, я Я не успею к семи, давай Давай перенесем на восемь",
+    "mtText": "תראה, אני לא אגיע לשם עד שבע, אז בוא נקבע שמונה.",
+    "tFinalMs": 194.9,
+    "mtMs": 50.1,
+    "ttsMs": 906.8,
+    "firstAudioAfterSpeechMs": 1151.8,
+    "audioS": 4.16
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Слушай, я",
+      "he": "תראה, אני...",
+      "tCommitMs": -5416.0,
+      "mtMs": 21.4,
+      "ttsMs": 648.3,
+      "atempoMs": 322.5
+     },
+     {
+      "chunk": "Я не успею к семи, давай",
+      "he": "אני לא אגיע לשם עד שבע. קדימה.",
+      "tCommitMs": -1987.9,
+      "mtMs": 34.0,
+      "ttsMs": 792.2,
+      "atempoMs": 73.1
+     },
+     {
+      "chunk": "Давай перенесем на восемь",
+      "he": "בוא נעביר את זה לשמונה.",
+      "tCommitMs": 194.9,
+      "mtMs": 41.5,
+      "ttsMs": 605.5,
+      "atempoMs": 70.4
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -5416.0,
+    "firstAudioAfterSpeechMs": -4423.8,
+    "audioS": 6.88,
+    "audioFastS": 5.47,
+    "speechS": 7.76
+   }
+  },
+  {
+   "id": "utt-01",
+   "truthText": "Ну это, я посмотрел расписание, там эээ… там всё занято до четверга.",
+   "events": 11,
+   "reference": {
+    "sttText": "Ну, это я посмотрел расписание там Там все занято до четверга",
+    "mtText": "ובכן, אני זה שהסתכל על לוח הזמנים שם. הכל תפוס עד יום חמישי.",
+    "tFinalMs": 223.1,
+    "mtMs": 57.6,
+    "ttsMs": 2501.3,
+    "firstAudioAfterSpeechMs": 2782.1,
+    "audioS": 6.96
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Ну, это я посмотрел расписание там",
+      "he": "ובכן, אני הסתכלתי על לוח הזמנים שם.",
+      "tCommitMs": -2502.1,
+      "mtMs": 38.0,
+      "ttsMs": 846.1,
+      "atempoMs": 71.5
+     },
+     {
+      "chunk": "Там все занято до четверга",
+      "he": "המקום תפוס עד יום חמישי.",
+      "tCommitMs": 223.1,
+      "mtMs": 35.6,
+      "ttsMs": 795.1,
+      "atempoMs": 71.8
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -2502.1,
+    "firstAudioAfterSpeechMs": -1546.3,
+    "audioS": 6.8,
+    "audioFastS": 5.47,
+    "speechS": 6.72
+   }
+  },
+  {
+   "id": "utt-02",
+   "truthText": "Я ей утром написал, но она эмм… она пока не ответила ничего.",
+   "events": 9,
+   "reference": {
+    "sttText": "Я ей утром написал Она пока не ответила ничего",
+    "mtText": "שלחתי לה הודעה הבוקר, היא עדיין לא ענתה.",
+    "tFinalMs": 237.1,
+    "mtMs": 36.1,
+    "ttsMs": 957.3,
+    "firstAudioAfterSpeechMs": 1230.6,
+    "audioS": 4.0
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Я ей утром написал",
+      "he": "שלחתי לה הודעה הבוקר.",
+      "tCommitMs": -4385.7,
+      "mtMs": 37.4,
+      "ttsMs": 588.3,
+      "atempoMs": 74.5
+     },
+     {
+      "chunk": "Она пока не ответила ничего",
+      "he": "היא עדיין לא ענתה.",
+      "tCommitMs": 237.1,
+      "mtMs": 24.2,
+      "ttsMs": 634.4,
+      "atempoMs": 72.1
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -4385.7,
+    "firstAudioAfterSpeechMs": -3685.5,
+    "audioS": 4.0,
+    "audioFastS": 3.24,
+    "speechS": 6.16
+   }
+  },
+  {
+   "id": "utt-03",
+   "truthText": "Короче, эээ… цена нормальная, но доставка эээ… доставка почти тысячу стоит.",
+   "events": 9,
+   "reference": {
+    "sttText": "Короче Цена нормальная Но доставка Доставка почти тысячу стоит",
+    "mtText": "המחיר הוא נורמלי, אבל המשלוח כמעט שווה אלף דולר.",
+    "tFinalMs": 267.4,
+    "mtMs": 39.6,
+    "ttsMs": 1120.4,
+    "firstAudioAfterSpeechMs": 1427.5,
+    "audioS": 4.8
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Короче",
+      "he": "בקיצור",
+      "tCommitMs": -7347.5,
+      "mtMs": 19.0,
+      "ttsMs": 437.1,
+      "atempoMs": 65.4
+     },
+     {
+      "chunk": "Цена нормальная",
+      "he": "המחיר נורמלי.",
+      "tCommitMs": -4286.4,
+      "mtMs": 25.2,
+      "ttsMs": 619.8,
+      "atempoMs": 72.9
+     },
+     {
+      "chunk": "Но доставка",
+      "he": "אבל משלוח.",
+      "tCommitMs": -2036.0,
+      "mtMs": 19.7,
+      "ttsMs": 627.9,
+      "atempoMs": 70.0
+     },
+     {
+      "chunk": "Доставка почти тысячу стоит",
+      "he": "המשלוח כמעט שווה אלף דולר.",
+      "tCommitMs": 267.4,
+      "mtMs": 32.3,
+      "ttsMs": 683.9,
+      "atempoMs": 68.6
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -7347.5,
+    "firstAudioAfterSpeechMs": -6826.1,
+    "audioS": 9.6,
+    "audioFastS": 7.74,
+    "speechS": 8.72
+   }
+  },
+  {
+   "id": "utt-04",
+   "truthText": "Мы же договорились на четыре, ты эмм… ты точно не забыл?",
+   "events": 9,
+   "reference": {
+    "sttText": "Мы же договорились на четыре Ты точно не забыл",
+    "mtText": "אמרנו לך שזה יהיה 4.",
+    "tFinalMs": 196.7,
+    "mtMs": 41.2,
+    "ttsMs": 549.6,
+    "firstAudioAfterSpeechMs": 787.5,
+    "audioS": 1.84
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Мы же договорились на четыре",
+      "he": "אמרנו ארבעה.",
+      "tCommitMs": -3069.8,
+      "mtMs": 18.6,
+      "ttsMs": 516.1,
+      "atempoMs": 65.7
+     },
+     {
+      "chunk": "Ты точно не забыл",
+      "he": "אתה בטוח לא שכחת.",
+      "tCommitMs": 196.7,
+      "mtMs": 27.7,
+      "ttsMs": 790.3,
+      "atempoMs": 71.7
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -3069.8,
+    "firstAudioAfterSpeechMs": -2469.4,
+    "audioS": 4.64,
+    "audioFastS": 3.74,
+    "speechS": 5.2
+   }
+  },
+  {
+   "id": "utt-05",
+   "truthText": "Я в аптеке взял что ты просила, и ещё эээ… ещё батарейки для пульта.",
+   "events": 12,
+   "reference": {
+    "sttText": "Я в аптеке взял, что ты просила И еще Еще батарейки для пульта",
+    "mtText": "לקחתי את מה שביקשת מבית המרקחת, וגם את הסוללות של השלט הרחוק.",
+    "tFinalMs": 218.8,
+    "mtMs": 47.6,
+    "ttsMs": 1191.4,
+    "firstAudioAfterSpeechMs": 1457.8,
+    "audioS": 6.08
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Я в аптеке взял,",
+      "he": "לקחתי את זה מבית המרקחת.",
+      "tCommitMs": -4411.3,
+      "mtMs": 32.7,
+      "ttsMs": 698.9,
+      "atempoMs": 76.4
+     },
+     {
+      "chunk": "что ты просила",
+      "he": "זה כל מה שביקשת.",
+      "tCommitMs": -3669.0,
+      "mtMs": 42.3,
+      "ttsMs": 592.8,
+      "atempoMs": 79.8
+     },
+     {
+      "chunk": "И еще",
+      "he": "עוד דבר אחד.",
+      "tCommitMs": -2403.0,
+      "mtMs": 24.9,
+      "ttsMs": 493.3,
+      "atempoMs": 71.7
+     },
+     {
+      "chunk": "Еще батарейки для пульта",
+      "he": "עוד סוללות ללוח הבקרה.",
+      "tCommitMs": 218.8,
+      "mtMs": 32.8,
+      "ttsMs": 640.9,
+      "atempoMs": 85.7
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -4411.3,
+    "firstAudioAfterSpeechMs": -3603.3,
+    "audioS": 8.56,
+    "audioFastS": 6.89,
+    "speechS": 6.32
+   }
+  },
+  {
+   "id": "utt-06",
+   "truthText": "Он обещал позвонить вчера вечером, но эээ… похоже опять забил совсем.",
+   "events": 9,
+   "reference": {
+    "sttText": "Он обещал позвонить вчера вечером Похожая опять забил совсем",
+    "mtText": "הוא אמר שיתקשר אתמול בלילה.",
+    "tFinalMs": 217.4,
+    "mtMs": 44.3,
+    "ttsMs": 670.8,
+    "firstAudioAfterSpeechMs": 932.4,
+    "audioS": 2.72
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Он обещал позвонить вчера вечером",
+      "he": "הוא אמר שיתקשר אתמול בלילה.",
+      "tCommitMs": -4114.2,
+      "mtMs": 25.8,
+      "ttsMs": 612.2,
+      "atempoMs": 67.1
+     },
+     {
+      "chunk": "Похожая опять забил совсем",
+      "he": "הבחורה הזאת שוב שוב פעם שוב פעם שוב פעם.",
+      "tCommitMs": 217.4,
+      "mtMs": 48.8,
+      "ttsMs": 957.4,
+      "atempoMs": 84.7
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -4114.2,
+    "firstAudioAfterSpeechMs": -3409.1,
+    "audioS": 5.76,
+    "audioFastS": 4.63,
+    "speechS": 6.64
+   }
+  },
+  {
+   "id": "utt-07",
+   "truthText": "Давай тогда на вторник, если эмм… если ничего не поменяется у тебя.",
+   "events": 11,
+   "reference": {
+    "sttText": "Давай тогда на вторник Если Если ничего не поменяется у тебя",
+    "mtText": "אז בוא נעשה את זה ביום שלישי, אם שום דבר לא ישתנה אצלך.",
+    "tFinalMs": 237.9,
+    "mtMs": 71.4,
+    "ttsMs": 1034.6,
+    "firstAudioAfterSpeechMs": 1343.9,
+    "audioS": 4.8
+   },
+   "assembled": {
+    "chunks": [
+     {
+      "chunk": "Давай тогда на вторник",
+      "he": "אז בוא נעשה את זה ביום שלישי.",
+      "tCommitMs": -4922.0,
+      "mtMs": 55.9,
+      "ttsMs": 643.0,
+      "atempoMs": 73.1
+     },
+     {
+      "chunk": "Если",
+      "he": "אם.",
+      "tCommitMs": -3507.7,
+      "mtMs": 18.6,
+      "ttsMs": 394.3,
+      "atempoMs": 81.7
+     },
+     {
+      "chunk": "Если ничего не поменяется у тебя",
+      "he": "אם שום דבר לא ישתנה אצלך.",
+      "tCommitMs": 237.9,
+      "mtMs": 38.4,
+      "ttsMs": 772.3,
+      "atempoMs": 79.4
+     }
+    ],
+    "fillersDropped": 0,
+    "firstCommitAfterSpeechMs": -4922.0,
+    "firstAudioAfterSpeechMs": -4149.9,
+    "audioS": 6.4,
+    "audioFastS": 5.15,
+    "speechS": 6.8
+   }
+  }
+ ],
+ "summary": {
+  "n": 8,
+  "refFirstAudioP50": 1343.9,
+  "asmFirstAudioP50": -3603.3,
+  "speedFactor": 1.25
+ }
+}
