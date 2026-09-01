@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05030e">
+<title>SameVoice — звонок по записи</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;600;800&family=Rubik:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#05030e; --surface:#0b0722;
+  --ink:#eae6ff; --ink2:#b9b4cd; --dim:#6f6a92; --dim2:#4a4570; --chip:#a79fd6;
+  --el:#4d5bff; --cy:#22e3ff; --mg:#ff3df2;
+  --grad:linear-gradient(92deg,var(--el) 0%,var(--cy) 46%,var(--mg) 100%);
+  --f-disp:'Unbounded','Rubik','Arial Black',system-ui,sans-serif;
+  --f-text:'Rubik',-apple-system,'Segoe UI',Arial,sans-serif;
+  --ease:cubic-bezier(.3,.85,.25,1); --d-fast:.25s; --d-mid:.4s; --d-screen:.55s;
+}
+@media (prefers-reduced-motion: reduce){:root{--d-fast:.01s;--d-mid:.01s;--d-screen:.01s}}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:
+    radial-gradient(1100px 700px at 72% -8%,#170d38 0%,transparent 60%),
+    radial-gradient(900px 700px at 6% 108%,#0b1d33 0%,transparent 55%),var(--void);
+  color:var(--ink);font-family:var(--f-text);overscroll-behavior:none}
+.stage{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;padding:18px}
+.phone{position:relative;width:390px;height:844px;border-radius:54px;overflow:hidden;flex:none;
+  border:1px solid rgba(160,150,255,.14);background:var(--void);
+  box-shadow:0 44px 120px -28px rgba(30,10,90,.85),inset 0 0 0 1px rgba(255,255,255,.04)}
+@media (min-width:480px) and (max-height:980px){.phone{transform:scale(.86);margin:-60px 0}}
+@media (max-width:479px){
+  .stage{padding:0;gap:0;justify-content:flex-start}
+  .phone{width:100%;height:100vh;height:100dvh;border-radius:0;border:none;box-shadow:none;transform:none;margin:0}
+}
+.app{position:absolute;inset:0;overflow:hidden;background:
+  radial-gradient(520px 380px at 88% -4%,rgba(84,42,190,.20),transparent 65%),
+  radial-gradient(440px 440px at -6% 104%,rgba(0,122,190,.13),transparent 60%),
+  linear-gradient(180deg,#070312,#0a0620 60%,#060310)}
+#cosmos{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.scr{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;padding:52px 24px 26px;
+  opacity:0;visibility:hidden;transform:translateY(14px);
+  transition:opacity var(--d-screen),transform var(--d-screen) var(--ease),visibility var(--d-screen);overflow-y:auto}
+.scr.on{opacity:1;visibility:visible;transform:none}
+button{font-family:inherit;background:none;border:0;color:inherit;cursor:pointer}
+input{font-family:inherit;background:none;border:0;color:inherit;outline:none}
+.brand{font:600 10px var(--f-disp);letter-spacing:.5em;color:var(--dim);text-transform:lowercase}
+h1{font:800 34px/1.08 var(--f-disp);margin:12px 0 6px;letter-spacing:-.01em;
+  background:var(--grad);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;animation:shim 9s linear infinite}
+@keyframes shim{from{background-position:0 0}to{background-position:100% 0}}
+.lead{font:300 13.5px/1.55 var(--f-text);color:var(--dim);max-width:20rem}
+.hint{font:300 10px var(--f-text);color:var(--dim2);letter-spacing:.2em;text-transform:uppercase}
+.spacer{flex:1;min-height:16px}
+.cta{font:500 12px var(--f-disp);letter-spacing:.12em;color:var(--ink);padding:15px 24px;border-radius:999px;
+  border:1px solid transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--grad) border-box;
+  transition:opacity var(--d-fast),transform var(--d-fast) var(--ease)}
+.cta:disabled{opacity:.3;cursor:default}
+.cta:not(:disabled):active{transform:scale(.97)}
+.cta.wide{align-self:stretch;text-align:center}
+.ghost{font:300 11px var(--f-text);color:var(--dim);letter-spacing:.16em;text-transform:uppercase;
+  padding:12px;align-self:center}
+
+/* шапка «с кем» */
+.who{display:flex;align-items:baseline;gap:10px;margin-top:6px}
+.who .nm{font:600 26px var(--f-disp)}
+.who .nm[dir="rtl"]{font-family:var(--f-text);font-weight:600;font-size:28px}
+.who .lang{font:300 11px var(--f-text);color:var(--dim);letter-spacing:.16em}
+
+/* дни */
+.days{display:flex;gap:8px;margin:22px 0 16px;overflow-x:auto;padding-bottom:4px}
+.day{flex:none;padding:10px 14px;border-radius:14px;border:1px solid rgba(160,150,255,.16);
+  font:400 12px var(--f-text);color:var(--ink2);transition:all var(--d-fast) var(--ease);white-space:nowrap}
+.day b{display:block;font:600 15px var(--f-disp);color:var(--ink);margin-top:2px}
+.day.on{border-color:transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--grad) border-box}
+
+/* время как узлы на нити */
+.thread{position:relative;margin:4px 0 6px;height:74px}
+.thread canvas{position:absolute;inset:0;width:100%;height:100%}
+.times{display:flex;gap:7px;overflow-x:auto;padding:6px 0 10px;scrollbar-width:none}
+.times::-webkit-scrollbar{display:none}
+.tm{flex:none;padding:9px 13px;border-radius:999px;border:1px solid rgba(160,150,255,.16);
+  font:500 13px var(--f-text);color:var(--ink2);font-variant-numeric:tabular-nums;
+  transition:all var(--d-fast) var(--ease);white-space:nowrap}
+.tm.on{color:var(--ink);border-color:transparent;
+  background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--grad) border-box;
+  box-shadow:0 0 22px -8px rgba(90,170,255,.7)}
+.tm:disabled{opacity:.3}
+.tz{font:300 12px var(--f-text);color:var(--chip);margin-top:8px;font-style:italic}
+
+/* контекст */
+.themes{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 6px}
+.th{padding:9px 14px;border-radius:999px;border:1px solid rgba(160,150,255,.18);
+  font:400 12.5px var(--f-text);color:var(--ink2);transition:all var(--d-fast) var(--ease)}
+.th.on{color:var(--ink);border-color:transparent;
+  background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--grad) border-box}
+.notes{margin-top:18px}
+.notes label{display:block}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{font:italic 300 12.5px var(--f-text);color:var(--chip);position:relative;padding:6px 12px 6px 22px;
+  border-radius:999px;background:rgba(120,110,220,.10)}
+.chip::before{content:'';position:absolute;left:10px;top:calc(50% - 3px);width:6px;height:6px;border-radius:50%;
+  background:linear-gradient(135deg,var(--cy),var(--mg));opacity:.85}
+.chip button{color:var(--dim);margin-left:6px;font-size:13px;line-height:1}
+.addrow{display:flex;gap:10px;align-items:center;margin-top:12px;
+  border-bottom:1px solid rgba(160,150,255,.2);padding-bottom:8px}
+.addrow input{flex:1;font:300 14px var(--f-text)}
+.addrow input::placeholder{color:var(--dim2)}
+.why{font:300 12px/1.5 var(--f-text);color:var(--dim2);margin-top:14px}
+
+/* состояние брони */
+.state{align-items:center;text-align:center;justify-content:center}
+.big{font:800 52px/1 var(--f-disp);font-variant-numeric:tabular-nums;
+  background:var(--grad);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;animation:shim 9s linear infinite}
+.when{font:300 13px var(--f-text);color:var(--dim);letter-spacing:.18em;text-transform:uppercase;margin-top:10px}
+#statecv{width:100%;height:120px;margin:26px 0 6px}
+.stat{font:400 13px var(--f-text);color:var(--ink2)}
+.stat b{color:var(--cy);font-weight:500}
+.ctxrecap{margin-top:22px;padding:14px 16px;border-radius:16px;border:1px solid rgba(160,150,255,.14);
+  background:rgba(120,110,220,.05);text-align:left;width:100%}
+.ctxrecap h4{font:500 11px var(--f-text);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+
+/* нижняя навигация макета */
+.nav{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:390px}
+.nav button{font:300 10px var(--f-text);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  padding:8px 12px;border-radius:999px;border:1px solid rgba(160,150,255,.16);transition:all var(--d-fast)}
+.nav button.on{color:var(--ink);border-color:transparent;
+  background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--grad) border-box}
+@media (max-width:479px){
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:9;max-width:none;padding:8px 10px;
+    background:linear-gradient(180deg,transparent,rgba(5,3,14,.92) 40%)}
+  .scr{padding-bottom:74px}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone">
+    <div class="app">
+      <canvas id="cosmos"></canvas>
+
+      <!-- 1. ДОГОВОРИТЬСЯ -->
+      <section class="scr on" data-s="pick">
+        <div class="brand">samevoice</div>
+        <h1>договориться</h1>
+        <div class="who"><span class="nm" dir="rtl">רונית</span><span class="lang">עב ⇄ ру</span></div>
+        <div class="days" id="days"></div>
+        <div class="thread"><canvas id="threadcv"></canvas></div>
+        <div class="times" id="times"></div>
+        <p class="tz" id="tz">у Ронит это будет 19:00 — тот же час, её время</p>
+        <div class="spacer"></div>
+        <button class="cta wide" id="propose" disabled>предложить</button>
+        <p class="hint" style="text-align:center;margin-top:12px">она подтвердит — и мы позвоним обоим</p>
+      </section>
+
+      <!-- 2. КОНТЕКСТ -->
+      <section class="scr" data-s="ctx">
+        <div class="brand">samevoice</div>
+        <h1>о чём<br>будете говорить</h1>
+        <p class="lead">Чем раньше мы это знаем, тем быстрее перевод: слова угадываются заранее, а не разбираются на слух.</p>
+        <div class="themes" id="themes"></div>
+        <div class="notes">
+          <span class="hint">кто будет упомянут</span>
+          <div class="chips" id="chips"></div>
+          <div class="addrow">
+            <input id="addin" placeholder="Амин — прораб, вопрос по смете" aria-label="добавить заметку">
+            <button class="ghost" id="addbtn" style="padding:6px">добавить</button>
+          </div>
+          <p class="why">Заметки видит только движок перевода. Собеседнику они не показываются.</p>
+        </div>
+        <div class="spacer"></div>
+        <button class="cta wide" id="ctxGo">готово</button>
+      </section>
+
+      <!-- 3. ЖДЁМ ПОДТВЕРЖДЕНИЯ -->
+      <section class="scr state" data-s="sent">
+        <div class="big">19:00</div>
+        <div class="when">завтра · четверг</div>
+        <canvas id="statecv"></canvas>
+        <p class="stat" id="sentStat">предложено Ронит · ждём ответа</p>
+        <div class="ctxrecap">
+          <h4>контекст готов</h4>
+          <div class="chips">
+            <span class="chip">ремонт</span><span class="chip">Амин — прораб, смета</span>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <button class="ghost" id="cancel1">отменить</button>
+      </section>
+
+      <!-- 4. ПОДТВЕРЖДЕНО, ГРЕЕМ -->
+      <section class="scr state" data-s="warm">
+        <div class="big" id="cd">04:12</div>
+        <div class="when">до звонка с Ронит</div>
+        <canvas id="warmcv"></canvas>
+        <p class="stat" id="warmStat">готовим движок · <b>2 мин</b></p>
+        <p class="lead" style="text-align:center;margin-top:18px;max-width:17rem">
+          Позвоним обоим сразу. Снимите трубку — и вы уже в разговоре.</p>
+        <div class="spacer"></div>
+        <button class="ghost" id="cancel2">отменить встречу</button>
+      </section>
+
+    </div>
+  </div>
+  <nav class="nav" id="nav" aria-label="экраны макета"></nav>
+</div>
+
+<script>
+(function(){
+  var RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var state = { day: 1, time: null, themes: {}, notes: ['Амин — прораб, вопрос по смете'], warm: 0 };
+
+  /* ---------- космос (общий для всех экранов темы) ---------- */
+  var cosmosEnergy = 0;
+  (function(){
+    var cv = document.getElementById('cosmos'); if (!cv) return;
+    var ctx = cv.getContext('2d'), W=0,H=0,DPR=1, stars=[], neb=null, shoot=null, nextShoot=6, drift=0;
+    function nebula(){
+      var c=document.createElement('canvas');
+      c.width=180; c.height=Math.max(60,Math.round(180*H/(W||1)));
+      var g=c.getContext('2d');
+      [{x:.80,y:.05,r:.85,col:'120,70,255'},{x:.02,y:.62,r:.75,col:'0,170,235'},
+       {x:.62,y:.95,r:.80,col:'255,60,230'},{x:.28,y:.34,r:.55,col:'90,120,255'}].forEach(function(b){
+        var R=b.r*c.width, gr=g.createRadialGradient(b.x*c.width,b.y*c.height,0,b.x*c.width,b.y*c.height,R);
+        gr.addColorStop(0,'rgba('+b.col+',.30)'); gr.addColorStop(.45,'rgba('+b.col+',.10)');
+        gr.addColorStop(1,'rgba('+b.col+',0)'); g.fillStyle=gr; g.fillRect(0,0,c.width,c.height);
+      });
+      return c;
+    }
+    function build(){
+      var r=cv.getBoundingClientRect(); if(!r.width||!r.height) return;
+      DPR=Math.min(2,window.devicePixelRatio||1); W=r.width; H=r.height;
+      cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0);
+      stars=[]; var n=Math.round(W*H/2400);
+      for(var i=0;i<n;i++){
+        var d=Math.random(), L=d<.55?0:(d<.86?1:2), t=Math.random();
+        stars.push({x:Math.random()*W,y:Math.random()*H,L:L,
+          r:L===0?.55+Math.random()*.45:L===1?.85+Math.random()*.6:1.25+Math.random()*1.1,
+          a:L===0?.26+Math.random()*.18:L===1?.40+Math.random()*.28:.58+Math.random()*.34,
+          tw:Math.random()*6.283,tws:.35+Math.random()*1.5,hue:t<.14?195:(t<.24?292:null)});
+      }
+      neb=nebula();
+    }
+    function draw(t,dt){
+      if(!W) return;
+      var e = cosmosEnergy;
+      ctx.clearRect(0,0,W,H);
+      if(neb){
+        ctx.globalCompositeOperation='lighter';
+        var s1=Math.sin(t*.045),s2=Math.cos(t*.031);
+        ctx.globalAlpha=.55+e*.4; ctx.drawImage(neb,s1*14-10,s2*10-6,W*1.14,H*1.10);
+        ctx.globalAlpha=.34+e*.3; ctx.drawImage(neb,-s2*22-30,-s1*16-40,W*1.32,H*1.28);
+        ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+      }
+      drift+=dt*(RM?0:1);
+      for(var i=0;i<stars.length;i++){
+        var st=stars[i], y=st.y-drift*(2.5+st.L*4.5)*.35;
+        y=((y%(H+40))+(H+40))%(H+40)-20;
+        var tw=RM?.85:(.62+.38*Math.sin(t*st.tws+st.tw));
+        var a=st.a*tw*(1+e*.8), rr=st.r*(1+e*.3);
+        ctx.fillStyle=st.hue!==null?'hsla('+st.hue+',100%,'+(st.hue===195?78:74)+'%,'+a.toFixed(3)+')'
+                                   :'rgba(232,236,255,'+a.toFixed(3)+')';
+        if(st.L===2){ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=6+e*14;}
+        ctx.beginPath();ctx.arc(st.x,y,rr,0,6.283);ctx.fill();ctx.shadowBlur=0;
+      }
+      if(!RM){
+        nextShoot-=dt;
+        if(!shoot&&nextShoot<=0){shoot={x:W*(.15+Math.random()*.7),y:-20,vx:-(60+Math.random()*70),
+          vy:210+Math.random()*130,life:0,len:90+Math.random()*70}; nextShoot=8+Math.random()*12;}
+        if(shoot){
+          shoot.life+=dt;shoot.x+=shoot.vx*dt;shoot.y+=shoot.vy*dt;
+          var f=Math.max(0,1-shoot.life/1.5);
+          var gx=shoot.x-shoot.vx*.0045*shoot.len, gy=shoot.y-shoot.vy*.0045*shoot.len;
+          var g2=ctx.createLinearGradient(shoot.x,shoot.y,gx,gy);
+          g2.addColorStop(0,'rgba(255,255,255,'+(.75*f).toFixed(3)+')');
+          g2.addColorStop(.35,'rgba(120,225,255,'+(.35*f).toFixed(3)+')');
+          g2.addColorStop(1,'rgba(120,225,255,0)');
+          ctx.strokeStyle=g2;ctx.lineWidth=1.6;ctx.lineCap='round';
+          ctx.beginPath();ctx.moveTo(shoot.x,shoot.y);ctx.lineTo(gx,gy);ctx.stroke();
+          if(shoot.y>H+60||f<=0) shoot=null;
+        }
+      }
+    }
+    var last=0;
+    function loop(ms){var t=ms/1000,dt=last?Math.min(.05,t-last):0;last=t;draw(t,dt);requestAnimationFrame(loop);}
+    build(); if(RM) draw(0,0); else requestAnimationFrame(loop);
+    addEventListener('resize',function(){build();if(RM)draw(0,0);});
+    if(window.ResizeObserver){
+      var lw=0,lh=0;
+      new ResizeObserver(function(){
+        var r=cv.getBoundingClientRect(); if(!r.width||!r.height) return;
+        if(Math.abs(r.width-lw)<1&&Math.abs(r.height-lh)<1) return;
+        lw=r.width;lh=r.height;build();if(RM)draw(0,0);
+      }).observe(cv);
+    }
+  })();
+
+  /* ---------- экраны ---------- */
+  var scrs=[].slice.call(document.querySelectorAll('.scr'));
+  var titles={pick:'время',ctx:'контекст',sent:'ждём',warm:'греем'};
+  var nav=document.getElementById('nav');
+  scrs.forEach(function(s){
+    var b=document.createElement('button');
+    b.textContent=titles[s.dataset.s]||s.dataset.s;
+    b.addEventListener('click',function(){show(s.dataset.s);});
+    nav.appendChild(b);
+  });
+  function show(name){
+    scrs.forEach(function(s){s.classList.toggle('on',s.dataset.s===name);});
+    [].forEach.call(nav.children,function(b,i){b.classList.toggle('on',scrs[i].dataset.s===name);});
+    cosmosEnergy = name==='warm' ? state.warm : 0;
+  }
+  show('pick');
+
+  /* ---------- 1. выбор дня и времени ---------- */
+  var DAYNAMES=['вс','пн','вт','ср','чт','пт','сб'];
+  var daysEl=document.getElementById('days'), timesEl=document.getElementById('times');
+  var base=new Date();
+  for(var d=0; d<5; d++){
+    (function(off){
+      var dt=new Date(base.getTime()+off*86400000);
+      var b=document.createElement('button');
+      b.className='day'+(off===state.day?' on':'');
+      b.innerHTML=(off===0?'сегодня':off===1?'завтра':DAYNAMES[dt.getDay()])+
+        '<b>'+dt.getDate()+'.'+('0'+(dt.getMonth()+1)).slice(-2)+'</b>';
+      b.addEventListener('click',function(){
+        state.day=off;
+        [].forEach.call(daysEl.children,function(x){x.classList.remove('on');});
+        b.classList.add('on'); buildTimes();
+      });
+      daysEl.appendChild(b);
+    })(d);
+  }
+  function buildTimes(){
+    timesEl.replaceChildren();
+    var now=new Date(), startH = state.day===0 ? now.getHours()+1 : 8;
+    for(var h=Math.max(8,startH); h<23; h++){
+      [0,30].forEach(function(m){
+        var b=document.createElement('button');
+        b.className='tm'; b.textContent=('0'+h).slice(-2)+':'+('0'+m).slice(-2);
+        b.addEventListener('click',function(){
+          state.time=b.textContent;
+          [].forEach.call(timesEl.children,function(x){x.classList.remove('on');});
+          b.classList.add('on');
+          document.getElementById('propose').disabled=false;
+          document.getElementById('tz').textContent='у Ронит это будет '+state.time+' — тот же час, её время';
+        });
+        timesEl.appendChild(b);
+      });
+    }
+    state.time=null; document.getElementById('propose').disabled=true;
+  }
+  buildTimes();
+  document.getElementById('propose').addEventListener('click',function(){ show('ctx'); });
+
+  /* нить времени: узлы разгораются под выбранным часом */
+  var tcv=document.getElementById('threadcv'), tctx=tcv.getContext('2d'), tW=0,tH=0;
+  function fitThread(){
+    var r=tcv.getBoundingClientRect(); if(!r.width) return;
+    var d=Math.min(2,devicePixelRatio||1);
+    tcv.width=Math.round(r.width*d); tcv.height=Math.round(r.height*d);
+    tctx.setTransform(d,0,0,d,0,0); tW=r.width; tH=r.height;
+  }
+  function drawThread(t){
+    if(!tW){fitThread(); if(!tW) return;}
+    tctx.clearRect(0,0,tW,tH);
+    var picked=!!state.time;
+    var g=tctx.createLinearGradient(0,0,tW,0);
+    g.addColorStop(0,'rgba(77,91,255,0)');
+    g.addColorStop(.5, picked?'rgba(34,227,255,.9)':'rgba(120,110,220,.4)');
+    g.addColorStop(1,'rgba(255,61,242,0)');
+    tctx.strokeStyle=g; tctx.lineWidth=picked?2:1.3;
+    tctx.beginPath();
+    for(var x=0;x<=tW;x+=3){
+      var u=x/tW, env=Math.sin(Math.PI*u), amp=picked?13:5;
+      var y=tH/2+env*(Math.sin(x*.026+t*(picked?1.6:.7))*amp+Math.sin(x*.052-t*1.3)*amp*.4);
+      if(x===0) tctx.moveTo(x,y); else tctx.lineTo(x,y);
+    }
+    tctx.stroke();
+    if(picked){
+      var px=tW/2, py=tH/2, pulse=.6+.4*Math.sin(t*3);
+      tctx.fillStyle='rgba(255,255,255,'+(.85*pulse).toFixed(2)+')';
+      tctx.shadowColor='rgba(90,200,255,.9)'; tctx.shadowBlur=16*pulse;
+      tctx.beginPath(); tctx.arc(px,py,4.5,0,6.283); tctx.fill(); tctx.shadowBlur=0;
+    }
+  }
+
+  /* ---------- 2. контекст ---------- */
+  var themesEl=document.getElementById('themes');
+  ['ремонт','работа','семья','деньги','врач','документы','дети'].forEach(function(name){
+    var b=document.createElement('button');
+    b.className='th'+(name==='ремонт'?' on':''); b.textContent=name;
+    if(name==='ремонт') state.themes[name]=true;
+    b.addEventListener('click',function(){
+      var on=b.classList.toggle('on');
+      if(on) state.themes[name]=true; else delete state.themes[name];
+    });
+    themesEl.appendChild(b);
+  });
+  var chipsEl=document.getElementById('chips'), addin=document.getElementById('addin');
+  function renderChips(){
+    chipsEl.replaceChildren();
+    state.notes.forEach(function(n,i){
+      var s=document.createElement('span'); s.className='chip'; s.textContent=n;
+      var x=document.createElement('button'); x.textContent='×'; x.setAttribute('aria-label','убрать');
+      x.addEventListener('click',function(){ state.notes.splice(i,1); renderChips(); });
+      s.appendChild(x); chipsEl.appendChild(s);
+    });
+  }
+  renderChips();
+  function addNote(){
+    var v=addin.value.trim(); if(!v) return;
+    state.notes.push(v); addin.value=''; renderChips();
+  }
+  document.getElementById('addbtn').addEventListener('click',addNote);
+  addin.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); addNote(); }});
+  document.getElementById('ctxGo').addEventListener('click',function(){ show('sent'); });
+
+  /* ---------- 3. ждём подтверждения ---------- */
+  var scv=document.getElementById('statecv'), sctx=scv.getContext('2d'), sW=0,sH=0;
+  function fitState(){
+    var r=scv.getBoundingClientRect(); if(!r.width) return;
+    var d=Math.min(2,devicePixelRatio||1);
+    scv.width=Math.round(r.width*d); scv.height=Math.round(r.height*d);
+    sctx.setTransform(d,0,0,d,0,0); sW=r.width; sH=r.height;
+  }
+  function drawSent(t){
+    if(!sW){fitState(); if(!sW) return;}
+    sctx.clearRect(0,0,sW,sH);
+    /* две нити: твоя живая, его — пунктир, пока не подтвердил */
+    for(var k=0;k<2;k++){
+      var mine=k===0, yb=sH/2+(mine?-13:13);
+      if(!mine){ sctx.setLineDash([2,8]); sctx.lineDashOffset=-t*20; }
+      else sctx.setLineDash([]);
+      var g=sctx.createLinearGradient(0,0,sW,0);
+      g.addColorStop(0,'rgba(77,91,255,0)');
+      g.addColorStop(.5, mine?'rgba(34,227,255,.85)':'rgba(160,150,255,.45)');
+      g.addColorStop(1,'rgba(255,61,242,0)');
+      sctx.strokeStyle=g; sctx.lineWidth=mine?2:1.4;
+      sctx.beginPath();
+      for(var x=0;x<=sW;x+=3){
+        var u=x/sW, env=Math.sin(Math.PI*u), amp=mine?12:5;
+        var y=yb+env*(Math.sin(x*.027+t*(mine?1.5:.8)+k)*amp);
+        if(x===0) sctx.moveTo(x,y); else sctx.lineTo(x,y);
+      }
+      sctx.stroke();
+    }
+    sctx.setLineDash([]);
+  }
+  document.getElementById('cancel1').addEventListener('click',function(){ show('pick'); });
+
+  /* ---------- 4. греем ---------- */
+  var wcv=document.getElementById('warmcv'), wctx=wcv.getContext('2d'), wW=0,wH=0, warmT0=Date.now();
+  function fitWarm(){
+    var r=wcv.getBoundingClientRect(); if(!r.width) return;
+    var d=Math.min(2,devicePixelRatio||1);
+    wcv.width=Math.round(r.width*d); wcv.height=Math.round(r.height*d);
+    wctx.setTransform(d,0,0,d,0,0); wW=r.width; wH=r.height;
+  }
+  function drawWarm(t){
+    if(!wW){fitWarm(); if(!wW) return;}
+    /* прогрев показан честно: звезда разгорается ровно на долю готовности */
+    var el=(Date.now()-warmT0)/1000;
+    state.warm=Math.min(1, (el%40)/24);
+    cosmosEnergy=state.warm;
+    wctx.clearRect(0,0,wW,wH);
+    var cx=wW/2, cy=wH/2, p=state.warm;
+    var rad=10+p*26, glow=wctx.createRadialGradient(cx,cy,0,cx,cy,rad*2.4);
+    glow.addColorStop(0,'rgba(255,255,255,'+(.35+p*.5).toFixed(2)+')');
+    glow.addColorStop(.35,'rgba(34,227,255,'+(.22+p*.35).toFixed(2)+')');
+    glow.addColorStop(1,'rgba(120,70,255,0)');
+    wctx.fillStyle=glow; wctx.beginPath(); wctx.arc(cx,cy,rad*2.4,0,6.283); wctx.fill();
+    wctx.fillStyle='rgba(255,255,255,'+(.6+p*.4).toFixed(2)+')';
+    wctx.beginPath(); wctx.arc(cx,cy,3+p*4,0,6.283); wctx.fill();
+    /* кольцо готовности */
+    wctx.strokeStyle='rgba(160,150,255,.22)'; wctx.lineWidth=2;
+    wctx.beginPath(); wctx.arc(cx,cy,42,0,6.283); wctx.stroke();
+    var g=wctx.createLinearGradient(cx-42,cy,cx+42,cy);
+    g.addColorStop(0,'#4d5bff'); g.addColorStop(.5,'#22e3ff'); g.addColorStop(1,'#ff3df2');
+    wctx.strokeStyle=g; wctx.lineWidth=2.5; wctx.lineCap='round';
+    wctx.beginPath(); wctx.arc(cx,cy,42,-Math.PI/2,-Math.PI/2+6.283*p); wctx.stroke();
+    var left=Math.max(0, Math.ceil((1-p)*4));
+    document.getElementById('warmStat').innerHTML = p>=1
+      ? 'движок готов · <b>ждём времени</b>'
+      : 'готовим движок · <b>'+left+' мин</b>';
+    var cd=Math.max(0, 252-Math.floor(el));
+    document.getElementById('cd').textContent=Math.floor(cd/60)+':'+('0'+(cd%60)).slice(-2);
+  }
+  document.getElementById('cancel2').addEventListener('click',function(){ show('pick'); });
+
+  /* ---------- общий кадр ---------- */
+  function frame(ms){
+    var t=ms/1000;
+    var cur=document.querySelector('.scr.on');
+    if(cur){
+      if(cur.dataset.s==='pick') drawThread(t);
+      else if(cur.dataset.s==='sent') drawSent(t);
+      else if(cur.dataset.s==='warm') drawWarm(t);
+    }
+    requestAnimationFrame(frame);
+  }
+  fitThread(); fitState(); fitWarm();
+  addEventListener('resize',function(){ fitThread(); fitState(); fitWarm(); });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
