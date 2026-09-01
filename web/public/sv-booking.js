@@ -61,6 +61,12 @@
     '  margin-right:7px;vertical-align:middle;background:linear-gradient(135deg,#ffca6a,#ff7a3d);',
     '  box-shadow:0 0 8px rgba(255,150,60,.9)}',
     '.sv-note{font:300 12.5px/1.5 var(--font);color:var(--fg-faint);margin:6px 0 14px}',
+    '.sv-note.tight{color:var(--warn)}',
+    '.sv-exact{display:flex;align-items:center;gap:12px;margin:4px 0 2px}',
+    '.sv-exact span{font:300 10px var(--font);letter-spacing:.2em;text-transform:uppercase;',
+    '  color:var(--fg-faint);white-space:nowrap}',
+    '.sv-exact input{flex:0 0 auto;width:auto;min-height:44px;padding:8px 14px;',
+    '  font:600 18px var(--font-display);font-variant-numeric:tabular-nums}',
     '.sv-note.warm{color:#ffd9a3;font-style:italic}',
     '.sv-lbl{font:300 10px var(--font);letter-spacing:.22em;text-transform:uppercase;',
     '  color:var(--fg-faint);display:block;margin:16px 0 8px}',
@@ -131,10 +137,14 @@
 
   /* ------------------------------------------------------------ лист */
   var warmSlots = {};      // 'HH:MM' -> true, если карта уже будет горячей
+  var warmLeadMin = 5;     // сколько нужно на подъём карты (спросим у сервера)
 
   function loadWarm() {
     return api('/plan').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
       warmSlots = {};
+      if (d && d.params) {
+        warmLeadMin = (d.params.warmMinutes || 4) + (d.params.riskMinutes || 1);
+      }
       if (!d || !d.windows) return;
       d.windows.forEach(function (w) {
         // окно горячее от начала до конца: слоты внутри не требуют прогрева
@@ -148,7 +158,7 @@
   }
 
   function openSheet(userId, displayName) {
-    var state = { day: 1, time: null, notes: [], themes: {}, autoCall: false };
+    var state = { day: 0, time: null, notes: [], themes: {}, autoCall: false };
 
     var wrap = document.createElement('div');
     wrap.className = 'sv-sheet';
@@ -160,6 +170,8 @@
       '  <span class="sv-lbl">когда</span>' +
       '  <div class="sv-row" data-days></div>' +
       '  <div class="sv-row" data-times></div>' +
+      '  <div class="sv-exact"><span>или своё время</span>' +
+      '    <input type="time" step="60" data-exact aria-label="произвольное время"></div>' +
       '  <p class="sv-note" data-tz>огонёк — карта уже будет горячей, ждать не придётся</p>' +
       '  <span class="sv-lbl">о чём</span>' +
       '  <div class="sv-row" data-themes></div>' +
@@ -204,6 +216,50 @@
       })(d);
     }
 
+    var exactEl = wrap.querySelector('[data-exact]');
+
+    /* Время можно назначить любое, минимум — через две минуты от сейчас.
+     * Если до встречи меньше, чем нужно на подъём карты, честно говорим об
+     * этом: движок догреется уже в начале разговора. Запрещать не за что —
+     * пусть человек решает сам. */
+    function whenOf(label) {
+      var hm = String(label).split(':');
+      var dt = new Date(Date.now() + state.day * 86400000);
+      dt.setHours(+hm[0], +hm[1], 0, 0);
+      return dt;
+    }
+
+    function pickTime(label) {
+      var dt = whenOf(label);
+      var minutesAway = (dt.getTime() - Date.now()) / 60000;
+      if (minutesAway < 2) {
+        state.time = null;
+        sendBtn.disabled = true;
+        tzEl.textContent = 'слишком близко: назначайте не раньше чем через две минуты';
+        tzEl.className = 'sv-note tight';
+        return;
+      }
+      state.time = label;
+      sendBtn.disabled = false;
+      if (warmSlots[label]) {
+        tzEl.textContent = 'в это время карта уже горячая — позвоним сразу, без ожидания';
+        tzEl.className = 'sv-note warm';
+      } else if (minutesAway < warmLeadMin) {
+        tzEl.textContent = 'до встречи меньше, чем нужно на подъём карты (' +
+          warmLeadMin + ' мин): движок догреется уже в начале разговора';
+        tzEl.className = 'sv-note tight';
+      } else {
+        tzEl.textContent = 'движок поднимем заранее, к началу разговора он будет готов';
+        tzEl.className = 'sv-note';
+      }
+    }
+
+    exactEl.addEventListener('input', function () {
+      if (!exactEl.value) return;
+      [].forEach.call(timesEl.children, function (x) { x.classList.remove('on'); });
+      pickTime(exactEl.value);
+    });
+
     function buildTimes() {
       timesEl.replaceChildren();
       state.time = null; sendBtn.disabled = true;
@@ -216,15 +272,10 @@
           b.className = 'sv-chip' + (warmSlots[label] ? ' warm' : '');
           b.textContent = label;
           b.addEventListener('click', function () {
-            state.time = label;
             [].forEach.call(timesEl.children, function (x) { x.classList.remove('on'); });
             b.classList.add('on');
-            sendBtn.disabled = false;
-            var warm = !!warmSlots[label];
-            tzEl.textContent = warm
-              ? 'в это время карта уже горячая — позвоним сразу, без ожидания'
-              : 'движок поднимем заранее, к началу разговора он будет готов';
-            tzEl.classList.toggle('warm', warm);
+            exactEl.value = '';
+            pickTime(label);
           });
           timesEl.appendChild(b);
         });
@@ -281,9 +332,7 @@
 
     sendBtn.addEventListener('click', function () {
       if (!state.time) return;
-      var dt = new Date(Date.now() + state.day * 86400000);
-      var hm = state.time.split(':');
-      dt.setHours(+hm[0], +hm[1], 0, 0);
+      var dt = whenOf(state.time);
       sendBtn.disabled = true;
       sendBtn.textContent = 'отправляю…';
       api('/bookings', {
@@ -360,14 +409,22 @@
   function watchWarmup(booking) {
     if (booking.state !== 'confirmed') return;
     var until = booking.startsAt - Date.now();
-    if (until > 12 * 60000 || until < -5 * 60000) return;     // рано или поздно
+    // Грубый предфильтр — только чтобы не спрашивать про дальние встречи.
+    // КОГДА показывать окно, решает не это число, а ответ оркестратора: он
+    // один знает, греется ли карта уже и сколько осталось ИМЕННО этой броне.
+    if (until > 30 * 60000 || until < -5 * 60000) return;
     if (warmShownFor === booking.id) return;
     api('/readiness?bookingId=' + encodeURIComponent(booking.id))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (s) {
-        if (!s || s.state === 'hot' || s.etaSeconds == null) return;   // ждать нечего
+        if (!s || s.etaSeconds == null) return;
+        if (s.state === 'hot') return;              // карта горячая — ждать нечего
+        // Показываем, когда прогрев уже идёт или вот-вот начнётся. Висеть
+        // на экране за десять минут до начала бессмысленно: ничего не происходит.
+        var скороНачнётся = s.state === 'scheduled' && (s.warmStartsInSeconds || 0) <= 60;
+        if (!(s.state === 'warming' || s.state === 'starting' || скороНачнётся)) return;
         warmShownFor = booking.id;
-        showWarmup(s);
+        showWarmup(s, booking);
       }).catch(function () {});
   }
 
@@ -378,7 +435,7 @@
     { t: 'Почти готово', e: 'Последняя проверка: слышно ли обоих и не рвётся ли звук.' }
   ];
 
-  function showWarmup(status) {
+  function showWarmup(status, booking) {
     var eta = Math.max(0, status.etaSeconds || 0);
     var lessons = LESSONS.slice(0, Math.min(LESSONS.length, Math.max(1, Math.floor(eta / 25))));
 
@@ -483,7 +540,26 @@
       texts(pr, left);
       raf = requestAnimationFrame(frame);
     }
-    function stop() { if (raf !== null) { cancelAnimationFrame(raf); raf = null; } }
+    function stop() {
+      if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+    }
+
+    // Окно не гадает: раз в 20 секунд переспрашивает оркестратор. Если карта
+    // прогрелась раньше срока или встреча отменилась — окно честно закроется.
+    var poll = booking ? setInterval(function () {
+      api('/readiness?bookingId=' + encodeURIComponent(booking.id))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) {
+          if (!s) return;
+          if (s.state === 'hot' || s.state === 'not-confirmed') {
+            stop(); wrap.remove(); warmShownFor = null;
+            return;
+          }
+          if (typeof s.etaSeconds === 'number') { eta = Math.max(0, s.etaSeconds); t0 = 0; }
+        }).catch(function () {});
+    }, 20000) : null;
+
     raf = requestAnimationFrame(frame);
   }
 
