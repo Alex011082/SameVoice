@@ -9,17 +9,19 @@
  * у кнопки движка. Без ключа модуль молчит и ничего не рисует.
  */
 (function () {
-  var KEY;
+  /* Бронь работает у ЛЮБОГО вошедшего: подтверждением служит его собственный
+   * вход в приложение — оркестратор переспрашивает бэкенд, кто это. Наш
+   * лабораторный ключ, если он есть, остаётся отдельным входом для отладки. */
+  var KEY = null;
   try { KEY = localStorage.getItem('sv-engine-key'); } catch (e) {}
-  if (!KEY) return;
 
   var RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var me = null;
 
   function api(path, opts) {
-    return fetch('/orch' + path, Object.assign({
-      headers: { 'x-engine-key': KEY, 'Content-Type': 'application/json' },
-    }, opts || {}));
+    var headers = { 'Content-Type': 'application/json' };
+    if (KEY) headers['x-engine-key'] = KEY;
+    return fetch('/orch' + path, Object.assign({ credentials: 'include', headers }, opts || {}));
   }
 
   fetch('/api/auth/session', { credentials: 'include' })
@@ -288,9 +290,9 @@
         method: 'POST',
         body: JSON.stringify({
           startsAt: dt.getTime(),
-          byUserId: me, withUserId: userId,
+          withUserId: userId,
           context: { themes: Object.keys(state.themes), notes: state.notes },
-          initiator: { userId: me, autoCall: state.autoCall },
+          initiator: { autoCall: state.autoCall },
           invitee: { userId: userId },
         }),
       }).then(function (r) {

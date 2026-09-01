@@ -242,7 +242,11 @@ async function reconcile() {
   ticking = true;
   try {
     const now = Date.now();
-    const live = bookings.filter((b) => b.state === 'confirmed' && b.startsAt + (b.durationMinutes || PARAMS.durationMinutes) * MIN > now - 5 * MIN);
+    const bothSigned = (b) => !b.byUserId || !b.withUserId ||
+      (Array.isArray(b.signedBy) && b.signedBy.includes(b.byUserId) && b.signedBy.includes(b.withUserId));
+    // Карта греется только под встречу, которую подписали ОБА: иначе платим
+    // за разговор, на который вторая сторона не соглашалась.
+    const live = bookings.filter((b) => b.state === 'confirmed' && bothSigned(b) && b.startsAt + (b.durationMinutes || PARAMS.durationMinutes) * MIN > now - 5 * MIN);
     const windows = plan(live, PARAMS);
     const acts = decide(windows, pods, now, PARAMS);
 
@@ -328,6 +332,32 @@ async function reconcile() {
 setInterval(reconcile, TICK_MS);
 setTimeout(reconcile, 2000);
 
+/* ------------------------------------------------------------ кто спрашивает */
+
+/* Бронь подтверждается ВХОДОМ КАЖДОГО в приложение — это и есть его ключ.
+ * Оркестратор не умеет проверять подпись сессии сам, поэтому переспрашивает
+ * бэкенд: пересылает куки и узнаёт, кто это. Наш лабораторный ключ остаётся
+ * отдельным входом для отладки. */
+async function whoIs(req) {
+  if ((req.headers['x-engine-key'] || '') === env.ENGINE_KEY) return { admin: true, userId: null };
+  const cookie = req.headers.cookie;
+  if (!cookie) return null;
+  try {
+    const r = await fetch('http://127.0.0.1:8787/api/auth/session', {
+      headers: { cookie },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const id = j && j.user && (j.user.id || j.user.userId);
+    return id ? { admin: false, userId: id } : null;
+  } catch (e) { return null; }
+}
+
+function isParty(bk, userId) {
+  return !!userId && (bk.byUserId === userId || bk.withUserId === userId);
+}
+
 /* ---------------------------------------------------------------------- API */
 
 function send(res, code, obj) {
@@ -360,9 +390,13 @@ function planView() {
 http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
   const p = u.pathname.replace(/^\/orch/, '') || '/';
-  if ((req.headers['x-engine-key'] || '') !== env.ENGINE_KEY) return send(res, 403, { error: 'нет ключа' });
+  const who = await whoIs(req);
+  if (!who) return send(res, 403, { error: 'нужен вход в приложение' });
   try {
-    if (p === '/bookings' && req.method === 'GET') return send(res, 200, { bookings });
+    if (p === '/bookings' && req.method === 'GET') {
+      const mine = who.admin ? bookings : bookings.filter((b) => isParty(b, who.userId));
+      return send(res, 200, { bookings: mine });
+    }
     if (p === '/bookings' && req.method === 'POST') {
       const b = await body(req);
       const startsAt = typeof b.startsAt === 'number' ? b.startsAt : Date.parse(b.startsAt);
@@ -371,11 +405,16 @@ http.createServer(async (req, res) => {
         id: 'bk_' + crypto.randomBytes(5).toString('hex'),
         createdAt: Date.now(), startsAt,
         durationMinutes: b.durationMinutes || PARAMS.durationMinutes,
-        byUserId: b.byUserId || null, withUserId: b.withUserId || null,
+        // Автора НЕ берём из тела: инициатором записывается тот, кто вошёл.
+        byUserId: who.admin ? (b.byUserId || null) : who.userId,
+        withUserId: b.withUserId || null,
         initiator: Object.assign({ userId: b.byUserId || null }, b.initiator || {}),
         invitee: Object.assign({ userId: b.withUserId || null }, b.invitee || {}),
         context: { themes: (b.context && b.context.themes) || [], notes: (b.context && b.context.notes) || [] },
-        state: b.autoConfirm ? 'confirmed' : 'proposed',
+        state: b.autoConfirm && who.admin ? 'confirmed' : 'proposed',
+        // Подписи сторон: инициатор подписывает самим фактом создания,
+        // приглашённый — подтверждением. Греем только когда подписали оба.
+        signedBy: who.admin ? [] : [who.userId],
       };
       bookings.push(rec); save('bookings.json', bookings);
       note(`бронь ${rec.id} на ${new Date(startsAt).toISOString().slice(11, 16)} — ${rec.state}`);
@@ -386,8 +425,22 @@ http.createServer(async (req, res) => {
     if (m && req.method === 'POST') {
       const rec = bookings.find((b) => b.id === m[1]);
       if (!rec) return send(res, 404, { error: 'нет такой брони' });
-      rec.state = m[2] === 'confirm' ? 'confirmed' : 'cancelled';
-      if (rec.state === 'confirmed') rec.confirmedAt = Date.now(); else rec.cancelledAt = Date.now();
+      if (!who.admin && !isParty(rec, who.userId)) {
+        return send(res, 403, { error: 'это не ваша встреча' });
+      }
+      if (m[2] === 'confirm') {
+        // Подтверждает приглашённый: инициатор уже подписался, создав бронь.
+        if (!who.admin && who.userId !== rec.withUserId) {
+          return send(res, 403, { error: 'подтвердить может только приглашённый' });
+        }
+        rec.signedBy = Array.from(new Set([...(rec.signedBy || []), rec.byUserId, rec.withUserId].filter(Boolean)));
+        rec.state = 'confirmed';
+        rec.confirmedAt = Date.now();
+      } else {
+        rec.state = 'cancelled';
+        rec.cancelledAt = Date.now();
+        rec.cancelledBy = who.userId || 'админ';
+      }
       save('bookings.json', bookings);
       note(`бронь ${rec.id}: ${rec.state}`);
       reconcile();
