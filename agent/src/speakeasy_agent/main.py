@@ -29,6 +29,7 @@ from .evallog import VERDICTS, EvalLogStore, is_valid_call_id, verdict_record
 from .httpclient import close_shared_session
 from .providers import build_mt, build_stt, build_tts
 from .relay import Relay, RelayJob
+from .engine_routing import resolve_for_call
 
 logger = logging.getLogger("speakeasy_agent")
 
@@ -70,7 +71,11 @@ class AgentService:
 
     async def start_job(self, job: RelayJob) -> None:
         self._failures.pop(job.call_id, None)
-        relay = Relay(job, self.cfg, eval_store=self.eval_store)
+        # Движок выбирается ДЛЯ ЭТОГО звонка: у оркестратора может быть
+        # поднято несколько подов, и соседний разговор пойдёт на другой.
+        # Молчание оркестратора не мешает звонку — остаются настройки среды.
+        cfg = await resolve_for_call(self.cfg, job)
+        relay = Relay(job, cfg, eval_store=self.eval_store)
         self._relays[job.call_id] = relay
         task = asyncio.create_task(self._supervise(job.call_id, relay), name=f"relay:{job.call_id}")
         self._tasks[job.call_id] = task

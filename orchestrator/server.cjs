@@ -12,13 +12,13 @@
  * «пора», и человек нажимает сам: звонить тому, кто на это не соглашался,
  * нельзя.
  *
- * Чего НЕ делает и почему: не умеет одновременно обслуживать два пода
- * ЖИВЫМИ звонками. Причина честная: агент берёт адрес движка из глобальных
- * переменных окружения (RUNPOD_STT_URL/RUNPOD_MT_URL), то есть в каждый
- * момент говорит с одним подом. Пока это так, оркестратор переключает агента
- * на под ближайшего активного гнезда и пишет предупреждение, если активных
- * гнёзд оказалось больше одного. Разводка по звонкам — следующая работа в
- * agent/src/speakeasy_agent/providers.
+ * Разводка по звонкам: агент перед каждым звонком спрашивает
+ * `GET /engine-for?a=&b=` — какой под обслуживает ЭТУ пару. Поэтому
+ * одновременно живых гнёзд может быть сколько угодно, и соседние разговоры
+ * идут на разные поды. Ответ даётся только про ГОТОВЫЙ под активного
+ * гнезда: греющийся звонку не поможет, а адрес мёртвого хуже молчания.
+ * Глобальное переключение агента осталось подстраховкой на случай, если
+ * у агента не задан ORCHESTRATOR_URL.
  *
  * Слушает 127.0.0.1:9098, наружу — через Caddy на /orch/*, ключ x-engine-key.
  */
@@ -276,10 +276,14 @@ async function reconcile() {
       }
     }
 
-    // Кого слушает агент: под ближайшего активного гнезда.
+    // Агент спрашивает движок сам, для каждого звонка (GET /engine-for),
+    // поэтому активных гнёзд может быть сколько угодно. Глобальное
+    // переключение осталось как подстраховка: если разводка выключена
+    // (у агента нет ORCHESTRATOR_URL), звонки всё равно попадут на под.
     const activeWindows = windows.filter((w) => now >= w.start - MIN && now < w.end + 5 * MIN);
-    if (activeWindows.length > 1) {
-      note(`ВНИМАНИЕ: активных гнёзд ${activeWindows.length}, а агент умеет один под — разводка по звонкам ещё не сделана`);
+    for (const w of activeWindows) {
+      const pod = pods.find((x) => String(x.windowStart) === String(w.start) && x.state === 'ready');
+      if (pod) pod.busyUntil = Math.max(pod.busyUntil || 0, w.end + 5 * MIN);
     }
     const target = activeWindows.length
       ? pods.find((p) => String(p.windowStart) === String(activeWindows[0].start) && p.state === 'ready')
@@ -388,6 +392,35 @@ http.createServer(async (req, res) => {
       note(`бронь ${rec.id}: ${rec.state}`);
       reconcile();
       return send(res, 200, { booking: rec });
+    }
+    if (p === '/engine-for' && req.method === 'GET') {
+      /* Кто обслуживает ЭТУ пару прямо сейчас. Отвечаем только про готовый
+       * под активного гнезда: греющийся под звонку не поможет, а адрес
+       * мёртвого пода хуже отсутствия ответа — агент останется без движка. */
+      const a = u.searchParams.get('a'), b = u.searchParams.get('b');
+      const now = Date.now();
+      const live = bookings.filter((x) => x.state === 'confirmed');
+      const windows = plan(live, PARAMS);
+      const pair = (bk) => {
+        const set = new Set([bk.byUserId, bk.withUserId].filter(Boolean));
+        return set.has(a) && set.has(b);
+      };
+      for (const w of windows) {
+        if (now < w.start - 2 * MIN || now > w.end + 5 * MIN) continue;
+        const mine = w.items.some((i) => {
+          const bk = live.find((x) => x.id === i.id);
+          return bk && pair(bk);
+        });
+        if (!mine) continue;
+        const pod = pods.find((x) => String(x.windowStart) === String(w.start) && x.state === 'ready');
+        if (!pod) continue;
+        const host = `${pod.id}-8000.proxy.runpod.net`;
+        return send(res, 200, { podId: pod.id, engine: {
+          sttUrl: `wss://${host}/stt/v1/stream`,
+          mtUrl: `https://${host}/mt/v1/translate`,
+        } });
+      }
+      return send(res, 200, { podId: null, engine: null });
     }
     if (p === '/push/key' && req.method === 'GET') return send(res, 200, { key: env.VAPID_PUBLIC || null });
     if (p === '/push/subscribe' && req.method === 'POST') {

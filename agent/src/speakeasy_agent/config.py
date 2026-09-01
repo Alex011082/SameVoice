@@ -153,6 +153,10 @@ class Config:
     #: accepted, so this is an escape hatch rather than a guess baked into code.
     cartesia_api_version: str = ""
     cartesia_sample_rate: int = 24000
+    #: Оркестратор броней: у кого спрашивать движок для конкретного звонка.
+    #: Пусто — агент работает как раньше, по переменным окружения.
+    orchestrator_url: str = ""
+    orchestrator_key: str = ""
     runpod_stt_url: str = ""
     runpod_mt_url: str = ""
     runpod_tts_url: str = ""
@@ -209,6 +213,8 @@ class Config:
             cartesia_voice_he=_env("CARTESIA_VOICE_HE", ""),
             cartesia_api_version=_env("CARTESIA_API_VERSION", ""),
             cartesia_sample_rate=_env_int("CARTESIA_SAMPLE_RATE", 24000),
+            orchestrator_url=_env("ORCHESTRATOR_URL", ""),
+            orchestrator_key=_env("ORCHESTRATOR_KEY", ""),
             runpod_stt_url=_env("RUNPOD_STT_URL", ""),
             runpod_mt_url=_env("RUNPOD_MT_URL", ""),
             runpod_tts_url=_env("RUNPOD_TTS_URL", ""),
