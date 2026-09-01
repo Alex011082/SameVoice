@@ -19,8 +19,11 @@ case "$1" in
     [ -n "$2" ] || { echo "нужен POD_ID"; exit 1; }
     setvar STT_PROVIDER runpod
     setvar MT_PROVIDER runpod
-    setvar RUNPOD_STT_URL "wss://$2-8102.proxy.runpod.net/v1/stream"
-    setvar RUNPOD_MT_URL "https://$2-8103.proxy.runpod.net/v1/translate"
+    # Один порт, не три: под с тремя http-портами не запускает контейнер
+    # вовсе (опыт 01.09, под vfa1ryl4zqdwvi ожил с одним). Сервисы
+    # смонтированы в gpu/engine_app.py по путям /stt и /mt.
+    setvar RUNPOD_STT_URL "wss://$2-8000.proxy.runpod.net/stt/v1/stream"
+    setvar RUNPOD_MT_URL "https://$2-8000.proxy.runpod.net/mt/v1/translate"
     ;;
   cloud)
     setvar STT_PROVIDER deepgram

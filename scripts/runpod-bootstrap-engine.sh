@@ -1,7 +1,11 @@
 #!/bin/bash
-# Bootstrap БОЕВОГО движка по требованию: STT-стрим (Nemotron) + Marian наружу
-# для живого звонка: агент на samevoice-сервере ходит сюда по proxy-URL пода.
-# Порты 8102/8103 открыты наружу — держать под только на время теста. Схема без SSH.
+# Bootstrap БОЕВОГО движка: STT-стрим (Nemotron) + Marian на ОДНОМ порту 8000.
+# Агент на samevoice-сервере ходит сюда по proxy-URL пода: /stt и /mt.
+#
+# Почему один порт, а не три: под, созданный с ports "8000/http,8102/http,
+# 8103/http", НЕ ЗАПУСКАЕТ контейнер вовсе — 4 попытки молчали по 25-30 минут
+# (01.09.2026). Тот же bootstrap с одним портом ожил с первой проверки
+# (под vfa1ryl4zqdwvi). Сервисы сведены в gpu/engine_app.py.
 # Перед выкладкой подставить RD_TOKEN; CARTESIA_API_KEY приходит через POD_ENV.
 mkdir -p /workspace/out/results
 exec >> /workspace/out/log.txt 2>&1
@@ -59,21 +63,20 @@ tar xzf /tmp/payload.tgz || fail "tar упал"
 export HF_HOME=/workspace/hf
 export PYTHONPATH=/workspace/code
 
-step "сервисы: STT-стрим (8102) и Marian (8103)"
-nohup $PY -m uvicorn gpu.acoustic.app:app --host 0.0.0.0 --port 8102 > /workspace/out/stt.log 2>&1 &
-nohup $PY -m uvicorn gpu.mt.app:app     --host 0.0.0.0 --port 8103 > /workspace/out/mt.log 2>&1 &
-for port in 8102 8103; do
-  ok=""
-  for i in $(seq 1 90); do
-    curl -fsS --max-time 2 "http://127.0.0.1:$port/healthz" >/dev/null 2>&1 && { ok=1; break; }
-    sleep 2
-  done
-  [ -n "$ok" ] || { tail -30 /workspace/out/stt.log /workspace/out/mt.log; fail "сервис $port не поднялся"; }
+step "движок: STT и перевод одним приложением на 8000"
+# лог-раздачу гасим: файлы из /workspace/out теперь отдаёт само приложение
+pkill -f "http.server 8000"; sleep 1
+nohup $PY -m uvicorn gpu.engine_app:app --host 0.0.0.0 --port 8000 > /workspace/out/engine.log 2>&1 &
+ok=""
+for i in $(seq 1 90); do
+  curl -fsS --max-time 2 "http://127.0.0.1:8000/engine/healthz" >/dev/null 2>&1 && { ok=1; break; }
+  sleep 2
 done
+[ -n "$ok" ] || { tail -30 /workspace/out/engine.log; fail "движок на 8000 не поднялся"; }
 step "warmup STT (модель качается — минуты)"
-curl -fsS --max-time 1200 -X POST http://127.0.0.1:8102/v1/warmup \
+curl -fsS --max-time 1200 -X POST http://127.0.0.1:8000/stt/v1/warmup \
   -H 'Content-Type: application/json' -d '{"lang":"ru"}' || fail "warmup STT"
-curl -fsS --max-time 600 -X POST http://127.0.0.1:8103/v1/warmup || echo "warmup MT не критичен"
+curl -fsS --max-time 600 -X POST http://127.0.0.1:8000/mt/v1/warmup || echo "warmup MT не критичен"
 
 step "ГОТОВО"
 echo done > /workspace/out/DONE
