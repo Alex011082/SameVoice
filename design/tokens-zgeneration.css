@@ -1,0 +1,88 @@
+/* SameVoice — токены темы ZGeneration («язык = цвет»).
+   Вторая утверждённая шкура на том же скелете (01.09.2026). Эталон —
+   design/zgeneration.html. Основная тема — tokens.css («Тишина и голос»).
+
+   Идея, из которой всё следует: у каждого языка свой кричащий цвет, а
+   перевод — живой перелив одного в другой. Поэтому здесь цвет не украшение,
+   а носитель смысла: по цвету видно, на каком языке сейчас звучит речь.
+   Холст светлый — это единственное место, где SameVoice выходит из темноты.
+
+   Обе темы обязаны совпадать по СТРУКТУРЕ (одни компоненты, одни жесты,
+   одни имена токенов), различаться — только палитрой, гарнитурами и
+   характером движения. Тогда переключение темы не трогает разметку. */
+
+[data-sv-theme="zgeneration"] {
+  /* --- ЯЗЫКИ. Пара, которая дерётся и дружит одновременно --- */
+  --sv-lang-ru:     #2726FF;   /* русский — ультрамарин */
+  --sv-lang-he:     #FF4D00;   /* иврит — оранжевый */
+  --sv-accent:      #FF00B4;   /* перелив/действие — маджента */
+  --sv-voice-grad:  linear-gradient(100deg, var(--sv-lang-ru), var(--sv-accent) 52%, var(--sv-lang-he));
+
+  /* --- ГРУНТ И ЧЕРНИЛА. Светлая сторона продукта --- */
+  --sv-void:        #F3F3F7;
+  --sv-deep:        #F3F3F7;
+  --sv-deep-2:      #EDEDF4;
+  --sv-surface:     #FFFFFF;
+  --sv-ink:         #16123A;
+  --sv-ink-2:       rgba(22,18,58,.72);
+  --sv-dim:         rgba(22,18,58,.50);
+  --sv-dim-2:       rgba(22,18,58,.30);
+  --sv-chip:        #16123A;
+
+  /* Тембр пары в этой теме задаётся не тоном, а ДОЛЕЙ языка в переливе:
+     0 = говорит русский, 1 = говорит иврит. Компонент волны читает одну
+     переменную и не знает про палитру. */
+  --sv-mix-ru:      0;
+  --sv-mix-he:      1;
+
+  /* --- ТИПОГРАФИКА. Акцидентная пара: гротеск + ивритская Karantina.
+     Karantina несёт иврит и держит крупный кегль; кириллицы у неё нет —
+     русские имена ставит Unbounded. Это не «фолбэк на всякий случай»,
+     а осознанное разделение по языкам. --- */
+  --sv-font-display: 'Unbounded', 'Rubik', system-ui, sans-serif;
+  --sv-font-he:      'Karantina', 'Rubik', 'Arial Narrow', sans-serif;
+  --sv-font-text:    'Rubik', -apple-system, 'Segoe UI', Arial, sans-serif;
+
+  /* Имена живут во весь экран — кегль тянется от ширины, а не фиксирован */
+  --sv-t-hero:      900 clamp(15px,2.2vw,30px)/1.05 var(--sv-font-display);
+  --sv-t-name:      900 clamp(46px,17vw,86px)/.95 var(--sv-font-display);
+  --sv-t-name-rtl:  700 clamp(56px,21vw,104px)/.8 var(--sv-font-he);
+  --sv-t-call:      900 clamp(40px,14vw,72px)/1 var(--sv-font-display);
+  --sv-t-body:      500 15px/1.45 var(--sv-font-text);
+  --sv-t-chip:      600 12px/1.3 var(--sv-font-text);
+  --sv-t-hint:      600 11px/1.3 var(--sv-font-text);
+  --sv-t-label:     600 10px/1.2 var(--sv-font-text);
+
+  --sv-track-brand: .02em;
+  --sv-track-label: .34em;
+  --sv-track-tag:   .14em;
+  --sv-track-hint:  .1em;
+
+  /* --- ДВИЖЕНИЕ. Резче основной темы: поп-арт не нежничает --- */
+  --sv-ease:      cubic-bezier(.2,.9,.2,1);
+  --sv-ease-open: cubic-bezier(.2,.95,.25,1);
+  --sv-d-fast:   .15s;
+  --sv-d-mid:    .28s;
+  --sv-d-screen: .34s;
+  --sv-d-slow:   .6s;
+
+  --sv-r-pill: 999px;
+  --sv-r-card: 14px;
+
+  /* Свет здесь не свечение, а плотная тень предмета */
+  --sv-glow-soft:   0 6px 0;
+  --sv-shadow-phone: 0 30px 80px -30px rgba(22,18,58,.35);
+}
+
+/* Космос основной темы в ZGeneration не участвует: фон — чистый холст,
+   вся жизнь в типографике и переливе. Красим явно, чтобы страница не
+   подхватила чужой грунт. */
+[data-sv-theme="zgeneration"] .sv-cosmos-bg {
+  background: linear-gradient(180deg, var(--sv-deep), var(--sv-deep-2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sv-theme="zgeneration"] {
+    --sv-d-fast: .01s; --sv-d-mid: .01s; --sv-d-screen: .01s; --sv-d-slow: .01s;
+  }
+}
