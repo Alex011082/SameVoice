@@ -17,14 +17,24 @@
   var pull = {};             // сколько протянут каждый контакт: 0..1
   var callWave = null;       // волна экрана разговора
 
-  /* ------------------------------------------------- цвет пары по имени */
-  /* Тембр пары — пара тонов ИЗ ПАЛИТРЫ ГОЛОСА (электрик 200 -> маджента 330).
-     Брать весь круг нельзя: выпадают зелёные и жёлтые, которых в системе нет. */
-  function hues(seed) {
+  /* ------------------------------------------------- цвет пары из ТЕМЫ */
+  /* Нить не имеет своей палитры: она берёт цвета голоса у активной темы
+     (--voice-1/2/3). В «тишине» это электрик-циан-маджента, в ZGen —
+     ультрамарин русского, перелив и оранжевый иврита. Компонент не должен
+     знать, какого цвета язык: это решает тема. */
+  function themeVoice() {
+    var cs = getComputedStyle(document.documentElement);
+    var a = cs.getPropertyValue('--voice-1').trim() || '#4d5bff';
+    var b = cs.getPropertyValue('--voice-2').trim() || '#22e3ff';
+    var c = cs.getPropertyValue('--voice-3').trim() || '#ff3df2';
+    return [a, b, c];
+  }
+  /* Различие пар — не в цвете, а в ритме: свой сдвиг фазы и своя доля
+     перелива. Так все нити остаются в палитре темы и всё равно различимы. */
+  function seedOf(seed) {
     var h = 0;
-    for (var i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 1000;
-    var a = 200 + (h % 130);              // 200..330
-    return [a, 200 + ((h * 7 + 55) % 130)];
+    for (var i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 997;
+    return h;
   }
 
   function dpr() { return Math.min(2, window.devicePixelRatio || 1); }
@@ -60,13 +70,19 @@
               + Math.sin(px * .052 - t * 1.7 + ph * 1.7) * amp * .45);
         if (px === s) x.moveTo(px, y); else x.lineTo(px, y);
       }
+      var v = themeVoice();
       var g = x.createLinearGradient(s, 0, end, 0);
-      g.addColorStop(0, 'hsla(' + h1 + ',92%,62%,' + a + ')');
-      g.addColorStop(1, 'hsla(' + h2 + ',92%,64%,' + (a * .55) + ')');
+      // mix — доля перелива у этой пары: 0 ближе к первому цвету, 1 к третьему
+      var mix = (h1 % 100) / 100;
+      g.addColorStop(0, v[0]);
+      g.addColorStop(Math.max(.15, Math.min(.85, .35 + mix * .3)), v[1]);
+      g.addColorStop(1, v[2]);
+      x.globalAlpha = a;
       x.strokeStyle = g; x.lineWidth = lw;
-      if (k === 0 && !RM) { x.shadowColor = 'hsla(' + ((h1 + h2) / 2) + ',95%,60%,.5)'; x.shadowBlur = 8; }
+      if (k === 0 && !RM) { x.shadowColor = v[1]; x.shadowBlur = 8; }
       else x.shadowBlur = 0;
       x.stroke();
+      x.globalAlpha = 1;
     }
     x.shadowBlur = 0;
   }
@@ -79,26 +95,27 @@
     var cards = list.querySelectorAll('li.card');
     for (var i = 0; i < cards.length; i++) {
       (function (card) {
-        var main = card.querySelector('.card-main');
+        var head = card.querySelector('.card-head') || card;
         var name = card.querySelector('.card-name');
-        if (!main || !name) return;
+        if (!name) return;
         var cv = card.querySelector('canvas.sv-thread');
         if (!cv) {
           cv = document.createElement('canvas');
           cv.className = 'sv-thread';
           cv.setAttribute('aria-hidden', 'true');
-          // Полотно кладём на всю карточку: нить должна идти от имени вправо
-          // через весь ряд, а не ютиться в колонке шириной с имя.
-          card.appendChild(cv);
+          // Полотно — на строку с именем: нить идёт от имени до подписи
+          // направления, как в макете.
+          head.style.position = 'relative';
+          head.appendChild(cv);
         }
         var id = card.dataset.userId || name.textContent || '?';
-        var hs = hues(id);
+        var sd = seedOf(id);
         // Внешний номер (перевод не нужен) звучит тише: обесцвеченная нить.
-        var badge = card.querySelector('.badge[data-mode]');
-        var direct = badge && badge.dataset.mode === 'DIRECT';
-        threads.push({ cv: cv, name: name, card: card, h1: hs[0], h2: hs[1], id: id,
-          direct: direct, btn: card.querySelector('button.btn'),
-          dot: card.querySelector('.presence'), ph: (hs[0] % 17) * .37 });
+        var dirEl = card.querySelector('.card-dir');
+        var direct = !!(dirEl && dirEl.dataset && dirEl.dataset.direct);
+        threads.push({ cv: cv, name: name, card: card, h1: sd, h2: sd, id: id,
+          direct: direct, btn: card.querySelector('.card-dir'),
+          dot: card.querySelector('.presence'), ph: (sd % 17) * .37 });
       })(cards[i]);
     }
   }
@@ -172,8 +189,8 @@
       else screen.insertBefore(cv, screen.firstChild);
     }
     var peer = document.getElementById('call-peer-name');
-    var hs = hues((peer && peer.textContent) || 'peer');
-    callWave = { cv: cv, h1: hs[0], h2: hs[1] };
+    var sd = seedOf((peer && peer.textContent) || 'peer');
+    callWave = { cv: cv, h1: sd, h2: sd };
 
     // Жест «положить трубку»: протяжка вниз по шапке разговора. Субтитры
     // ниже прокручиваются, поэтому жест берётся только с неподвижной части.
@@ -241,7 +258,7 @@
       if (callWave) {
         var cv = callWave.cv;
         if (cv._w || fit(cv)) {
-          var amp = 8 + smooth * 46;
+          var amp = 14 + smooth * 62;
           strand(cv, t, RM ? 10 : amp, callWave.h1, callWave.h2, 0, 1);
         }
       }
@@ -251,7 +268,7 @@
         var th = threads[i];
         if (!th.cv.isConnected) continue;
         var p = pull[th.id] || 0;
-        var amp = 4.5 + p * 26 + (RM ? 0 : Math.sin(t * 1.3 + th.ph) * 1.2);
+        var amp = 9 + p * 30 + (RM ? 0 : Math.sin(t * 1.3 + th.ph) * 2.6);
         var cr = th.cv.getBoundingClientRect(), nr = th.name.getBoundingClientRect();
         if (!cr.width) continue;
         var x0 = (nr.right - cr.left) + 14;       // нить рождается из имени

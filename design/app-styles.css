@@ -1,0 +1,669 @@
+/* SameVoice — оформление ПО УТВЕРЖДЁННЫМ МАКЕТАМ.
+ *
+ * Файл написан от макета, а не от прежнего приложения: если правило здесь
+ * есть, оно есть в design/a-quiet.html (тема «тишина») или в
+ * design/zgeneration.html (тема ZGen). Прежняя раскладка сюда не переносилась.
+ *
+ * Три правила системы (design/DESIGN-SYSTEM.md):
+ *   1. Голос — единственный источник света: всё яркое либо есть голос, либо
+ *      им вызвано. Декоративного цвета нет.
+ *   2. Слова — крайнее средство: сначала форма, движение и цвет.
+ *   3. Интерфейс уступает разговору.
+ *
+ * Следствия, которые легко нечаянно «починить» обратно: у контакта НЕТ
+ * аватара и НЕТ зелёного кружка трубки — есть имя, нить голоса из него и
+ * одно действие. Так в макете, и так согласовано.
+ */
+
+/* ========================= 1. ТОКЕНЫ ДВУХ ТЕМ ========================= */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #05030e;
+  --bg-lift: #0d0926;
+  --bg-lift-2: #151041;
+  --line: rgba(160, 150, 255, 0.14);
+  --line-strong: rgba(160, 150, 255, 0.32);
+
+  --fg: #eae6ff;
+  --fg-dim: #8f88b8;
+  --fg-faint: #4a4570;
+
+  --voice-1: #4d5bff;
+  --voice-2: #22e3ff;
+  --voice-3: #ff3df2;
+  --voice: linear-gradient(92deg, var(--voice-1) 0%, var(--voice-2) 46%, var(--voice-3) 100%);
+  --accent: var(--voice-2);
+  --accept: #2fd07a;
+  --end: #ff4d6d;
+  --warn: #ffb020;
+
+  --sky:
+    radial-gradient(520px 380px at 88% -4%, rgba(84, 42, 190, 0.20), transparent 65%),
+    radial-gradient(440px 440px at -6% 104%, rgba(0, 122, 190, 0.13), transparent 60%);
+
+  --r-sm: 12px;
+  --r: 18px;
+  --r-lg: 28px;
+  --pill: 999px;
+
+  --ease: cubic-bezier(0.3, 0.85, 0.25, 1);
+  --d-fast: 0.22s;
+  --d-mid: 0.4s;
+  --d-screen: 0.55s;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --font: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: "Unbounded", "Rubik", system-ui, sans-serif;
+  /* Иврит крупным кеглем ставит гарнитура со СВОИМ ивритским начертанием:
+     у акцидентной его нет, браузер молча подменит шрифт и высота имён поедет. */
+  --font-he: "Noto Sans Hebrew", "Rubik", system-ui, sans-serif;
+}
+
+:root[data-sv-theme="zgen"] {
+  color-scheme: light;
+
+  --bg: #f3f3f7;
+  --bg-lift: #ffffff;
+  --bg-lift-2: #ececf5;
+  --line: rgba(22, 18, 58, 0.12);
+  --line-strong: rgba(22, 18, 58, 0.30);
+
+  --fg: #16123a;
+  --fg-dim: rgba(22, 18, 58, 0.62);
+  --fg-faint: rgba(22, 18, 58, 0.38);
+
+  /* язык = цвет: русский ультрамарин, иврит оранжевый, перевод — перелив */
+  --voice-1: #2726ff;
+  --voice-2: #ff00b4;
+  --voice-3: #ff4d00;
+  --voice: linear-gradient(100deg, var(--voice-1), var(--voice-2) 52%, var(--voice-3));
+  --accent: var(--voice-1);
+  --accept: #00a25a;
+  --end: #ff3b30;
+  --warn: #ff8a00;
+
+  --sky: none;
+  --font-he: "Karantina", "Noto Sans Hebrew", "Rubik", system-ui, sans-serif;
+  --ease: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --d-fast: 0.15s;
+  --d-mid: 0.28s;
+  --d-screen: 0.34s;
+}
+
+/* ============================ 2. ОСНОВА ============================ */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* Скрытое — скрыто. Правила display ниже (flex/grid) сильнее браузерного
+   [hidden], и без этой строки на экран вылезают куски других экранов. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+body {
+  background-image: var(--sky);
+  background-attachment: fixed;
+  position: relative;
+  overflow-x: hidden;      /* строка контакта не должна уводить экран вбок */
+}
+
+/* Космос лежит ПОД интерфейсом и не ловит касания (рисует sv-theme.js) */
+#sv-cosmos { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+#app, .incoming { position: relative; z-index: 1; }
+
+#app {
+  min-height: 100vh;
+  min-height: 100dvh;      /* без запасной vh экран схлопывается в ноль */
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--safe-top) + 14px) 20px calc(var(--safe-bottom) + 18px);
+  max-width: 620px;
+  margin: 0 auto;
+}
+main { flex: 1; }
+
+button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; }
+
+/* ========================= 3. ШАПКА И НИЗ ========================= */
+
+#topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+
+.brand-mark {
+  font: 600 10px var(--font-display);
+  letter-spacing: 0.5em;
+  text-transform: lowercase;
+  color: var(--fg-dim);
+}
+
+.whoami {
+  display: flex; align-items: center; gap: 8px;
+  font: 300 12px var(--font); color: var(--fg-dim); min-width: 0;
+}
+.whoami .btn { padding: 6px 10px; min-height: 0; font-size: 10px; }
+
+#sv-theme-btn {
+  margin-inline-start: auto; flex: 0 0 auto;
+  font: 500 10px/1 var(--font);
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--fg-dim);
+  border: 1px solid var(--line); border-radius: var(--pill);
+  padding: 8px 13px;
+  transition: color var(--d-fast), border-color var(--d-fast);
+}
+#sv-theme-btn:hover, #sv-theme-btn:focus-visible { color: var(--fg); border-color: var(--line-strong); }
+
+.footer {
+  margin-top: 26px;
+  font: 300 10px var(--font);
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--fg-faint);
+}
+body:not([data-debug]) .footer { display: none; }
+
+/* ========================= 4. ТИПОГРАФИКА ========================= */
+
+h1, .screen-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+  margin: 0 0 10px;
+  background: var(--voice);
+  background-size: 220% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: sv-shim 9s linear infinite;
+}
+h1 { font-size: clamp(30px, 9vw, 42px); }
+.screen-title { font-size: clamp(30px, 9vw, 40px); }
+:root[data-sv-theme="zgen"] h1,
+:root[data-sv-theme="zgen"] .screen-title { font-weight: 900; font-size: clamp(34px, 11vw, 54px); }
+
+@keyframes sv-shim { from { background-position: 0 0; } to { background-position: 100% 0; } }
+
+h2 { font: 600 17px var(--font-display); margin: 0 0 8px; }
+h3 { font: 500 14px var(--font); margin: 0 0 6px; }
+
+.hint, .field-note, .mode-explainer, .incoming-explainer, .outgoing-detail {
+  color: var(--fg-dim);
+  font: 300 14px/1.55 var(--font);
+  margin: 0 0 18px;
+  max-width: 34ch;
+}
+
+.label, .incoming-eyebrow, .selfmon-title {
+  font: 300 10px var(--font);
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.error {
+  color: var(--end);
+  font: 400 13px/1.5 var(--font);
+  border: 1px solid color-mix(in srgb, var(--end) 40%, transparent);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin: 14px 0 0;
+}
+
+.banner {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 13px 16px;
+  margin-bottom: 20px;
+  font: 300 13.5px/1.5 var(--font);
+  color: var(--fg-dim);
+  background: color-mix(in srgb, var(--bg-lift) 70%, transparent);
+}
+
+/* ========================== 5. ДЕЙСТВИЯ ========================== */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px;
+  padding: 13px 22px;
+  border-radius: var(--pill);
+  font: 500 11.5px var(--font-display);
+  letter-spacing: 0.12em;
+  color: var(--fg);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--bg-lift), var(--bg-lift)) padding-box,
+    var(--voice) border-box;
+  transition: transform var(--d-fast) var(--ease), filter var(--d-fast), opacity var(--d-fast);
+}
+.btn:active { transform: scale(0.96); filter: brightness(1.15); }
+.btn:disabled { opacity: 0.35; }
+.btn-primary { width: 100%; }
+
+.btn-ghost { background: none; border: 1px solid var(--line); color: var(--fg-dim); font-weight: 400; }
+.btn-ghost:active { filter: none; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+
+.btn-danger, .btn-flag {
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--end) 45%, transparent);
+  color: var(--end);
+}
+
+.step-back {
+  color: var(--fg-dim);
+  font: 300 12px var(--font);
+  letter-spacing: 0.08em;
+  padding: 12px 0;
+}
+
+:root[data-sv-theme="zgen"] .btn {
+  color: #fff; border: 0;
+  background: linear-gradient(100deg, var(--voice-1), var(--voice-2));
+  box-shadow: 0 5px 0 rgba(22, 18, 58, 0.14);
+  font-weight: 700;
+}
+:root[data-sv-theme="zgen"] .btn:active {
+  transform: translateY(3px) scale(0.99);
+  box-shadow: 0 2px 0 rgba(22, 18, 58, 0.14);
+}
+:root[data-sv-theme="zgen"] .btn-ghost {
+  color: var(--fg-dim); background: none; border: 1px solid var(--line); box-shadow: none;
+}
+
+.round {
+  width: 66px; height: 66px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: #fff;
+  transition: transform var(--d-fast) var(--ease), box-shadow var(--d-fast);
+}
+.round svg { width: 26px; height: 26px; }
+.round:active { transform: scale(0.93); }
+.round-label { display: none; }
+
+.round-accept { background: var(--accept); box-shadow: 0 0 30px -8px var(--accept); }
+.round-end { background: var(--end); box-shadow: 0 0 30px -8px var(--end); }
+.round-mute { background: var(--bg-lift-2); color: var(--fg); border: 1px solid var(--line); }
+.round-mute[aria-pressed="true"] { background: var(--warn); color: #241800; }
+:root[data-sv-theme="zgen"] .round-accept,
+:root[data-sv-theme="zgen"] .round-end { box-shadow: 0 5px 0 rgba(22, 18, 58, 0.16); }
+
+/* =================== 6. ЭКРАНЫ И СПИСОК ЛЮДЕЙ =================== */
+
+.screen { animation: sv-enter var(--d-screen) var(--ease); }
+@keyframes sv-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.people { list-style: none; margin: 0; padding: 0; }
+
+/* Строка человека по макету: имя, нить голоса из него во всю ширину и
+   направление перевода на правом конце нити. Кнопок в строке нет — они
+   появляются по тапу; звонок начинается протяжкой вбок. */
+.card {
+  position: relative;
+  display: block;
+  padding: 18px 2px;
+  cursor: pointer;
+}
+.card + .card { border-top: 1px solid var(--line); }
+
+.card-head {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 46px;
+  min-width: 0;            /* иначе длинное имя распирает строку за экран */
+  overflow: hidden;
+}
+
+.card-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 52%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(26px, 8vw, 34px);
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+  text-shadow: 0 0 26px color-mix(in srgb, var(--voice-2) 26%, transparent);
+}
+.card-name:lang(he), .card-name[dir="rtl"] { font-family: var(--font-he); font-weight: 600; }
+
+/* Направление перевода лежит на конце нити — как подпись под голосом */
+.card-dir {
+  margin-inline-start: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 11px var(--font);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.card-dir[data-direct] { color: var(--fg-faint); }
+
+/* Раскрытие строки. Анимация max-height ненадёжна (её легко пережать чужим
+   правилом и она дёргается на телефоне), поэтому раскрытие сделано сеткой:
+   строка растёт от 0fr до 1fr — высота считается браузером сама. */
+.card-ctx {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  overflow: hidden;
+  transition: grid-template-rows var(--d-mid) var(--ease), opacity var(--d-fast), padding var(--d-fast);
+}
+.card-ctx > * { min-height: 0; }
+.card.open .card-ctx { grid-template-rows: 1fr; opacity: 1; padding-top: 14px; }
+.card-explain { font: 300 13.5px/1.5 var(--font); color: var(--fg-dim); margin: 0 0 12px; max-width: 34ch; }
+.card-acts { display: flex; gap: 10px; flex-wrap: wrap; }
+.card-acts .btn::before { content: "позвонить"; }
+.card-acts .btn::after { content: "↑"; font-size: 13px; }
+
+.avatar { display: none; }             /* аватаров в макете нет */
+
+.presence { width: 8px; height: 8px; border-radius: 50%; font-size: 0; flex: 0 0 auto; }
+.presence[data-state="online"] { background: var(--accept); box-shadow: 0 0 12px var(--accept); }
+.presence[data-state="offline"] { background: var(--fg-faint); }
+.presence[data-state="unknown"] { box-shadow: inset 0 0 0 1.5px var(--fg-faint); }
+
+.screen-hint {
+  font: 300 11px var(--font);
+  letter-spacing: 0.14em;
+  color: var(--fg-faint);
+  margin: -4px 0 22px;
+}
+
+:root[data-sv-theme="zgen"] .card-name {
+  font-weight: 900;
+  font-size: clamp(32px, 11vw, 56px);
+  letter-spacing: -0.03em;
+  color: var(--voice-1);
+  text-shadow: none;
+}
+:root[data-sv-theme="zgen"] .card-name:lang(he),
+:root[data-sv-theme="zgen"] .card-name[dir="rtl"] {
+  font-weight: 700;
+  font-size: clamp(40px, 14vw, 68px);
+  line-height: 0.84;
+  color: var(--voice-3);
+}
+:root[data-sv-theme="zgen"] .card-dir { color: var(--voice-2); font-weight: 600; }
+
+/* Диагностика прячется, пока не включён отладочный режим */
+.card-meta .badge, .card-meta code, .card-toggle { display: none; }
+body[data-debug] .card-meta .badge,
+body[data-debug] .card-meta code,
+body[data-debug] .card-toggle { display: inline-flex; align-items: center; gap: 5px; }
+
+.badge {
+  font: 400 10px var(--font);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--fg-faint);
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  padding: 3px 9px;
+}
+
+.joinbox { margin-top: 24px; }
+.joinbox summary {
+  list-style: none; cursor: pointer;
+  color: var(--fg-dim);
+  font: 300 13px var(--font);
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.joinbox summary::-webkit-details-marker { display: none; }
+.joinbox-row { display: flex; gap: 10px; padding-bottom: 8px; }
+.joinbox-row input { flex: 1; }
+
+/* =================== 7. ВХОД: НОМЕР, КОД, ПРОФИЛЬ =================== */
+
+.intro { text-align: center; margin: 4vh 0 24px; }
+.intro-mark { color: var(--voice-2); margin: 0 auto 18px; width: 54px; height: 54px; }
+.intro-mark svg {
+  width: 100%; height: 100%;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--voice-2) 55%, transparent));
+}
+.intro .hint { margin-inline: auto; }
+
+.auth-card {
+  display: flex; flex-direction: column; gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  background: color-mix(in srgb, var(--bg-lift) 72%, transparent);
+  backdrop-filter: blur(8px);
+}
+:root[data-sv-theme="zgen"] .auth-card {
+  background: var(--bg-lift); box-shadow: 0 4px 0 rgba(22, 18, 58, 0.06); backdrop-filter: none;
+}
+
+.auth-card label {
+  font: 300 10px var(--font);
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+input, select {
+  width: 100%;
+  min-height: 54px;
+  padding: 14px 16px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  color: var(--fg);
+  font: 500 20px var(--font-display);
+  letter-spacing: 0.03em;
+  outline: none;
+  transition: border-color var(--d-fast), box-shadow var(--d-fast);
+}
+input::placeholder { color: var(--fg-faint); font-weight: 300; }
+input:focus, select:focus {
+  border-color: var(--voice-2);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--voice-2) 18%, transparent);
+}
+select { font: 400 16px var(--font); }
+
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.profile-grid label { display: flex; flex-direction: column; gap: 8px; }
+
+.verified-destination { font: 300 13px var(--font); color: var(--fg-dim); margin: 0; }
+.verified-destination strong { color: var(--fg); font-weight: 500; }
+
+.dev-code {
+  display: flex; flex-direction: column; gap: 4px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  color: var(--fg-dim);
+  font: 300 11px var(--font);
+  letter-spacing: 0.16em; text-transform: uppercase;
+}
+.dev-code strong {
+  font: 700 30px var(--font-display);
+  letter-spacing: 0.22em;
+  color: transparent;
+  background: var(--voice);
+  -webkit-background-clip: text; background-clip: text;
+}
+.dev-code small { text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--fg-faint); }
+
+.steps { margin-top: 20px; }
+.step-q { font: 600 18px var(--font-display); margin-bottom: 14px; }
+.choices { display: flex; gap: 12px; }
+.choice {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 20px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  color: var(--fg);
+  transition: border-color var(--d-fast), transform var(--d-fast) var(--ease);
+}
+.choice:active { transform: scale(0.97); border-color: var(--line-strong); }
+.choice-ico { font-size: 26px; }
+.choice-t { font: 400 13px var(--font); color: var(--fg-dim); }
+
+.phone-auth { display: flex; flex-direction: column; gap: 16px; }
+
+/* ======================= 8. ЭКРАН РАЗГОВОРА ======================= */
+
+.screen-call { display: flex; flex-direction: column; min-height: 70vh; }
+
+.call-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.call-peer { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#call-peer-name {
+  font: 600 clamp(30px, 9vw, 42px) var(--font-display);
+  letter-spacing: -0.02em; line-height: 1.04;
+}
+#call-peer-name:lang(he), #call-peer-name[dir="rtl"] { font-family: var(--font-he); }
+.call-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+body:not([data-debug]) .call-badges { display: none; }
+
+/* Волна разговора — главный герой экрана (рисует sv-motion.js) */
+.sv-callwave { display: block; width: 100%; height: 116px; margin: 10px 0 14px; pointer-events: none; }
+
+.subtitles { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 6px 0 18px; }
+.subtitle-committed { font: 400 clamp(19px, 5.4vw, 24px)/1.42 var(--font); color: var(--fg); }
+:root:not([data-sv-theme="zgen"]) .subtitle-committed { text-shadow: 0 0 26px rgba(90, 170, 255, 0.22); }
+.subtitle-partial { font: 300 clamp(17px, 5vw, 22px)/1.42 var(--font); color: var(--fg-dim); }
+.subtitle-empty { color: var(--fg-faint); font: 300 13px var(--font); }
+
+.controls { display: flex; justify-content: center; gap: 26px; padding: 14px 0 6px; margin-top: auto; }
+
+.invite { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.unlock, .audio-hint {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  color: var(--fg-dim);
+  font: 300 13px/1.5 var(--font);
+  margin: 10px 0;
+}
+.audio-hint strong { color: var(--fg); font-weight: 500; }
+
+.metrics, .selfmon, .judge, .sub-line { font: 300 12px var(--font); color: var(--fg-faint); }
+body:not([data-debug]) .metrics,
+body:not([data-debug]) .selfmon,
+body:not([data-debug]) .judge { display: none; }
+.selfmon-src, .selfmon-dst { color: var(--fg-dim); font-size: 13px; margin: 4px 0; }
+.judge-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.judge-fix { display: flex; gap: 10px; margin-top: 10px; }
+.judge-fix input { flex: 1; font: 400 15px var(--font); min-height: 46px; }
+
+.outgoing {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 2px 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.outgoing-main { flex: 1; min-width: 0; }
+.outgoing-main strong { font: 600 19px var(--font-display); display: block; }
+.outgoing-detail { margin: 4px 0 0; font-size: 13px; }
+.outgoing-pulse {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--voice-2);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--voice-2) 60%, transparent);
+  animation: sv-pulse 1.8s ease-out infinite;
+  flex: 0 0 auto;
+}
+@keyframes sv-pulse { to { box-shadow: 0 0 0 18px transparent; } }
+.outgoing .round { width: 56px; height: 56px; }
+
+/* ====================== 9. ВХОДЯЩИЙ ЗВОНОК ====================== */
+
+.incoming {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(12px);
+  z-index: 40;
+}
+.incoming[hidden] { display: none; }
+.incoming-card {
+  width: min(100%, 420px);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  text-align: center;
+  padding: 34px 26px calc(30px + var(--safe-bottom));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--bg-lift) 88%, transparent);
+  animation: sv-enter var(--d-screen) var(--ease);
+}
+.incoming-title {
+  font: 700 clamp(30px, 9vw, 40px) var(--font-display);
+  letter-spacing: -0.02em; line-height: 1.05;
+}
+.incoming-title:lang(he), .incoming-title[dir="rtl"] { font-family: var(--font-he); }
+.incoming-meta { display: flex; gap: 10px; color: var(--fg-dim); font: 300 13px var(--font); }
+.incoming-actions { display: flex; gap: 30px; margin-top: 10px; }
+.incoming-note { margin-top: 6px; }
+
+/* ================ 10. ЖИВАЯ ЧАСТЬ (sv-motion.js) ================ */
+
+.sv-thread { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+li.card.sv-armed::after {
+  content: "";
+  position: absolute; inset: -4px -10px;
+  border-radius: var(--r);
+  border: 1px solid var(--accept);
+  box-shadow: 0 0 26px -8px var(--accept);
+  pointer-events: none;
+}
+#screen-call.sv-armed { opacity: 0.82; }
+
+@media (prefers-reduced-motion: reduce) {
+  h1, .screen-title, .outgoing-pulse, .screen, .incoming-card { animation: none; }
+  .btn, .round, .card, .choice, #sv-theme-btn, input, select { transition: none !important; }
+}
+
+
+/* ============ ПОЛКА ЛАБОРАТОРИИ ============
+ * Кнопки движка и уведомлений — наш инструмент, а не часть продукта.
+ * Раньше они висели поверх экрана и перекрывали действия контакта; теперь
+ * лежат внизу страницы отдельной полкой.
+ */
+.sv-lab {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+.sv-lab::before {
+  content: "лаборатория";
+  width: 100%;
+  font: 300 10px var(--font);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.sv-lab #sv-eng, .sv-lab #sv-push {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: var(--pill) !important;
+  padding: 11px 16px !important;
+  font: 500 11px var(--font) !important;
+  letter-spacing: 0.1em;
+  white-space: pre-line;
+  box-shadow: none !important;
+  bottom: auto !important;
+  right: auto !important;
+}

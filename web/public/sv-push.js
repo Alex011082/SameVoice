@@ -29,7 +29,18 @@
   var btn = document.createElement('button');
   btn.id = 'sv-push';
   btn.textContent = 'Уведомления';
-  document.body.appendChild(btn);
+  (function () {
+    // Инструменты лаборатории живут внизу страницы, а не поверх интерфейса:
+    // плавающая кнопка перекрывала действия контакта.
+    var host = document.querySelector('.sv-lab');
+    if (!host) {
+      host = document.createElement('div');
+      host.className = 'sv-lab';
+      var app = document.getElementById('app') || document.body;
+      app.appendChild(host);
+    }
+    host.appendChild(btn);
+  })();
 
   function api(path, opts) {
     return fetch('/orch' + path, Object.assign({
