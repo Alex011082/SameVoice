@@ -11,7 +11,7 @@
 | `planner.cjs` | чистая раскладка броней по гнёздам. Ни сети, ни часов внутри — только вход и выход |
 | `planner.test.cjs` | 12 тестов на случаи, которые обсуждались вживую |
 | `notifications.cjs` | чистое расписание уведомлений: кому и когда |
-| `notifications.test.cjs` | 10 тестов (запуск обоих: `node --test orchestrator/`) |
+| `notifications.test.cjs` | 10 тестов (запуск обоих: `node --test orchestrator/*.test.cjs`) |
 | `server.cjs` | хранение броней, жизненный цикл подов, переключение агента, доставка пушей, автосозвон, HTTP-API |
 | `../web/public/sv-push-sw.js` | рабочий процесс браузера: показывает уведомление, когда вкладка закрыта |
 | `../web/public/sv-push.js` | подписка в приложении (кнопка «Включить уведомления») |
@@ -98,9 +98,13 @@ POST /orch/reconcile           — согласовать немедленно, 
 ## Эксплуатация
 
 ```bash
+node --test orchestrator/*.test.cjs          # 22 теста планировщика и расписания
 systemctl status samevoice-orchestrator      # служба
 journalctl -u samevoice-orchestrator -f      # что делает прямо сейчас
 ```
+
+Папку тестам передавать бесполезно (`node --test orchestrator/` пытается
+запустить её как модуль) — нужен шаблон имён.
 
 Данные: `/opt/samevoice/orchestrator/data/{bookings,pods}.json` (запись через
 временный файл и переименование — файл не бывает полупустым).
