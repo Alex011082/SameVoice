@@ -1,0 +1,37 @@
+# Образ БОЕВОГО движка (STT Nemotron + ivrit Whisper + Marian на одном порту 8000).
+#
+# Зачем: без образа каждый под ставил зависимости pip и качал ~4 ГБ моделей
+# с HuggingFace при прогреве — 77–180 с лотереи (03.09.2026). Здесь и то и
+# другое запечено, прогрев сводится к загрузке весов с диска в GPU.
+#
+# База — ровно та, что оркестратор поднимал до образа: её слои уже лежат в
+# кэше хостов RunPod, поэтому под качает только наши ~7 ГБ, а не все 25.
+# Код движка НЕ запекается — он меняется часто и по-прежнему приезжает
+# payload.tgz через bootstrap; образ несёт только то, что меняется редко.
+FROM runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG IMAGE_TAG=dev
+# Веса — вне /workspace: там RunPod монтирует диск пода, и слой образа был бы
+# спрятан под точкой монтирования.
+ENV HF_HOME=/opt/hf \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update -q \
+    && apt-get install -y -q --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Список ОДИН К ОДНОМУ с bootstrap-template.sh — расхождение здесь означает,
+# что под с образом и под без образа ведут себя по-разному.
+RUN python3 -m pip install -q --no-input --no-cache-dir \
+      "fastapi>=0.116,<1" "uvicorn[standard]>=0.35,<1" "transformers>=4.56,<6" \
+      "sentencepiece>=0.2,<1" "safetensors>=0.5,<1" "accelerate>=1.10,<2" \
+      "numpy>=2,<3" sacremoses websockets silero-vad librosa \
+      "faster-whisper>=1.1,<2"
+
+COPY gpu/image/download_models.py /opt/download_models.py
+RUN python3 /opt/download_models.py && rm /opt/download_models.py
+
+# Метка для bootstrap: «зависимости и модели внутри, pip и скачивание пропустить».
+RUN echo "samevoice-engine ${IMAGE_TAG} $(date -u +%Y-%m-%dT%H:%MZ)" > /opt/samevoice-image
