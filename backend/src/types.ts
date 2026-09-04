@@ -184,6 +184,13 @@ export interface ApiError {
 
 export type ApiErrorCode =
   | "bad_request"
+  // Вход: нет сессии, протухший запрос пасскея, чужой или негодный ключ.
+  | "unauthorized"
+  | "expired"
+  | "invalid_passkey"
+  | "unknown_passkey"
+  // Добавление контакта по номеру: перебор номеров — это телефонная книга.
+  | "rate_limited"
   | "invalid_code"
   | "invalid_challenge"
   | "invalid_verification"

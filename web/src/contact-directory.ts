@@ -56,6 +56,14 @@ export function buildDirectory(
     entries.push({ contact, saved: true, test: isSeededIdentity(contact.userId) });
   }
 
+  // Тестовые обитатели существуют, чтобы новичку было куда позвонить, и
+  // мешают всем остальным: у основателя один живой Igor тонул среди семи
+  // тестовых (его скрин 02.09.2026). Поэтому решение принимается здесь, на
+  // экране, а не в хранилище: есть хоть один живой собеседник — тестовых
+  // прячем; нет ни одного — показываем всю посеянную сетку.
+  const alive = entries.filter((entry) => !entry.test);
+  if (alive.length > 0) return alive;
+
   for (const user of selectSeededIdentities(users)) {
     if (seen.has(user.id)) continue;
     seen.add(user.id);

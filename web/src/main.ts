@@ -5,6 +5,7 @@ import { api, ApiRequestError, BACKEND_URL } from './api';
 import { startRingingAttention, stopRingingAttention } from './attention';
 import { AutoJoinGate } from './autojoin';
 import { CallSession, micFailureText, type CallMetrics, type MicFailureKind } from './call';
+import { renderAddContact } from './contacts-add';
 import { contactsModel } from './contact-directory';
 import { authErrorText, callErrorText, contactsErrorText } from './errors';
 import { FlagLog, type FlagTarget } from './flags';
@@ -686,6 +687,13 @@ async function showContacts(): Promise<void> {
     },
     ringer.current.peers,
   );
+
+  // Как в списке появляется новый живой человек: по номеру, приглашением или
+  // из книги там, где браузер её отдаёт. Панель живёт под списком и
+  // перерисовывается вместе с ним.
+  renderAddContact(document.getElementById('screen-contacts') as HTMLElement, () => {
+    void showContacts();
+  });
 
   // Когда список всё-таки есть, отказ показывается отдельной строкой: список
   // неполон, и молчать об этом нельзя. Когда списка нет, тот же текст уже стоит

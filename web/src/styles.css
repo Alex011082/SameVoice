@@ -1403,3 +1403,29 @@ body.zg-on #screen-contacts:has(#outgoing:not([hidden])) #zg-pull { display: non
   color: var(--fg-dim);
 }
 body:not([data-debug]) .card-meta code { display: none; }
+
+/* ---- новый собеседник: по номеру, приглашением, из книги ---- */
+.addbox {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.addbox-title {
+  font: 300 10px var(--font);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin: 0 0 12px;
+}
+.addbox-row { display: flex; gap: 10px; align-items: center; }
+.addbox-row input { flex: 1; min-width: 0; min-height: 46px; font-size: 16px; }
+.addbox-row .btn { flex: 0 0 auto; }
+.addbox-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.addbox-acts .btn { min-height: 42px; padding: 10px 16px; }
+.addbox-status {
+  margin: 12px 0 0;
+  font: 300 12.5px/1.5 var(--font);
+  color: var(--fg-dim);
+  max-width: 40ch;
+}
+.addbox-status:empty { display: none; }

@@ -1,5 +1,7 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
+
+import { requireActor, requireSelf } from "../auth.js";
 import type { CallArchive } from "../archive.js";
 import { getUser } from "../store.js";
 import { apiError, CALL_ID_RE, USER_ID_RE } from "../types.js";
@@ -45,8 +47,10 @@ function parse<S extends z.ZodType>(
 export function archiveRoutes(archive: CallArchive): FastifyPluginAsync {
   return async (app) => {
     app.get("/api/users/:userId/calls", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(userParams, req.params, reply, "path");
       if (!params) return reply;
+      if (!requireSelf(req, reply, params.userId)) return reply;
       if (!getUser(params.userId)) {
         return reply.code(404).send(apiError("not_found", `user ${params.userId} does not exist`));
       }
@@ -54,8 +58,10 @@ export function archiveRoutes(archive: CallArchive): FastifyPluginAsync {
     });
 
     app.get("/api/users/:userId/calls/:callId", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(recordParams, req.params, reply, "path");
       if (!params) return reply;
+      if (!requireSelf(req, reply, params.userId)) return reply;
       if (!getUser(params.userId)) {
         return reply.code(404).send(apiError("not_found", `user ${params.userId} does not exist`));
       }

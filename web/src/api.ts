@@ -155,6 +155,17 @@ export const api = {
   ): Promise<UserProfile> =>
     (await patch<{ user: UserProfile }>(`/api/users/${encodeURIComponent(userId)}`, body)).user,
 
+  /**
+   * Добавить контакт по номеру телефона.
+   *
+   * Ответ намеренно одинаков и для номера, который нашёлся, и для того, что не
+   * нашёлся: иначе маршрут стал бы способом узнать, зарегистрирован ли человек
+   * — по номеру, который он не выбирал публиковать. Экран говорит то же самое.
+   */
+  addContactByPhone: async (phone: string): Promise<void> => {
+    await post<{ requested: boolean }>('/api/contacts/by-phone', { phone });
+  },
+
   listContacts: async (userId: string): Promise<ContactCard[]> =>
     (await request<{ contacts: ContactCard[] }>(`/api/users/${encodeURIComponent(userId)}/contacts`))
       .contacts,

@@ -60,11 +60,32 @@ describe('contacts screen model', () => {
     expect(entries[1]).toMatchObject({ saved: false, test: true });
   });
 
+  it('прячет посеянную сетку, как только есть хоть один живой собеседник', () => {
+    // Скрин основателя 02.09.2026: один настоящий Igor тонул среди семи
+    // тестовых. Сетка нужна тому, кому иначе некуда звонить, и мешает всем
+    // остальным — поэтому решение принимает экран, а не хранилище.
+    const igor: UserProfile = {
+      id: 'u_7e7dcddc014c56e1',
+      handle: 'user_7e7dcddc',
+      displayName: 'Igor',
+      lang: 'he',
+      gender: 'm',
+      tone: 'friendly',
+    };
+    const entries = buildDirectory(me, [card(igor)], [...seeded, igor]);
+
+    expect(entries.map((entry) => entry.contact.userId)).toEqual(['u_7e7dcddc014c56e1']);
+    expect(entries[0]).toMatchObject({ saved: true, test: false });
+  });
+
   it('never lists the signed-in user as someone to call', () => {
     const alex = seeded[0]!;
     const entries = buildDirectory(alex, [card(seeded[1]!)], seeded);
 
     expect(entries.map((entry) => entry.contact.userId)).toEqual(['u_noa', 'u_omri', 'u_maya']);
+
+    // И когда список пуст, посев тоже не подсовывает человеку его самого.
+    expect(buildDirectory(alex, [], seeded).map((e) => e.contact.userId)).not.toContain('u_alex');
   });
 
   it('marks a real contact as neither test nor unsaved', () => {
