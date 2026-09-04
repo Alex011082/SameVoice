@@ -1324,3 +1324,82 @@ body.zg-on #screen-contacts:has(#outgoing:not([hidden])) #zg-pull { display: non
   .brand-mark { letter-spacing: 0.28em; }
   .whoami .lang-chip { display: none; }
 }
+
+/* ============ ЭЛЕМЕНТЫ, ПРИШЕДШИЕ ИЗ main ============
+ * Каталог контактов, метки и пустые состояния появились в main вместе с
+ * починкой «после входа по номеру список пуст». Разметка нужна, но одета
+ * по утверждённому макету, а не по прежнему тёмному интерфейсу.
+ */
+
+/* Шесть цифр кода — единственное на шаге, и выглядят они как код из SMS.
+   text-indent гасит хвостовой трекинг последней цифры. */
+.code-input {
+  text-align: center;
+  min-height: 64px;
+  font: 600 28px var(--font-display);
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+}
+
+/* Метка постоянного тестового аккаунта: список живого человека может
+   содержать и тестовых, отличить их иначе нечем. */
+.test-chip {
+  flex: 0 0 auto;
+  font: 500 9px var(--font);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  padding: 3px 8px;
+}
+:root[data-sv-theme="zgen"] .test-chip {
+  color: var(--voice-2);
+  border-color: color-mix(in srgb, var(--voice-2) 45%, transparent);
+}
+
+/* Пол в раскрытии карточки: в иврите род — грамматика, а не стиль. */
+.gender-chip {
+  font: 400 11px var(--font);
+  letter-spacing: 0.12em;
+  color: var(--fg-dim);
+}
+
+/* Пустой список — всегда объяснённый список: молчащий пустой экран и есть
+   причина, по которой сломанные контакты жили незамеченными несколько дней. */
+.empty-state {
+  list-style: none;
+  padding: 26px 2px;
+  border-top: 1px solid var(--line);
+}
+.empty-state strong {
+  display: block;
+  font: 600 17px var(--font-display);
+  margin-bottom: 8px;
+}
+.empty-state p {
+  margin: 0;
+  font: 300 13.5px/1.55 var(--font);
+  color: var(--fg-dim);
+  max-width: 34ch;
+}
+
+.contacts-note {
+  font: 300 11px var(--font);
+  letter-spacing: 0.14em;
+  color: var(--fg-faint);
+  margin: -4px 0 18px;
+}
+.contacts-note[hidden] { display: none; }
+
+/* Пол, тон и переключатель живут в раскрытии, а не в строке имени. */
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font: 300 12px var(--font);
+  color: var(--fg-dim);
+}
+body:not([data-debug]) .card-meta code { display: none; }

@@ -40,6 +40,88 @@ function contactKey(ownerId: string, contactUserId: string): string {
   return `${ownerId}->${contactUserId}`;
 }
 
+/**
+ * The Stage-0 test identities: today the 2x2 grid of translation directions
+ * (ru/he x m/f). Any pair of them exercises a different direction and a
+ * different Hebrew gender contract, so losing access to them means no direction
+ * can be tested at all.
+ *
+ * Captured FROM the seed rather than hand-listed beside it. A hand-written copy
+ * is a second source of truth, and the two drift the first time the grid grows:
+ * add a fifth seeded profile, forget to add its id to the list, and that
+ * profile is born with an empty contact list and invisible to everyone else —
+ * which is precisely the bug the auto-join below exists to prevent. Deriving it
+ * makes that impossible instead of merely unlikely.
+ */
+let stage0TestIdentityIds: readonly string[] = [];
+
+export function stage0TestIdentityIdList(): readonly string[] {
+  return stage0TestIdentityIds;
+}
+
+/**
+ * STAGE 0 ONLY — a real product does not auto-befriend strangers.
+ *
+ * Stage 0 has no invite flow and no "add contact" screen, so a number that has
+ * just passed verification knows nobody. That is not a cosmetic gap: the
+ * founder verified his own number against the live server, got a profile
+ * (u_4e224d03a7370d19), and GET /api/users/<id>/contacts answered `[]` — he
+ * could neither place a test call nor record one, while u_alex's list was fine.
+ * Joining every new user to the test grid is what makes the app usable at all
+ * until invites exist.
+ *
+ * NOT a security boundary, and not a quota: /api/auth/* is unauthenticated and
+ * hands the confirmation code back in its own response, so anyone who can reach
+ * the server can mint users, and every one of them lands in all four seeded
+ * lists. 60 registrations take 0.1s and leave u_alex holding 63 contacts (his
+ * three seeded peers plus all 60). That is survivable only because Stage 0 runs
+ * behind a shared test URL with a handful of people on it; it stops being
+ * survivable the moment the URL is public. Invites — the thing that removes
+ * this flag — are also what bounds it.
+ *
+ * AND IT IS DELIBERATELY NOT TRANSITIVE. A new user joins the test grid and
+ * NOTHING else, so two people who both signed up by phone do not appear in each
+ * other's lists and cannot dial each other from the contacts screen — they have
+ * to meet through a seeded identity or an invite link. Joining every user to
+ * every user would be one word's change here and is the wrong word: it turns a
+ * public test URL into a directory of everyone's name and number-derived
+ * profile. The real fix is invites, not a wider blast radius.
+ *
+ * REMOVE WITH: this constant, its one use in createUserFromPhone(), and the
+ * backend tests named "Stage-0 auto-join", the moment an invite / add-contact
+ * flow lands. stage0TestIdentityIds and joinEveryone() stay — the seed still
+ * needs them.
+ */
+export const STAGE0_AUTO_JOIN_TEST_IDENTITIES = true;
+
+/**
+ * One contact row. Idempotent on purpose: re-registering the same phone, or
+ * re-running the seed, must not duplicate a contact nor silently reset the
+ * per-contact overrides a tester has already set on it.
+ */
+function addContact(ownerId: string, contactUserId: string): void {
+  // A user is never his own contact: his row would show up in his own list and
+  // he could "call" himself.
+  if (ownerId === contactUserId) return;
+  const key = contactKey(ownerId, contactUserId);
+  if (contacts.has(key)) return;
+  contacts.set(key, { ownerId, contactUserId, forceTranslate: false, overrides: {} });
+}
+
+/**
+ * Everyone in `userIds` becomes everyone else's contact, in BOTH directions.
+ * Both directions is the whole point: a one-way list lets a user dial out and
+ * never receive, because the callee never sees him and presence never lists him.
+ *
+ * The seed and the phone-registration path share this one function so the graph
+ * cannot drift apart into two hand-written versions of the same wiring.
+ */
+function joinEveryone(userIds: readonly string[]): void {
+  for (const a of userIds) {
+    for (const b of userIds) addContact(a, b);
+  }
+}
+
 function seed(): void {
   users.clear();
   contacts.clear();
@@ -99,17 +181,11 @@ function seed(): void {
   // Everyone is everyone's contact. With the role picker there is no way to
   // predict which two corners of the grid a session will use, so a hand-picked
   // pair list would leave testers unable to reach each other.
-  for (const owner of users.keys()) {
-    for (const contact of users.keys()) {
-      if (owner === contact) continue;
-      contacts.set(contactKey(owner, contact), {
-        ownerId: owner,
-        contactUserId: contact,
-        forceTranslate: false,
-        overrides: {},
-      });
-    }
-  }
+  //
+  // Read off the map that was just filled, so a profile added above is wired in
+  // by the act of seeding it and cannot be half-added.
+  stage0TestIdentityIds = [...users.keys()];
+  joinEveryone(stage0TestIdentityIds);
 }
 
 seed();
@@ -154,6 +230,10 @@ export function createUserFromPhone(input: {
   };
   users.set(id, user);
   userIdByPhone.set(input.phone, id);
+  // See STAGE0_AUTO_JOIN_TEST_IDENTITIES: without this the new user lands in an
+  // empty app. He joins the grid rather than only pointing at it, so the test
+  // identities can call him back.
+  if (STAGE0_AUTO_JOIN_TEST_IDENTITIES) joinEveryone([id, ...stage0TestIdentityIds]);
   return user;
 }
 

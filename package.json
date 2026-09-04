@@ -17,6 +17,7 @@
     "deps:agent": "cd agent && uv venv --python 3.13 && uv sync",
     "deps:agent:api": "cd agent && uv sync --extra api",
     "deps:livekit": "bash scripts/install-livekit.sh",
+    "build:web": "VITE_BACKEND_URL=/ npm --prefix web run build && bash scripts/check-web-dist.sh",
     "dev": "bash scripts/dev.sh",
     "dev:cloud": "SPEAKEASY_PROFILE=cloud bash scripts/dev.sh",
     "tunnel": "bash scripts/tunnel.sh",

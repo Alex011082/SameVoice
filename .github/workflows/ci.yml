@@ -66,4 +66,8 @@ jobs:
           bash -n docker/healthcheck.sh
           bash -n scripts/runpod-preflight.sh
           bash -n scripts/runpod-warmup.sh
-          python3 -m compileall -q gpu scripts/runpod-stage1-bench.py scripts/acoustic-pruning-bench.py
+          python3 -m compileall -q \
+            gpu \
+            scripts/runpod-stage1-bench.py \
+            scripts/acoustic-pruning-bench.py \
+            scripts/acoustic-replay-bench.py

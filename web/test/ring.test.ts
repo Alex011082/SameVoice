@@ -191,13 +191,27 @@ describe('ringReducer — outgoing', () => {
     const state = run([calling(), polled({ outgoing: ring('c_1', 'declined') })]);
     expect(state.outgoingPhase).toBe('closed');
     expect(state.outgoingClosed).toBe('declined');
-    expect(outgoingText(state)).toBe('Noa отклонил звонок.');
+    // Noa — женщина; русское прошедшее время согласуется по роду.
+    expect(outgoingText(state)).toBe('Noa отклонила звонок.');
   });
 
   it('distinguishes no-answer from declined', () => {
     const state = run([calling(), polled({ outgoing: ring('c_1', 'timeout') })]);
     expect(state.outgoingClosed).toBe('timeout');
-    expect(outgoingText(state)).toBe('Noa не ответил.');
+    expect(outgoingText(state)).toBe('Noa не ответила.');
+  });
+
+  it('agrees the verb with the gender of the person being called', () => {
+    // Тот же экран, мужчина вместо женщины: род берётся у участника, а не
+    // зашит в строку. Половина постоянной сетки — женщины, и «Maya отклонил
+    // звонок» в продукте про род собеседника — это его собственный баг.
+    const male = ring('c_2');
+    male.to = { ...ALEX };
+    const state = run([
+      { type: 'calling', ring: male },
+      polled({ outgoing: { ...male, ringState: 'declined' } }),
+    ]);
+    expect(outgoingText(state)).toBe('Alex отклонил звонок.');
   });
 
   it('closes when the ring disappears without a verdict', () => {
