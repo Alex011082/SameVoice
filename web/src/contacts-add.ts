@@ -33,13 +33,14 @@ function addressBookApi(): ContactsManagerLike | null {
 }
 
 /**
- * Ссылка-приглашение: она открывает закрытый тест новому человеку, поэтому
- * несёт ключ. Ключа в странице нет — его выдаёт сервер тому, кто уже вошёл.
- * Не вышло спросить — отдаём голый адрес: человек хотя бы найдёт приложение.
+ * Персональная ссылка-приглашение: сервер выпускает её тому, кто вошёл, на
+ * одно открытие и на семь дней. Открыл адресат — ссылка погасла; переслали
+ * дальше — «уже использовано». Общего ключа в приложении больше нет.
+ * Не вышло выпустить — отдаём голый адрес: человек хотя бы найдёт приложение.
  */
 async function inviteUrl(): Promise<string> {
   try {
-    const res = await fetch('/orch/invite-link', { credentials: 'include' });
+    const res = await fetch('/orch/invite', { method: 'POST', credentials: 'include' });
     if (res.ok) {
       const body = (await res.json()) as { url?: string };
       if (body.url) return body.url;
