@@ -26,6 +26,8 @@ def make_utterance(**overrides):
     base = dict(
         call_id="c_test01",
         utterance_id="utt_u_alex_000001",
+        utterance_key="utt_u_alex@1200",
+        is_first_chunk=True,
         segment_id="seg_u_alex_000001",
         speaker=SPEAKER,
         listener=LISTENER,
@@ -69,6 +71,10 @@ def test_utterance_record_carries_everything_a_judge_needs():
     for key in (
         "callId",
         "utteranceId",
+        # Without these two, one utterance committed in four chunks contributes
+        # four samples to a per-utterance percentile.
+        "utteranceKey",
+        "isFirstChunk",
         "direction",
         "srcLang",
         "dstLang",

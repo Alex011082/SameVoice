@@ -9,10 +9,12 @@ import { contactsModel } from './contact-directory';
 import { authErrorText, callErrorText, contactsErrorText } from './errors';
 import { FlagLog, type FlagTarget } from './flags';
 import { phoneAuthInitial, reducePhoneAuth, type PhoneAuthState } from './phone-auth';
+import { loginWithPasskey, passkeysSupported, registerPasskey } from './passkeys';
 import { profileUrl } from './profile-navigation';
 import { byGender } from './russian';
 import { RingPoller } from './ringpoll';
 import { selectSeededIdentities } from './seeded-identities';
+import { mountSettingsButton } from './settings';
 import type { RingState } from './ring';
 import { diagnoseCurrentOrigin, insecureContextMessage } from './secure';
 import { SubtitleModel } from './subtitles';
@@ -349,7 +351,21 @@ async function boot(): Promise<void> {
     `stt:${cfg.providers.stt} mt:${cfg.providers.mt} tts:${cfg.providers.tts}`,
   ]);
 
-  const meId = param('me');
+  // Вход помнится САМИМ БРАУЗЕРОМ: сессия живёт в куке 30 дней и привязана
+  // к устройству. Раньше приложение смотрело только на ?me= в адресе, поэтому
+  // обычное обновление страницы выбрасывало человека на ввод кода заново.
+  let meId = param('me');
+  if (!meId) {
+    try {
+      const res = await fetch('/api/auth/session', { credentials: 'include' });
+      if (res.ok) {
+        const body = (await res.json()) as { user?: { id?: string } };
+        if (body.user?.id) meId = body.user.id;
+      }
+    } catch {
+      // сеть подведёт — покажем обычный вход, это не авария
+    }
+  }
   if (!meId) {
     await showIdentityPicker();
     return;
@@ -365,6 +381,9 @@ async function boot(): Promise<void> {
 
   ui.renderWhoami(state.me, () => {
     setParams({ me: null, call: null });
+    window.location.reload();
+  });
+  mountSettingsButton(state.me, () => {
     window.location.reload();
   });
 
@@ -409,9 +428,97 @@ async function showIdentityPicker(): Promise<void> {
       void showIdentityPicker();
     },
   });
+  mountPasskeyLogin();
   if (phoneAuth.phase !== 'verified') return;
   ui.renderProfileRegistration((profile) => {
     void registerProfile(profile);
+  });
+}
+
+/* Вход без кода. Кнопка появляется там, где браузер умеет пасскеи, —
+ * заранее знать, есть ли у человека ключ, экран входа не может, поэтому
+ * отказ выбора в системном окне просто возвращает на телефонный вход. */
+function mountPasskeyLogin(): void {
+  const btn = document.getElementById('passkey-login') as HTMLButtonElement | null;
+  const note = document.getElementById('passkey-login-note');
+  if (!btn || !passkeysSupported()) return;
+  btn.hidden = false;
+  if (btn.dataset['wired']) return;
+  btn.dataset['wired'] = '1';
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    if (note) note.hidden = true;
+    loginWithPasskey()
+      .then(() => {
+        // сессия уже стоит (кука + копия в памяти устройства) — просто входим
+        setParams({ me: null });
+        window.location.reload();
+      })
+      .catch((err) => {
+        btn.disabled = false;
+        if (note) {
+          note.textContent = `Не вышло: ${describeError(err)}. Войдите по номеру — и включите вход без кода заново.`;
+          note.hidden = false;
+        }
+      });
+  });
+}
+
+/* Предложение включить вход без кода — один раз после входа по номеру. */
+const PASSKEY_SNOOZE = 'sv-passkey-snooze';
+async function maybeOfferPasskey(): Promise<void> {
+  if (!passkeysSupported()) return;
+  try {
+    if (Number(localStorage.getItem(PASSKEY_SNOOZE) ?? 0) > Date.now()) return;
+  } catch {
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth/passkey', { credentials: 'include' });
+    if (!res.ok) return;
+    const mine = (await res.json()) as { count: number };
+    if (mine.count > 0) return;
+  } catch {
+    return;
+  }
+  if (document.getElementById('passkey-offer')) return;
+  const card = document.createElement('div');
+  card.id = 'passkey-offer';
+  card.className = 'banner';
+  card.innerHTML =
+    'Устали от кодов? Включите вход по Face ID или отпечатку — код больше не понадобится. ' +
+    '<span class="passkey-offer-acts"></span>';
+  const acts = card.querySelector('.passkey-offer-acts') as HTMLElement;
+  const yes = document.createElement('button');
+  yes.type = 'button';
+  yes.className = 'btn';
+  yes.textContent = 'Включить';
+  const later = document.createElement('button');
+  later.type = 'button';
+  later.className = 'btn btn-ghost';
+  later.textContent = 'Позже';
+  acts.append(yes, later);
+  const screen = document.getElementById('screen-contacts');
+  screen?.prepend(card);
+  later.addEventListener('click', () => {
+    try {
+      localStorage.setItem(PASSKEY_SNOOZE, String(Date.now() + 3 * 24 * 60 * 60 * 1000));
+    } catch {
+      /* некритично */
+    }
+    card.remove();
+  });
+  yes.addEventListener('click', () => {
+    yes.disabled = true;
+    registerPasskey()
+      .then(() => {
+        card.textContent = 'Готово. В следующий раз — просто Face ID или отпечаток.';
+        setTimeout(() => card.remove(), 6000);
+      })
+      .catch((err) => {
+        yes.disabled = false;
+        card.append(` Не вышло: ${describeError(err)}`);
+      });
   });
 }
 
@@ -479,6 +586,53 @@ async function registerProfile(profile: ui.ProfileRegistrationInput): Promise<vo
   }
 }
 
+/* ИИ-собеседники: звонок им должен идти через ДВИЖОК, ради этого они и
+ * существуют. Если движок ещё не поднят, «позвонить» превращается в бронь на
+ * ближайший срок: оркестратор греет карту, бот сам подтверждает, а в срок
+ * приходит пуш и звонок начинается сам (sv-booking.js). Те же id живут в
+ * store.js бэкенда (DRILL_SPEAKER_IDS). */
+const AI_COMPANIONS = new Set(['u_141560d817f7c1af', 'u_6df46c7f61d47836']);
+
+async function callOrWarmForBot(contact: ContactCard): Promise<void> {
+  if (!AI_COMPANIONS.has(contact.userId)) {
+    void startCall(contact);
+    return;
+  }
+  // Автосозвон в срок брони: время пришло, движок грет (или почти) — звоним
+  // сразу. Заводить отсюда новую бронь = бег по кругу (18:32, 03.09).
+  if ((window as { __svAutoCallNow?: string | null }).__svAutoCallNow) {
+    void startCall(contact);
+    return;
+  }
+  try {
+    const res = await fetch('/orch/call-bot', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ botUserId: contact.userId }),
+    });
+    const data = (await res.json()) as { ready?: boolean; booking?: { startsAt: number } };
+    if (res.ok && data.ready) {
+      void startCall(contact);
+      return;
+    }
+    if (res.ok && data.booking) {
+      const dt = new Date(data.booking.startsAt);
+      const hh = `${dt.getHours()}`.padStart(2, '0');
+      const mm = `${dt.getMinutes()}`.padStart(2, '0');
+      ui.setBanner(
+        `Поднимаю движок под этот разговор. В ${hh}:${mm} соединю с ${contact.displayName} сам — ` +
+          'можно свернуть приложение, придёт пуш.',
+      );
+      return;
+    }
+    throw new Error('оркестратор не ответил');
+  } catch {
+    // Оркестратор недоступен — не блокировать человека, зовём облаком.
+    void startCall(contact);
+  }
+}
+
 /**
  * Экран контактов.
  *
@@ -493,6 +647,7 @@ async function showContacts(): Promise<void> {
   if (!me) return;
   ui.showScreen('contacts');
   clearBanner();
+  void maybeOfferPasskey();
   ui.setContactsError(null);
 
   const [contactsResult, usersResult] = await Promise.allSettled([
@@ -516,7 +671,7 @@ async function showContacts(): Promise<void> {
     model,
     {
       onCall: (contact) => {
-        void startCall(contact);
+        void callOrWarmForBot(contact);
       },
       onToggleForce: (contact, force) => {
         void (async () => {

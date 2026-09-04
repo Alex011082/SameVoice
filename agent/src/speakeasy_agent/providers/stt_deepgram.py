@@ -149,6 +149,14 @@ class DeepgramSttProvider:
                 # `utils.http_context.http_session()` would raise. See
                 # speakeasy_agent/httpclient.py.
                 http_session=shared_session(),
+                # Слова нашего мира, которые слух калечит чаще всего: первый
+                # реальный звонок (03.09.2026) трижды превратил «на иврите» в
+                # «на игри». Nova-3 принимает подсказки только через keyterm.
+                keyterm=[
+                    "иврит", "иврите", "ивритский", "русском", "русский",
+                    "SameVoice", "перевод", "переводчик",
+                    "עברית", "רוסית", "תרגום",
+                ],
             )
             self._impls[lang] = impl
             logger.info(

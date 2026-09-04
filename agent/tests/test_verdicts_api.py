@@ -24,6 +24,10 @@ def utterance(uid: str, *, speaker=SPEAKER, listener=LISTENER, dst="שלום"):
     return utterance_record(
         call_id=CALL_ID,
         utterance_id=uid,
+        # One chunk per utterance here: this file is about the verdict flow,
+        # which keys on utteranceId and never aggregates anything.
+        utterance_key=uid,
+        is_first_chunk=True,
         segment_id=f"seg_{uid}",
         speaker=speaker,
         listener=listener,

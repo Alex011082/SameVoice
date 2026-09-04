@@ -418,46 +418,6 @@ export function updatePresence(presence: PresenceMap): void {
   }
 }
 
-/** Язык словом, без «таблетки»: в строке направления фон только мешает. */
-function langWord(lang: Lang): HTMLSpanElement {
-  const word = document.createElement('span');
-  word.className = 'dir-lang';
-  word.dir = dirForLang(lang);
-  word.lang = lang;
-  word.textContent = langLabel(lang);
-  return word;
-}
-
-/**
- * Строка направления под именем: что именно проверит звонок этому контакту.
- *
- * Режим звонка окончательно решает backend (POST /api/calls), поэтому здесь
- * предсказание, а не решение. Раньше оно было спрятано под `?debug=1` вместе
- * с полом — и четыре тестовых аккаунта превращались в четыре одинаковых имени.
- */
-function directionRow(me: UserProfile, contact: ContactCard): HTMLDivElement {
-  const direction = describeDirection(me, contact, contact.forceTranslate);
-
-  const row = document.createElement('div');
-  row.className = 'card-dir';
-  row.dataset['translated'] = String(direction.translated);
-
-  const mode = document.createElement('span');
-  mode.className = 'dir-mode';
-  mode.textContent = direction.badge;
-
-  const route = document.createElement('span');
-  route.className = 'dir-route';
-  route.append(langWord(direction.from), document.createTextNode('→'), langWord(direction.to));
-
-  const note = document.createElement('span');
-  note.className = 'dir-note';
-  note.textContent = direction.note;
-
-  row.append(mode, route, note);
-  return row;
-}
-
 function contactCard(
   me: UserProfile,
   entry: DirectoryEntry,
@@ -466,56 +426,89 @@ function contactCard(
 ): HTMLLIElement {
   const contact = entry.contact;
 
+  // Разметка утверждённого макета: имя, нить голоса из него (её рисует
+  // sv-motion.js) и направление перевода на правом конце нити. Аватара и
+  // зелёного кружка трубки НЕТ — так согласовано. Действия появляются по
+  // тапу, звонок начинается протяжкой вбок.
   const li = document.createElement('li');
   li.className = 'card card-contact';
   li.dataset['userId'] = contact.userId;
 
-  const top = document.createElement('div');
-  top.className = 'card-top';
-
-  const main = document.createElement('div');
-  main.className = 'card-main';
-
   const name = document.createElement('span');
   name.className = 'card-name';
   name.textContent = contact.displayName;
+  name.lang = contact.lang;
+  name.dir = dirForLang(contact.lang);
 
-  const meta = document.createElement('div');
-  meta.className = 'card-meta';
-  meta.append(presenceDot(online));
-  meta.append(langChip(contact.lang));
-  // Пол виден всегда, а не только в отладке: в иврите он задаёт грамматику,
-  // и без него нельзя выбрать, какую пару языков и родов проверяет звонок.
-  const gender = document.createElement('span');
-  gender.className = 'gender-chip';
-  gender.textContent = genderLabel(contact.gender);
-  meta.append(gender);
+  const direction = describeDirection(me, contact, contact.forceTranslate);
+  const dir = document.createElement('span');
+  dir.className = 'card-dir';
+  dir.dataset['translated'] = String(direction.translated);
+  if (direction.translated) {
+    const from = document.createElement('bdi');
+    from.lang = contact.lang;
+    from.dir = dirForLang(contact.lang);
+    from.textContent = langLabel(contact.lang);
+    dir.append(from, document.createTextNode(' ⇄ '), document.createTextNode(langLabel(me.lang)));
+  } else {
+    dir.textContent = `${langLabel(me.lang)} ⇄ ${langLabel(me.lang)}`;
+    dir.dataset['direct'] = '1';
+  }
 
-  // Метка постоянного тестового аккаунта. Список тестового аккаунта состоит НЕ
-  // из одних тестовых: каждый, кто завёл профиль по номеру, попадает в списки
-  // всех четырёх (STAGE0_AUTO_JOIN_TEST_IDENTITIES в backend/src/store.ts). Без
-  // метки строка над списком обещает «сетку направлений», а показывает сетку
-  // вперемешку с посторонними — и отличить одно от другого на экране нечем.
+  const head = document.createElement('div');
+  head.className = 'card-head';
+  head.append(presenceDot(online), name, dir);
+
+  // Метка постоянного тестового аккаунта: список настоящего человека может
+  // содержать и тестовых, и отличить их на экране больше нечем.
   if (entry.test) {
     const test = document.createElement('span');
     test.className = 'test-chip';
     test.textContent = 'тест';
-    meta.append(test);
+    head.append(test);
   }
 
+  // Раскрывающаяся часть: то, что в макете появлялось по тапу.
+  const ctx = document.createElement('div');
+  ctx.className = 'card-ctx';
+  const ctxInner = document.createElement('div');
+  ctxInner.className = 'card-ctx-inner';
+
+  const explain = document.createElement('p');
+  explain.className = 'card-explain';
+  explain.textContent = direction.note;
+
+  const acts = document.createElement('div');
+  acts.className = 'card-acts';
+  const call = document.createElement('button');
+  call.type = 'button';
+  call.className = 'btn';
+  call.setAttribute('aria-label', `Позвонить: ${contact.displayName}`);
+  call.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    handlers.onCall(contact);
+  });
+  acts.append(call);
+  ctxInner.append(explain, acts);
+
+  // Пол и тон — не украшение: в иврите род это грамматика. Но в макете строка
+  // человека несёт только имя, поэтому они живут в раскрытии.
+  const meta = document.createElement('div');
+  meta.className = 'card-meta';
+  const gender = document.createElement('span');
+  gender.className = 'gender-chip';
+  gender.textContent = genderLabel(contact.gender);
+  meta.append(gender);
   const tone = document.createElement('code');
   tone.textContent = contact.tone;
   meta.append(tone);
-
   if (Object.keys(contact.overrides).length > 0) {
     const override = document.createElement('code');
     override.textContent = 'override';
     meta.append(override);
   }
-
   // PATCH по контакту, которого нет в базе сервера, отвечает 404, поэтому
-  // переключатель показывается только у сохранённых карточек. На звонок это
-  // не влияет: POST /api/calls требует лишь чтобы оба пользователя были.
+  // переключатель показывается только у сохранённых карточек.
   if (entry.saved) {
     const toggle = document.createElement('label');
     toggle.className = 'card-toggle';
@@ -526,18 +519,21 @@ function contactCard(
     toggle.append(checkbox, document.createTextNode('всегда переводить'));
     meta.append(toggle);
   }
+  ctxInner.append(meta);
+  ctx.append(ctxInner);
 
-  main.append(name, meta);
+  li.append(head, ctx);
 
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn';
-  // Подпись читает скринридер; глазами видна иконка трубки из CSS.
-  btn.setAttribute('aria-label', `Позвонить: ${contact.displayName}`);
-  btn.addEventListener('click', () => handlers.onCall(contact));
+  // Тап раскрывает строку: контекст и действия. Второй тап закрывает.
+  li.addEventListener('click', (ev) => {
+    if ((ev.target as HTMLElement).closest('button, input, label, a')) return;
+    const open = li.classList.toggle('open');
+    for (const other of el.contactList().querySelectorAll('li.card.open')) {
+      if (other !== li) other.classList.remove('open');
+    }
+    li.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
 
-  top.append(avatarFor(contact.displayName), main, btn);
-  li.append(top, directionRow(me, contact));
   return li;
 }
 
@@ -606,7 +602,11 @@ const MODE_EXPLAINER: Record<CallMode, string> = {
 };
 
 export function renderCallHeader(join: JoinResponse): void {
-  el.peerName().textContent = join.peer.displayName;
+  const peer = el.peerName();
+  peer.textContent = join.peer.displayName;
+  // Язык на имени включает и шрифт иврита, и правило «язык = цвет» в ZGen.
+  peer.lang = join.peer.lang;
+  peer.dir = dirForLang(join.peer.lang);
 
   const chip = el.peerLang();
   chip.dir = dirForLang(join.peer.lang);

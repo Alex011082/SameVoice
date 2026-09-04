@@ -1,13 +1,19 @@
 <!doctype html>
-<html lang="ru" dir="ltr">
+<html lang="ru" dir="ltr" data-sv-theme="тишина">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0b0d12" />
+    <meta name="theme-color" content="#05030e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SameVoice" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karantina:wght@400;700&family=Unbounded:wght@300;600;700;800;900&family=Rubik:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=Noto+Sans+Hebrew:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <title>SameVoice</title>
   </head>
   <body>
@@ -16,7 +22,9 @@
            person you are calling, not to the app's own name. -->
       <header id="topbar">
         <div class="brand">
-          <span class="brand-mark">SameVoice</span>
+          <!-- Два спана ради ZGen: там «same» — цвет русского, «voice» — цвет
+               иврита. В «тишине» оба наследуют общий цвет и различия нет. -->
+          <span class="brand-mark"><span class="brand-l1">same</span><span class="brand-l2">voice</span></span>
         </div>
         <div id="whoami" class="whoami"></div>
       </header>
@@ -38,6 +46,13 @@
           </div>
 
           <div id="phone-auth" class="phone-auth">
+            <!-- Вход без кода: устройство подтверждает владельца само.
+                 Кнопка видна только там, где браузер умеет пасскеи. -->
+            <button type="button" id="passkey-login" class="btn btn-primary" hidden>
+              Войти по Face ID / отпечатку
+            </button>
+            <p id="passkey-login-note" class="field-note" role="status" hidden></p>
+
             <form id="phone-form" class="auth-card">
               <label for="phone-input">Номер телефона</label>
               <input
@@ -162,7 +177,8 @@
 
         <!-- ============ 2. контакты ============ -->
         <section id="screen-contacts" class="screen" hidden>
-          <h1 class="screen-title">Контакты</h1>
+          <h1 class="screen-title">голоса.</h1>
+          <p class="screen-hint">тап — что за разговор · протяжка вбок — звонок</p>
 
           <!-- Исходящий вызов: что видит звонящий, пока идут гудки. -->
           <div id="outgoing" class="outgoing" hidden role="status">
@@ -363,6 +379,25 @@
       </symbol>
     </svg>
 
+    <!-- Память устройства: копия сессии и её продление, чтобы вход не
+         терялся. Подключается ПЕРВЫМ — оборачивает fetch для всех остальных. -->
+    <script src="/sv-session.js?v=3"></script>
+    <!-- Оформление живёт отдельно от логики звонка: тема и космос ничего не
+         знают о внутренностях приложения, только об атрибуте на корне. -->
+    <script src="/sv-theme.js?v=3"></script>
+    <!-- Кнопка движка и подписка на уведомления: видны только тем, у кого в
+         браузере лежит ключ (ссылка вида /#engine-key=...). Иначе молчат. -->
+    <script src="/engine-button.js?v=3" defer></script>
+    <script src="/sv-push.js?v=3" defer></script>
+    <!-- Живая часть дизайна: нить голоса, протяжка для звонка, волна
+         разговора. Жест лишь нажимает ту же кнопку, что и палец, поэтому
+         приложение работает и без этого файла. -->
+    <script src="/sv-motion.js?v=3" defer></script>
+    <!-- Характер темы ZGen с макета: перелив-переход между экранами, имя
+         буквами, полоса направления, «догадка». Активен только в ZGen. -->
+    <script src="/sv-zgen.js?v=3" defer></script>
+    <!-- Договориться о разговоре: бронь, контекст, попап прогрева. -->
+    <script src="/sv-booking.js?v=4" defer></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

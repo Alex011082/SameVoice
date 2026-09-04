@@ -173,13 +173,25 @@ class CtcEvidenceEngine:
             started = time.perf_counter()
             try:
                 import torch
-                from transformers import AutoModelForCTC, AutoProcessor
+                from transformers import AutoModelForCTC, Wav2Vec2Processor
             except ImportError as exc:  # pragma: no cover - GPU image only
                 raise RuntimeError(
                     "CTC acoustic-pruner dependencies are missing; build with INSTALL_GPU_ENGINES=1"
                 ) from exc
 
-            processor = AutoProcessor.from_pretrained(self.model_id)
+            # Wav2Vec2Processor, а НЕ AutoProcessor. `bond005/wav2vec2-base-ru`
+            # объявляет в конфиге Wav2Vec2ProcessorWithLM, и AutoProcessor
+            # покорно тянет его — а тот требует pyctcdecode и без него валит
+            # загрузку: HTTP 500 на /v1/warmup, воспроизведено локально
+            # 31.08.2026 (ImportError: requires the pyctcdecode library).
+            #
+            # Ставить pyctcdecode было бы не просто лишним, а ВРЕДНЫМ. Этот
+            # сервис существует, чтобы измерять ЧИСТО акустическую улику первых
+            # 50-250 мс слова. Декодер с языковой моделью подмешал бы в неё
+            # лингвистическое ожидание — то самое, что предиктор даёт отдельно и
+            # что мы как раз хотим померить раздельно. Разделение бы схлопнулось,
+            # а числа стали бы необъяснимо хорошими.
+            processor = Wav2Vec2Processor.from_pretrained(self.model_id)
             model = AutoModelForCTC.from_pretrained(self.model_id)
             device = "cuda" if torch.cuda.is_available() else "cpu"
             if device == "cuda":
@@ -208,7 +220,13 @@ class CtcEvidenceEngine:
         assert processor is not None and model is not None
 
         inputs = processor(pcm, sampling_rate=SAMPLE_RATE, return_tensors="pt")
-        input_values = inputs.input_values.to(self._device)
+        # Вход обязан прийти в dtype модели. На CUDA модель лежит в float16
+        # (см. load()), а процессор отдаёт float32 — без приведения каждый
+        # запрос падает 503: "Input type (torch.cuda.FloatTensor) and weight
+        # type (torch.cuda.HalfTensor) should be the same". На CPU это не
+        # воспроизводится вовсе (модель float32), поэтому сухой прогон 31.08
+        # был зелёным, а под eizvbi6bza72um завалил все 900 запросов.
+        input_values = inputs.input_values.to(self._device, dtype=model.dtype)
         attention_mask = getattr(inputs, "attention_mask", None)
         if attention_mask is not None:
             attention_mask = attention_mask.to(self._device)

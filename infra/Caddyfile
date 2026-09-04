@@ -1,0 +1,17 @@
+samevoice.0110.digital {
+	root * /opt/samevoice/web/dist
+	encode gzip zstd
+
+	@api path /api/* /healthz
+	handle @api {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	@index path / /index.html
+	header @index Cache-Control "no-cache, no-store, must-revalidate"
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
