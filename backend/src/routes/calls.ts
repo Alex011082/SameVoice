@@ -1,5 +1,7 @@
-import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+
+import { requireActor, requireSelf } from "../auth.js";
 import { dispatchAgent, sendVerdict, stopAgent } from "../agentClient.js";
 import type { Config } from "../config.js";
 import { mintAgentToken, mintHumanToken } from "../livekit.js";
@@ -161,8 +163,12 @@ async function dispatchForCall(cfg: Config, call: Call): Promise<void> {
 export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsync {
   return async (app) => {
     app.post("/api/calls", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const body = parse(createCallBody, req.body, reply, "body");
       if (!body) return reply;
+      // Звонить может только сам звонящий: без этого `callerId` был способом
+      // заставить чужой телефон звонить чужим именем.
+      if (!requireSelf(req, reply, body.callerId)) return reply;
 
       if (body.callerId === body.calleeId) {
         return reply.code(409).send(apiError("self_call", "callerId and calleeId must differ"));
@@ -229,10 +235,12 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
     });
 
     app.post("/api/calls/:callId/join", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(userOnlyBody, req.body, reply, "body");
       if (!body) return reply;
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       await sweeper.sweep();
       const call = getCall(params.callId);
@@ -302,10 +310,12 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
     });
 
     app.post("/api/calls/:callId/mode", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(modeBody, req.body, reply, "body");
       if (!body) return reply;
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       const call = getCall(params.callId);
       if (!call) return reply.code(404).send(apiError("not_found", `call ${params.callId} does not exist`));
@@ -350,10 +360,12 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
     });
 
     app.post("/api/calls/:callId/end", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(userOnlyBody, req.body, reply, "body");
       if (!body) return reply;
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       const call = getCall(params.callId);
       if (!call) return reply.code(404).send(apiError("not_found", `call ${params.callId} does not exist`));
@@ -424,14 +436,19 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
      * having sent the response. `expectRole` is who is allowed to press this button.
      */
     async function ringGuard(
-      req: { params: unknown; body: unknown },
+      req: FastifyRequest,
       reply: FastifyReply,
       expectRole: "caller" | "callee",
     ): Promise<{ call: Call; userId: string } | null> {
+      if (requireActor(req, reply) === null) return null;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return null;
       const body = parse(userOnlyBody, req.body, reply, "body");
       if (!body) return null;
+      // Принять / отклонить / отменить сходятся здесь, и эта одна строка не даёт
+      // третьему лицу ответить или бросить чужой звонок. Проверка роли ниже
+      // остаётся: это другой вопрос — тот человек, но не та кнопка.
+      if (!requireSelf(req, reply, body.userId)) return null;
 
       await sweeper.sweep();
       const call = getCall(params.callId);
@@ -543,10 +560,12 @@ export function callRoutes(cfg: Config, sweeper: CallSweeper): FastifyPluginAsyn
      * land in the JSONL, the tester is told so while she still remembers what she heard.
      */
     app.post("/api/calls/:callId/verdict", async (req, reply) => {
+      if (requireActor(req, reply) === null) return reply;
       const params = parse(callParams, req.params, reply, "path");
       if (!params) return reply;
       const body = parse(verdictBody, req.body, reply, "body");
       if (!body) return reply;
+      if (!requireSelf(req, reply, body.userId)) return reply;
 
       const call = getCall(params.callId);
       if (!call) return reply.code(404).send(apiError("not_found", `call ${params.callId} does not exist`));

@@ -1,11 +1,21 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
+
+import { requireActor, requireSelf } from "../auth.js";
 import { effectiveGender, effectiveLang, effectiveTone } from "../mode.js";
-import { getContact, getUser, listContacts, listUsers, updateContact, updateUser } from "../store.js";
+import {
+  getContact,
+  getUser,
+  listContacts,
+  stage0TestIdentityIdList,
+  updateContact,
+  updateUser,
+} from "../store.js";
 import {
   apiError,
   USER_ID_RE,
   type ContactCard,
+  type UserProfile,
   type ContactOverridesPatch,
 } from "../types.js";
 
@@ -73,19 +83,33 @@ function toContactCard(ownerId: string, contactUserId: string): ContactCard | un
 }
 
 export const userRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/api/users", async () => ({ users: listUsers() }));
+  /**
+   * Единственный маршрут без сессии — и потому он отвечает ТОЛЬКО посеянной
+   * четвёркой. `listUsers()` здесь был утечкой: имя, язык и пол каждого
+   * зарегистрировавшегося отдавались любому, кто дотянулся до порта, а сужал
+   * выдачу только веб-клиент. Экран входа знает про сетку и больше ни про кого.
+   */
+  app.get("/api/users", async () => ({
+    users: stage0TestIdentityIdList()
+      .map((id) => getUser(id))
+      .filter((u): u is UserProfile => u !== undefined),
+  }));
 
   app.get("/api/users/:userId", async (req, reply) => {
+    if (requireActor(req, reply) === null) return reply;
     const params = parse(userParams, req.params, reply, "path");
     if (!params) return reply;
+    if (!requireSelf(req, reply, params.userId)) return reply;
     const user = getUser(params.userId);
     if (!user) return reply.code(404).send(apiError("not_found", `user ${params.userId} does not exist`));
     return { user };
   });
 
   app.patch("/api/users/:userId", async (req, reply) => {
+    if (requireActor(req, reply) === null) return reply;
     const params = parse(userParams, req.params, reply, "path");
     if (!params) return reply;
+    if (!requireSelf(req, reply, params.userId)) return reply;
     const body = parse(patchUserBody, req.body, reply, "body");
     if (!body) return reply;
     const user = updateUser(params.userId, body);
@@ -95,8 +119,10 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/api/users/:userId/contacts", async (req, reply) => {
+    if (requireActor(req, reply) === null) return reply;
     const params = parse(userParams, req.params, reply, "path");
     if (!params) return reply;
+    if (!requireSelf(req, reply, params.userId)) return reply;
     if (!getUser(params.userId)) {
       return reply.code(404).send(apiError("not_found", `user ${params.userId} does not exist`));
     }
@@ -107,8 +133,10 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.patch("/api/users/:userId/contacts/:contactUserId", async (req, reply) => {
+    if (requireActor(req, reply) === null) return reply;
     const params = parse(contactParams, req.params, reply, "path");
     if (!params) return reply;
+    if (!requireSelf(req, reply, params.userId)) return reply;
     const body = parse(patchContactBody, req.body, reply, "body");
     if (!body) return reply;
 

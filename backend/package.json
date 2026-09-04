@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@fastify/cors": "11.3.0",
+    "@simplewebauthn/server": "^13.3.3",
     "dotenv": "17.4.2",
     "fastify": "5.12.1",
     "livekit-server-sdk": "2.18.0",

@@ -7,11 +7,16 @@ import { loadConfig, type Config, type OriginRule } from "./config.js";
 import { createCallSweeper } from "./ringing.js";
 import { archiveRoutes } from "./routes/archive.js";
 import { authRoutes } from "./routes/auth.js";
+import { registerAuth } from "./auth.js";
 import { callRoutes } from "./routes/calls.js";
+import { contactRoutes } from "./routes/contacts.js";
+import { passkeyRoutes } from "./routes/passkeys.js";
 import { healthRoutes, VERSION } from "./routes/health.js";
 import { presenceRoutes } from "./routes/presence.js";
 import { userRoutes } from "./routes/users.js";
-import { STAGE0_AUTO_JOIN_TEST_IDENTITIES, stage0TestIdentityIdList } from "./store.js";
+import { STAGE0_AUTO_JOIN_TEST_IDENTITIES, stage0TestIdentityIdList,
+  loadIdentityStore,
+} from "./store.js";
 import { apiError } from "./types.js";
 
 const LOCAL_ORIGIN_RE =
@@ -45,12 +50,20 @@ export function originAllowed(cfg: Config, origin: string): boolean {
   return cfg.webOrigins.some((rule) => matches(rule, scheme, host, port));
 }
 
-export async function buildApp(cfg: Config): Promise<FastifyInstance> {
+/**
+ * `logStream` существует ровно ради одного утверждения: код подтверждения
+ * уходит в журнал, а номер телефона — нет. Pino пишет прямо в дескриптор 1,
+ * мимо всего, что тест может перехватить изнутри процесса, поэтому без точки
+ * перенаправления правило о личных данных держалось бы только на ревью.
+ * Продакшен его никогда не передаёт.
+ */
+export async function buildApp(cfg: Config, opts: { logStream?: NodeJS.WritableStream } = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: cfg.logLevel,
       timestamp: () => `,"time":"${new Date().toISOString()}"`,
       base: { service: "backend" },
+      ...(opts.logStream ? { stream: opts.logStream } : {}),
     },
     genReqId: () => randomUUID().slice(0, 8),
     requestIdHeader: "x-request-id",
@@ -66,9 +79,16 @@ export async function buildApp(cfg: Config): Promise<FastifyInstance> {
       cb(null, originAllowed(cfg, origin));
     },
     methods: ["GET", "POST", "PATCH", "OPTIONS"],
-    allowedHeaders: ["content-type", "x-request-id"],
+    // `authorization` — бортовая половина сессии (backend/src/session.ts):
+    // кука SameSite=Lax не уходит на кросс-оригин, а разработка именно такая —
+    // страница на :5173, API на :8787. И тем же заголовком живёт вход внутри
+    // встроенного браузера мессенджера, который теряет куки.
+    allowedHeaders: ["content-type", "x-request-id", "authorization"],
     exposedHeaders: ["x-request-id"],
-    credentials: false,
+    // Без этого кука вообще не поедет на кросс-оригин. Безопасно только
+    // потому, что список источников выше — белый список, а не `*`; эти две
+    // настройки — одно решение и читаются вместе.
+    credentials: true,
   });
 
   app.addHook("onSend", async (req, reply) => {
@@ -84,12 +104,40 @@ export async function buildApp(cfg: Config): Promise<FastifyInstance> {
   sweeper.start();
   app.addHook("onClose", async () => sweeper.stop());
 
+  // До любого маршрута: именно это превращает `?me=` из личности в подсказку.
+  // Снимок личностей читается ДО маршрутов: без него перезапуск стирал всех
+  // зарегистрированных, и API честно отвечал «нет такого пользователя».
+  loadIdentityStore(cfg.identityDir, app.log);
+
+  registerAuth(app, cfg);
+
   await app.register(healthRoutes(cfg));
-  await app.register(authRoutes);
+  await app.register(authRoutes(cfg));
+  await app.register(passkeyRoutes(cfg));
+  await app.register(contactRoutes);
   await app.register(userRoutes);
   await app.register(archiveRoutes(archive));
   await app.register(presenceRoutes(cfg, sweeper));
   await app.register(callRoutes(cfg, sweeper));
+
+  if (cfg.authDevCodeInResponse) {
+    app.log.warn(
+      "AUTH_DEV_CODE_IN_RESPONSE is on — the confirmation code is returned to the browser, " +
+        "so anyone can verify anyone's number. Development boxes only.",
+    );
+  }
+  if (cfg.authSeededLogin) {
+    app.log.warn(
+      "AUTH_SEEDED_LOGIN is on — anyone can take a session as a seeded test identity, " +
+        "and those identities are contacts of every registered user.",
+    );
+  }
+  if (cfg.sessionSecretEphemeral) {
+    app.log.warn(
+      "SESSION_SECRET is not set — a random key was generated, so every session ends at the " +
+        "next restart. Set it to keep people signed in (openssl rand -hex 32).",
+    );
+  }
 
   app.setNotFoundHandler((req, reply) => {
     reply.code(404).send(apiError("not_found", `no route for ${req.method} ${req.url}`));

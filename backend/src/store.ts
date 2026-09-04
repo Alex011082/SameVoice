@@ -1,8 +1,21 @@
 import { randomBytes } from "node:crypto";
 import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { join } from "node:path";
+
+import { z } from "zod";
+import {
   CALL_ID_RE,
   isRingLive,
   roomNameFor,
+  USER_ID_RE,
   type Call,
   type CallAgentInfo,
   type CallMode,
@@ -190,9 +203,398 @@ function seed(): void {
 
 seed();
 
-/** Test-only: restore the Stage-0 seed and drop every call. */
+/** Test-only: restore the Stage-0 seed, drop every call и снести снимок. */
 export function resetStore(): void {
   seed();
+  removeIdentityFile();
+}
+
+/* ============ ХРАНЕНИЕ ЛИЧНОСТЕЙ НА ДИСКЕ ============
+ * Без этого блока перезапуск бэкенда стирал ВСЕХ зарегистрированных: люди
+ * в памяти, память умирает вместе с процессом. Снимок лежит рядом с
+ * пользователями, читается на старте поверх посева и переписывается на
+ * каждое изменение — атомарно, через временный файл и rename.
+ */
+
+/** Тип журнала: подходит и pino, и любой объект с этими двумя методами. */
+type IdentityLog = {
+  info: (obj: unknown, msg?: string) => void;
+  warn: (obj: unknown, msg?: string) => void;
+  error?: (obj: unknown, msg?: string) => void;
+};
+
+type Snapshot = z.infer<typeof snapshotSchema>;
+type Stamp = { size: number; mtimeMs: number };
+const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_FILE = "identities.json";
+const langSchema = z.enum(["ru", "he"]);
+const genderSchema = z.enum(["m", "f", "u"]);
+const toneSchema = z.enum(["neutral", "friendly", "formal"]);
+const userIdSchema = z.string().regex(USER_ID_RE);
+const snapshotSchema = z
+    .object({
+    version: z.literal(SNAPSHOT_VERSION),
+    savedAt: z.string(),
+    users: z.array(z
+        .object({
+        id: userIdSchema,
+        handle: z.string().min(1),
+        displayName: z.string().min(1),
+        lang: langSchema,
+        gender: genderSchema,
+        tone: toneSchema,
+    })
+        .strict()),
+    // Mirrors normalizePhone()'s output shape. Validated on the way in because a
+    // phone that is not E.164 here would key an index nothing can ever look up.
+    phones: z.array(z.object({ phone: z.string().regex(/^\+[1-9]\d{7,14}$/), userId: userIdSchema }).strict()),
+    contacts: z.array(z
+        .object({
+        ownerId: userIdSchema,
+        contactUserId: userIdSchema,
+        forceTranslate: z.boolean(),
+        overrides: z
+            .object({
+            lang: langSchema.optional(),
+            gender: genderSchema.optional(),
+            tone: toneSchema.optional(),
+        })
+            .strict(),
+    })
+        .strict()),
+})
+    .strict();
+/** null until loadIdentityStore() runs: importing this module writes no files. */
+let identityDir: string | null = null;
+let identityLog: IdentityLog | undefined;
+/** The snapshot path, or null while nothing is attached. */
+export function identityStorePath(): string | null {
+    return identityDir === null ? null : join(identityDir, SNAPSHOT_FILE);
+}
+/**
+ * Refuses to answer with a half-read file. A JSON parse error or a shape that
+ * does not match means the process must not start: silently starting from an
+ * empty store is what let the missing-contacts failure look like a client bug
+ * for days, and it would do it again here — every phone user gone, the seeded
+ * four present, the API answering 200 the whole time.
+ *
+ * `null` means only "there is no file yet", which is the ordinary first boot.
+ */
+function readSnapshot(file: string): Snapshot | null {
+    let raw: string;
+    try {
+        raw = readFileSync(file, "utf8");
+    }
+    catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT")
+            return null;
+        throw new Error(`SpeakEasy backend cannot start: identity store ${file} could not be read (${String(err)}).`);
+    }
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    }
+    catch (err) {
+        throw new Error([
+            `SpeakEasy backend cannot start: identity store ${file} is not valid JSON (${String(err)}).`,
+            "It holds every phone-registered profile and their contacts. Starting without it would",
+            "silently answer \"user not found\" for all of them, so the process stops instead.",
+            "Move the file aside to start from the Stage-0 seed alone — that discards those profiles.",
+        ].join("\n"));
+    }
+    const result = snapshotSchema.safeParse(parsed);
+    if (!result.success) {
+        const issues = result.error.issues
+            .map((i) => `  - ${i.path.join(".") || "<root>"}: ${i.message}`)
+            .join("\n");
+        throw new Error([
+            `SpeakEasy backend cannot start: identity store ${file} does not match snapshot v${SNAPSHOT_VERSION}.`,
+            issues,
+        ].join("\n"));
+    }
+    return result.data;
+}
+/**
+ * The file on top of the seed. Both halves are keyed — users by id, contacts by
+ * `${ownerId}->${contactUserId}` — so a snapshot that contains the seeded four
+ * (it always does, they are ordinary users once they are in it) overwrites them
+ * with themselves instead of adding a second Alex.
+ *
+ * Rows whose endpoints are not users are dropped rather than kept: a contact
+ * row pointing at a profile that no longer exists is already invisible to the
+ * API (routes/users.ts filters it out of every list), so keeping it would only
+ * let it live forever in the file.
+ *
+ * The consequence worth knowing before it surprises somebody: for an id the
+ * snapshot contains, the FILE wins. Editing a seeded profile in seedIdentities()
+ * therefore does not reach a server whose snapshot already holds that id — the
+ * one there was written by the last PATCH /api/users/:userId. Delete the file
+ * (its path is in the boot log) to come back up on the code seed alone; that
+ * also discards every phone-registered profile in it.
+ */
+function applySnapshot(snapshot: Snapshot): void {
+    for (const user of snapshot.users)
+        users.set(user.id, user);
+    let droppedPhones = 0;
+    for (const entry of snapshot.phones) {
+        if (!users.has(entry.userId)) {
+            droppedPhones += 1;
+            continue;
+        }
+        userIdByPhone.set(entry.phone, entry.userId);
+    }
+    let droppedContacts = 0;
+    for (const contact of snapshot.contacts) {
+        if (contact.ownerId === contact.contactUserId ||
+            !users.has(contact.ownerId) ||
+            !users.has(contact.contactUserId)) {
+            droppedContacts += 1;
+            continue;
+        }
+        contacts.set(contactKey(contact.ownerId, contact.contactUserId), contact);
+    }
+    if (droppedPhones > 0 || droppedContacts > 0) {
+        identityLog?.warn({ droppedPhones, droppedContacts }, "identity store: dropped rows pointing at users the snapshot does not contain");
+    }
+}
+/**
+ * Point the store at `dir` and rebuild the identity half from the seed plus
+ * whatever is in it. This IS the boot path — buildApp() calls it once — which is
+ * also why a test can call it again to reproduce a restart without a second
+ * process.
+ *
+ * The seed runs first, unconditionally, so the four test identities exist even
+ * on a first boot with no file; see applySnapshot() for why running the file on
+ * top of them cannot duplicate them.
+ *
+ * Throws on an unreadable or malformed file. Deliberately fatal — see readSnapshot().
+ */
+export function loadIdentityStore(dir: string, log?: IdentityLog): void {
+    const file = join(dir, SNAPSHOT_FILE);
+    // Read FIRST, then commit. A throw here must change nothing: memory keeps
+    // whatever it held, and the store stays pointed where it was pointed, so the
+    // next write cannot overwrite the corrupt file an operator has to go and read.
+    const snapshot = readSnapshot(file);
+    identityDir = dir;
+    identityLog = log;
+    seed();
+    // The file we just read counts as "ours": the first save after boot must not
+    // mistake the snapshot it was built from for another process's write and
+    // announce a merge that added nothing.
+    lastWritten = stampOf(file);
+    if (snapshot === null) {
+        log?.info({ file }, "identity store: no snapshot yet, starting from the Stage-0 seed");
+        return;
+    }
+    applySnapshot(snapshot);
+    // Досвязываем тех, кто зарегистрировался, пока действовало старое правило.
+    // ИМЕННО С СЕТКОЙ, а не всех со всеми: joinEveryone([...users.keys()])
+    // делал контактами посторонних друг другу людей — чужой человек появлялся
+    // в списке и мог позвонить. Двое живых знакомятся через
+    // POST /api/contacts/by-phone (linkContactPair), это их согласие.
+    if (STAGE0_AUTO_JOIN_TEST_IDENTITIES) {
+        const before = contacts.size;
+        for (const id of users.keys()) {
+            if (stage0TestIdentityIds.includes(id)) continue;
+            joinEveryone([id, ...stage0TestIdentityIds]);
+        }
+        if (contacts.size !== before) {
+            log?.info({ added: contacts.size - before }, "identity store: досвязаны недостающие контакты");
+            saveIdentities();
+        }
+    }
+    // Counts only: the size of the phone index tells an operator everything the
+    // log needs to say and names nobody.
+    log?.info({
+        file,
+        users: users.size,
+        contacts: contacts.size,
+        phoneIdentities: userIdByPhone.size,
+        savedAt: snapshot.savedAt,
+    }, "identity store loaded");
+}
+/**
+ * Size and mtime of the snapshot as THIS process last left it — the one cheap
+ * way to tell "the file on disk is still mine" from "somebody else has written
+ * it since" without re-reading it on every save.
+ */
+let lastWritten: Stamp | null = null;
+function stampOf(file: string): Stamp | null {
+    try {
+        const s = statSync(file);
+        return { size: s.size, mtimeMs: s.mtimeMs };
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Merge a snapshot written by ANOTHER process into memory, adding only what is
+ * missing here.
+ *
+ * Add-only, and that is the whole design: this runs immediately before we
+ * overwrite the file, so everything it copies in is about to be written back.
+ * A full applySnapshot() would also copy the other process's version of rows
+ * this one has just edited, and the edit the route is in the middle of saving
+ * would be reverted by its own save.
+ *
+ * Users first: the phone index and the contact graph are both filtered against
+ * `users`, exactly as applySnapshot() filters them.
+ */
+function mergeMissing(snapshot: Snapshot): { users: number; phones: number; contacts: number } {
+    let addedUsers = 0;
+    let addedPhones = 0;
+    let addedContacts = 0;
+    for (const user of snapshot.users) {
+        if (users.has(user.id))
+            continue;
+        users.set(user.id, user);
+        addedUsers += 1;
+    }
+    for (const entry of snapshot.phones) {
+        if (userIdByPhone.has(entry.phone) || !users.has(entry.userId))
+            continue;
+        userIdByPhone.set(entry.phone, entry.userId);
+        addedPhones += 1;
+    }
+    for (const contact of snapshot.contacts) {
+        const key = contactKey(contact.ownerId, contact.contactUserId);
+        if (contact.ownerId === contact.contactUserId || contacts.has(key))
+            continue;
+        if (!users.has(contact.ownerId) || !users.has(contact.contactUserId))
+            continue;
+        contacts.set(key, contact);
+        addedContacts += 1;
+    }
+    return { users: addedUsers, phones: addedPhones, contacts: addedContacts };
+}
+/**
+ * A SECOND PROCESS ON ONE IDENTITY_DIR, which is what this guard is for.
+ *
+ * saveIdentities() serializes this process's entire memory, so with no check
+ * the file is simply replaced by whoever wrote last: every identity the other
+ * process holds and this one does not is deleted by a write that reports
+ * success and logs nothing. Measured on 31.08.2026 with two backends sharing
+ * one IDENTITY_DIR — a 545,725-byte snapshot holding 404 profiles was replaced
+ * by a 15,834-byte one holding 14, and neither log said a word.
+ *
+ * Two backends is not hypothetical here: docker/entrypoint.sh points
+ * IDENTITY_DIR at a persistent volume, and a restart that overlaps its
+ * predecessor, or a second container on the same volume, is exactly this.
+ *
+ * So: before overwriting, notice that the file is not the one we left, read it,
+ * and take in whatever we are missing. The write that follows is a union
+ * instead of a replacement. This does NOT make two writers correct — the last
+ * writer still decides a row both of them edited, and the window between this
+ * stat and the rename below is real. It makes the failure lose nothing and say
+ * so out loud, instead of losing everything and saying nothing.
+ */
+function adoptForeignWrites(file: string): void {
+    const onDisk = stampOf(file);
+    if (onDisk === null)
+        return;
+    if (lastWritten !== null &&
+        onDisk.size === lastWritten.size &&
+        onDisk.mtimeMs === lastWritten.mtimeMs) {
+        return;
+    }
+    let snapshot: Snapshot | null;
+    try {
+        snapshot = readSnapshot(file);
+    }
+    catch (err) {
+        // Refusing to BOOT on an unreadable file is right; refusing to SAVE on one
+        // would throw out of a route handler. Overwriting it is the better of the
+        // two options left — memory is the good copy either way.
+        (identityLog?.error ?? identityLog?.warn)?.call(identityLog, { file, err }, "identity store: a foreign write left a file this build cannot read — overwriting it from memory");
+        return;
+    }
+    if (snapshot === null)
+        return;
+    const added = mergeMissing(snapshot);
+    if (added.users === 0 && added.phones === 0 && added.contacts === 0)
+        return;
+    identityLog?.warn({ file, ...added }, "identity store: another process is writing this directory — merged its rows in rather than overwriting them");
+}
+/**
+ * Every mutation below ends here, synchronously, before the route replies. Sync
+ * because the store's whole API is sync and every caller is a route handler
+ * calling it inline: making it async would turn four functions into promises
+ * across three route files for a write that happens on registration and on a
+ * profile or contact edit — never on the call path, never on presence polling.
+ * The cost is an event-loop stall per registration, on a snapshot that today
+ * holds four seeded profiles plus the testers; its duration is не измерено.
+ * If the file ever grows to where that matters, measure first, then batch.
+ *
+ * Written to a temporary file and renamed. rename(2) within a directory is
+ * atomic, so a crash mid-write leaves either the whole previous snapshot or the
+ * whole new one — never the truncated half that readSnapshot() would refuse to
+ * boot on. Not fsync'd: a kernel-level crash can still lose the last write, and
+ * the rename only rules out a file that exists but cannot be parsed.
+ *
+ * The temporary name carries the pid and four random bytes, and that is not
+ * decoration: a fixed `.tmp` shared by two processes is one of them writing
+ * into the file the other is about to rename into place — precisely the torn
+ * file the rename was chosen to rule out.
+ *
+ * MODE 0600, and the directory 0700. This file holds the phone numbers — the
+ * index that stops one number minting a second profile IS the numbers — and
+ * the 0644 default published them to every account on the box, which is a
+ * strange thing to allow in the one file that works hardest to keep them out
+ * of every log line.
+ */
+function saveIdentities(): void {
+    if (identityDir === null)
+        return;
+    const file = join(identityDir, SNAPSHOT_FILE);
+    const tmp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+    try {
+        mkdirSync(identityDir, { recursive: true, mode: 0o700 });
+        adoptForeignWrites(file);
+        const snapshot = {
+            version: SNAPSHOT_VERSION,
+            savedAt: new Date().toISOString(),
+            users: [...users.values()],
+            phones: [...userIdByPhone.entries()].map(([phone, userId]) => ({ phone, userId })),
+            contacts: [...contacts.values()],
+        };
+        writeFileSync(tmp, `${JSON.stringify(snapshot, null, 2)}\n`, {
+            encoding: "utf8",
+            mode: 0o600,
+        });
+        renameSync(tmp, file);
+        lastWritten = stampOf(file);
+    }
+    catch (err) {
+        // Loud, and the process keeps serving: the profile is usable right now, it
+        // just will not survive a restart. Same call archive.ts makes when it cannot
+        // write a call — an operator who sees this knows the next restart loses data.
+        // The half-written temporary goes with it; on a full disk it is the thing
+        // standing between the operator and the space to write the next one.
+        rmSync(tmp, { force: true });
+        identityLog?.warn({ file, err }, "identity store could not be written — identities created now will not survive a restart");
+    }
+}
+/**
+ * Test-only, via resetStore(). Every temporary goes, not one fixed name: a
+ * write that died mid-flight leaves one named after the pid that died.
+ */
+function removeIdentityFile(): void {
+    if (identityDir === null)
+        return;
+    const file = join(identityDir, SNAPSHOT_FILE);
+    rmSync(file, { force: true });
+    lastWritten = null;
+    try {
+        for (const name of readdirSync(identityDir)) {
+            if (name.startsWith(`${SNAPSHOT_FILE}.`) && name.endsWith(".tmp")) {
+                rmSync(join(identityDir, name), { force: true });
+            }
+        }
+    }
+    catch {
+        // The directory need not exist; there is nothing to clean up if it does not.
+    }
 }
 
 export function listUsers(): UserProfile[] {
@@ -234,6 +636,7 @@ export function createUserFromPhone(input: {
   // empty app. He joins the grid rather than only pointing at it, so the test
   // identities can call him back.
   if (STAGE0_AUTO_JOIN_TEST_IDENTITIES) joinEveryone([id, ...stage0TestIdentityIds]);
+  saveIdentities();
   return user;
 }
 
@@ -245,9 +648,58 @@ export function updateUser(
   if (!existing) return undefined;
   const next: UserProfile = { ...existing, ...patch };
   users.set(userId, next);
+  saveIdentities();
   return next;
 }
 
+/* Тестовые обитатели — четыре посеянных профиля и два диктора сквозного
+ * прогона. Они нужны нам, но реальному человеку в списке контактов они —
+ * мусор, в котором тонет живой собеседник (скрин основателя 02.09.2026: один
+ * настоящий Igor на семь тестовых). Тестовые видят всех; настоящие — только
+ * настоящих; основатель видит ещё и ИИ-собеседников, ему ими тестировать. */
+const DRILL_SPEAKER_IDS = new Set([
+  "u_141560d817f7c1af", // Тест РУ — браузерный диктор сквозного прогона
+  "u_6df46c7f61d47836", // Тест ИВ — серверный диктор сквозного прогона
+]);
+export function isTestResident(userId: string): boolean {
+  // stage0TestIdentityIds заполняется при загрузке стора — проверять надо
+  // в момент вопроса, а не в момент импорта модуля (там список ещё пуст).
+  return DRILL_SPEAKER_IDS.has(userId) || stage0TestIdentityIds.includes(userId);
+}
+
+/**
+ * Two people become each other's contact. Used by "add a contact by phone
+ * number" (backend/src/routes/contacts.ts), which is how two humans on real
+ * numbers reach each other at all — the Stage-0 auto-join wires a new user to
+ * the seeded four and deliberately stops there.
+ *
+ * It delegates to joinEveryone() rather than calling addContact() twice, and
+ * that is the whole reason this function exists instead of being written out at
+ * the call site: BOTH directions is the property worth having in one place. A
+ * one-way row lets the adder dial out and never receive, because the other side
+ * never sees him in the list and presence never reports him.
+ *
+ * `persist` decides WHEN the snapshot is written, never WHETHER — a contact row
+ * that does not survive a restart puts the pair back to not being able to find
+ * each other, which is the bug this function was added to fix.
+ */
+export function linkContactPair(
+  userIdA: string,
+  userIdB: string,
+  persist: "now" | "deferred" = "now",
+): void {
+  joinEveryone([userIdA, userIdB]);
+  // Same reason createUserFromPhone() saves after its auto-join.
+  if (persist === "now") saveIdentities();
+  else setImmediate(saveIdentities);
+}
+
+/**
+ * Строки контактов как они есть. Прятать тестовых обитателей от живого
+ * человека — работа ЭКРАНА (web/src/contact-directory.ts), а не хранилища:
+ * фильтр здесь делал ответ API неправдой о том, что лежит в базе, и ломал
+ * ровно то, ради чего посев существует — новичку было бы некуда звонить.
+ */
 export function listContacts(ownerId: string): ContactRecord[] {
   return [...contacts.values()].filter((c) => c.ownerId === ownerId);
 }
@@ -274,6 +726,7 @@ export function updateContact(
     overrides: overrides as ContactOverrides,
   };
   contacts.set(contactKey(ownerId, contactUserId), next);
+  saveIdentities();
   return next;
 }
 

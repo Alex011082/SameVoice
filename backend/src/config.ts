@@ -1,7 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+
+import { normalizePhone } from "./phoneVerification.js";
 
 // The repo-root .env is the single source of truth shared by backend, agent and vite.
 // Resolved relative to this module so it works from src/ (tsx) and from dist/ (node) alike.
@@ -51,6 +54,22 @@ export interface Config {
    * started in — the same trap the agent's EVAL_LOG_DIR already documents.
    */
   callArchiveDir: string;
+  /** Где лежит снимок личностей. Под data/, а не logs/: там телефоны. */
+  identityDir: string;
+
+  /** Ключ подписи сессий. Пустой в окружении — сгенерируется случайный. */
+  sessionSecret: string;
+  /** Случайный ключ: сессии не переживут перезапуск, и об этом надо сказать вслух. */
+  sessionSecretEphemeral: boolean;
+  sessionTtlSeconds: number;
+  /** `auto` решает по Host: localhost без Secure, всё остальное с ним. */
+  sessionCookieSecure: boolean | "auto";
+  /** Вход посеянной тестовой личностью без доказательств. По умолчанию выключен. */
+  authSeededLogin: boolean;
+  /** Отдавать код подтверждения прямо в ответе. Небезопасно, по умолчанию нет. */
+  authDevCodeInResponse: boolean;
+  /** Кому вообще можно просить код. Пусто — всем (об этом предупреждает старт). */
+  authPhoneAllowlist: string[];
 }
 
 const REQUIRED = [
@@ -124,6 +143,45 @@ export function parseWebOrigins(rawList: string): OriginRule[] {
   return rules;
 }
 
+function parsePhoneAllowlist(raw: string): string[] {
+    const entries = raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s !== "");
+    const allowed: string[] = [];
+    const problems: string[] = [];
+    for (const entry of entries) {
+        const normalized = normalizePhone(entry);
+        // The rejected entry is echoed back here and NOWHERE else in the backend:
+        // this is a startup crash on the operator's own terminal, quoting his own
+        // config file. It is not a log line and not an API response, which is where
+        // the "a phone number is personal data" rule bites.
+        if (normalized === null)
+            problems.push(`  - "${entry}" is not a phone number`);
+        else if (!allowed.includes(normalized))
+            allowed.push(normalized);
+    }
+    if (problems.length > 0) {
+        throw new Error([
+            "SpeakEasy backend cannot start: AUTH_PHONE_ALLOWLIST contains invalid entries.",
+            ...problems,
+            "",
+            "AUTH_PHONE_ALLOWLIST is a comma-separated list of the numbers allowed to",
+            "start phone verification. Israeli mobile notation and +E.164 both work:",
+            "  AUTH_PHONE_ALLOWLIST=050-123-4567,+972527654321",
+            "Leave it empty to let anyone register (the pre-31.08.2026 behaviour).",
+        ].join("\n"));
+    }
+    return allowed;
+}
+
+
+function boolOrAutoFromEnv(name: string, fallback: boolean | "auto"): boolean | "auto" {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (raw === undefined || raw === "" || raw === "auto") return fallback;
+  return boolFromEnv(name, true);
+}
+
 function boolFromEnv(name: string, fallback: boolean): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
   if (raw === undefined || raw === "") return fallback;
@@ -177,6 +235,20 @@ export function loadConfig(): Config {
 
   const webOrigins = parseWebOrigins(process.env.WEB_ORIGINS ?? "");
   const allowLocalOrigins = boolFromEnv("ALLOW_LOCAL_ORIGINS", true);
+
+  // Случайный ключ лучше зашитого умолчания: умолчание в .env.example — это
+  // секрет, общий у всех, кто его не поменял. Цена — сессии не переживают
+  // перезапуск, и ровно об этом предупреждает загрузка приложения.
+  const configuredSecret = process.env.SESSION_SECRET?.trim() ?? "";
+  const sessionSecretEphemeral = configuredSecret.length === 0;
+  const sessionSecret = sessionSecretEphemeral
+    ? randomBytes(32).toString("hex")
+    : configuredSecret;
+  if (!sessionSecretEphemeral && configuredSecret.length < 32) {
+    process.emitWarning(
+      `SESSION_SECRET is ${configuredSecret.length} chars; use at least 32 (openssl rand -hex 32).`,
+    );
+  }
   if (webOrigins.length === 0 && !allowLocalOrigins) {
     throw new Error(
       [
@@ -221,5 +293,16 @@ export function loadConfig(): Config {
     presenceTtlSeconds: intFromEnv("PRESENCE_TTL_SECONDS", 15),
     presencePollIntervalMs: intFromEnv("PRESENCE_POLL_MS", 2000),
     callArchiveDir: pathFromEnv("CALL_ARCHIVE_DIR", "logs/archive"),
+    identityDir: pathFromEnv("IDENTITY_DIR", "data/identity"),
+    sessionSecret,
+    sessionSecretEphemeral,
+    // 30 дней. Приложение, в которое надо входить каждую неделю, никто не носит
+    // с собой; токен называет только идентификатор, а кнопка выхода гасит его
+    // на месте для случая, который действительно важен.
+    sessionTtlSeconds: intFromEnv("SESSION_TTL_SECONDS", 30 * 24 * 3600),
+    sessionCookieSecure: boolOrAutoFromEnv("SESSION_COOKIE_SECURE", "auto"),
+    authSeededLogin: boolFromEnv("AUTH_SEEDED_LOGIN", false),
+    authDevCodeInResponse: boolFromEnv("AUTH_DEV_CODE_IN_RESPONSE", false),
+    authPhoneAllowlist: parsePhoneAllowlist(process.env.AUTH_PHONE_ALLOWLIST ?? ""),
   };
 }
