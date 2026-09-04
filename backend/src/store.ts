@@ -33,6 +33,8 @@ const users = new Map<string, UserProfile>();
 const contacts = new Map<string, ContactRecord>();
 const calls = new Map<string, Call>();
 const presence = new Map<string, PresenceRecord>();
+/** Real-number identities only. Seeded test identities deliberately have no phone. */
+const userIdByPhone = new Map<string, string>();
 
 function contactKey(ownerId: string, contactUserId: string): string {
   return `${ownerId}->${contactUserId}`;
@@ -43,6 +45,7 @@ function seed(): void {
   contacts.clear();
   calls.clear();
   presence.clear();
+  userIdByPhone.clear();
 
   const alex: UserProfile = {
     id: "u_alex",
@@ -122,6 +125,36 @@ export function listUsers(): UserProfile[] {
 
 export function getUser(userId: string): UserProfile | undefined {
   return users.get(userId);
+}
+
+export function getUserByPhone(phone: string): UserProfile | undefined {
+  const userId = userIdByPhone.get(phone);
+  return userId ? users.get(userId) : undefined;
+}
+
+export function createUserFromPhone(input: {
+  phone: string;
+  displayName: string;
+  lang: UserProfile["lang"];
+  gender: UserProfile["gender"];
+}): UserProfile {
+  const existing = getUserByPhone(input.phone);
+  if (existing) return existing;
+  let id: string;
+  do {
+    id = `u_${randomBytes(8).toString("hex")}`;
+  } while (users.has(id));
+  const user: UserProfile = {
+    id,
+    handle: `user_${id.slice(2, 10)}`,
+    displayName: input.displayName.trim(),
+    lang: input.lang,
+    gender: input.gender,
+    tone: "friendly",
+  };
+  users.set(id, user);
+  userIdByPhone.set(input.phone, id);
+  return user;
 }
 
 export function updateUser(

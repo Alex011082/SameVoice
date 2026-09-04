@@ -1,0 +1,14 @@
+{
+  "minSamplesPerLanguage": 30,
+  "targetWindowMs": 150,
+  "predictorTop20RecallMin": 0.95,
+  "conditionalTop5RetentionMin": 0.95,
+  "conditionalTop3RetentionMin": 0.88,
+  "maxConditionalTop5DropRate": 0.05,
+  "leadPositiveRateMin": 0.75,
+  "leadP50MsMin": 150.0,
+  "prunerRoundTripP95MsMax": 220.0,
+  "rejectPredictorTop20RecallBelow": 0.80,
+  "rejectConditionalTop10RetentionBelow": 0.80,
+  "rejectPrunerRoundTripP95MsAbove": 500.0
+}

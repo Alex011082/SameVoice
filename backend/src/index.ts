@@ -6,6 +6,7 @@ import { createCallArchive } from "./archive.js";
 import { loadConfig, type Config, type OriginRule } from "./config.js";
 import { createCallSweeper } from "./ringing.js";
 import { archiveRoutes } from "./routes/archive.js";
+import { authRoutes } from "./routes/auth.js";
 import { callRoutes } from "./routes/calls.js";
 import { healthRoutes, VERSION } from "./routes/health.js";
 import { presenceRoutes } from "./routes/presence.js";
@@ -83,6 +84,7 @@ export async function buildApp(cfg: Config): Promise<FastifyInstance> {
   app.addHook("onClose", async () => sweeper.stop());
 
   await app.register(healthRoutes(cfg));
+  await app.register(authRoutes);
   await app.register(userRoutes);
   await app.register(archiveRoutes(archive));
   await app.register(presenceRoutes(cfg, sweeper));

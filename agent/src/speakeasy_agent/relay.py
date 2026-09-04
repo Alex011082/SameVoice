@@ -356,6 +356,7 @@ class Relay:
                 sink=LiveKitAudioSink(self._sources[listener.user_id]),
                 emitter=self._emitter,
                 chunker_config=chunker_config,
+                tts_tempo=self.cfg.tts_tempo,
                 history_turns=self.cfg.mt_history_turns,
                 glossary=self.cfg.glossary,
                 call_start=self._call_start,

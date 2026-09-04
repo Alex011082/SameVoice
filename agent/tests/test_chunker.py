@@ -274,3 +274,78 @@ def test_a_long_tail_does_not_wait_for_end_of_turn():
     c.on_partial("мы хотим заказать доставку домой", 0.6)
     units = c.tick(1.2)  # 600 ms quiet, below end_of_turn_ms
     assert [u.text for u in units] == ["мы хотим заказать доставку домой"]
+
+
+# ------------------------------------------------- нелексические заполнители
+
+def test_stretched_e_is_dropped_and_never_translated():
+    c = Chunker(NEVER)
+    c.on_partial("мне ээ нужно", 0.1)
+    c.on_partial("мне ээ нужно узнать", 0.2)
+    assert c.pending_text == "мне нужно"
+
+
+def test_filler_variants_ru_and_he_are_dropped():
+    c = Chunker(NEVER)
+    c.on_partial("я эээ э-э эм ммм думаю", 0.1)
+    c.on_partial("я эээ э-э эм ммм думаю что", 0.2)
+    assert c.pending_text == "я думаю"
+
+    h = Chunker(NEVER)
+    h.on_partial("אני אהה אממ רוצה", 0.1)
+    h.on_partial("אני אהה אממ רוצה לדעת", 0.2)
+    assert h.pending_text == "אני רוצה"
+
+
+def test_single_e_and_single_ah_survive():
+    # Одиночное «э»/«אה» может быть осмысленным междометием — не трогаем.
+    c = Chunker(NEVER)
+    c.on_partial("э ты куда", 0.1)
+    c.on_partial("э ты куда пошёл", 0.2)
+    assert c.pending_text == "э ты куда"
+
+
+def test_stretch_counts_as_silence_and_commits_pending_words():
+    # Говорящий закончил мысль и тянет «эээ...»: часы тишины не сбрасываются,
+    # и готовые слова уходят в перевод ВНУТРИ затяжки.
+    # end_of_turn_ms=400: хвост без пунктуации коммитится тишиной только по
+    # порогу конца реплики — затяжка должна дорастить тишину именно до него.
+    cfg = ChunkerConfig(
+        min_words=1000, max_silence_ms=300, end_of_turn_ms=400,
+        timeout_ms=10_000, weak_boundary_min_words=1000,
+    )
+    c = Chunker(cfg)
+    units = feed(c, ["мы", "уже", "всё", "решили"])
+    units += c.on_partial("мы уже всё решили", 0.5)  # последняя активность: 0.5
+    # затяжка растёт, реальные слова не меняются — часы тишины идут
+    units += c.on_partial("мы уже всё решили ээ", 0.6)
+    units += c.on_partial("мы уже всё решили эээ", 0.7)
+    units += c.on_partial("мы уже всё решили ээээ", 0.95)
+    # Коммит по тишине срабатывает на таймере (tick), как в проде: партиалы с
+    # затяжкой часы не сбросили, и тик видит дозревшую паузу.
+    units += c.tick(0.96)
+    assert any(u.trigger == "silence" for u in units)
+    assert "ээ" not in " ".join(u.text for u in units)
+
+
+def test_real_word_after_filler_still_resets_the_clock():
+    cfg = ChunkerConfig(min_words=1000, max_silence_ms=300, timeout_ms=10_000, weak_boundary_min_words=1000)
+    c = Chunker(cfg)
+    units = feed(c, ["мы", "уже"])
+    units += c.on_partial("мы уже ээ едем", 0.5)  # новое слово => активность
+    units += c.tick(0.7)  # 200 мс после активности — тишина ещё не дозрела
+    assert units == []
+
+
+def test_filler_only_final_commits_nothing():
+    c = Chunker(ChunkerConfig())
+    units = c.on_final("эээ", 0.1)
+    assert units == []
+    assert c.fillers_dropped == 1
+
+
+def test_fillers_dropped_counter_accumulates():
+    c = Chunker(NEVER)
+    c.on_partial("мне ээ эм нужно", 0.1)
+    c.on_final("мне нужно ммм идти", 0.5)
+    assert c.fillers_dropped == 3

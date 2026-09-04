@@ -10,6 +10,7 @@ module has decided will not change.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
@@ -38,6 +39,24 @@ _FUNCTION_WORDS_HE = frozenset(
     """.split()
 )
 _FUNCTION_WORDS = _FUNCTION_WORDS_RU | _FUNCTION_WORDS_HE
+
+# Нелексические заполнители. Правило основателя 31.08.2026: тянущееся «э» —
+# две и более одинаковые буквы подряд — словом не является ни в русском, ни в
+# иврите; это 99% затягивание говорящего. Для перевода это мусор, а время,
+# пока оно тянется, машинерия забирает себе: заполнитель считается «тишиной
+# со звуком» (см. on_partial).
+#
+# Списки НАМЕРЕННО консервативные — только однозначные растяжки. Одиночные
+# «э» и «אה» не трогаем: могут быть осмысленным междометием («Э!», «!אה»).
+# «ээ» с дефисами покрывает манеру Deepgram писать растяжку как «э-э».
+_FILLER_RU = re.compile(r"^(?:э{2,}|э(?:[-–—]э)+|эм+|м{2,})$")
+_FILLER_HE = re.compile(r"^(?:א{2,}|אהה+|אממ+|אהמ+)$")
+
+
+def _is_filler(word: str) -> bool:
+    w = _normalize_word(word)
+    return bool(_FILLER_RU.match(w) or _FILLER_HE.match(w))
+
 
 
 @dataclass(frozen=True)
@@ -71,6 +90,9 @@ class ChunkerConfig:
     end_of_turn_ms: int = 1200
     timeout_ms: int = 2200
     weak_boundary_min_words: int = 3
+    # Вырезать нелексические заполнители («эээ», «אהה») из потока гипотез.
+    # Выключатель существует ради A/B и отладки, не ради сомнений в правиле.
+    drop_fillers: bool = True
 
 
 @dataclass(frozen=True)
@@ -114,6 +136,9 @@ class Chunker:
         self._committed: int = 0
         self._pending_since: float | None = None
         self._last_activity: float = 0.0
+        # Сессионный счётчик вырезанных заполнителей; reset() его НЕ трогает —
+        # это диагностика на весь звонок, а не состояние реплики.
+        self._fillers_dropped: int = 0
 
     # ---------------------------------------------------------------- state
 
@@ -133,6 +158,10 @@ class Chunker:
     def has_pending(self) -> bool:
         return self._committed < len(self._stable)
 
+    @property
+    def fillers_dropped(self) -> int:
+        return self._fillers_dropped
+
     def reset(self) -> None:
         self._prev_words = []
         self._stable = []
@@ -143,8 +172,21 @@ class Chunker:
     # ---------------------------------------------------------------- input
 
     def on_partial(self, text: str, now: float) -> list[CommittedUnit]:
-        words = text.split()
-        self._last_activity = now
+        raw = text.split()
+        words = raw
+        filler_only_update = False
+        if self._cfg.drop_fillers:
+            words = [w for w in raw if not _is_filler(w)]
+            if len(words) != len(raw):
+                self._fillers_dropped += len(raw) - len(words)
+                # Если после фильтра гипотеза не отличается от прошлой —
+                # единственное новое в звуке было «эээ». Часы тишины НЕ
+                # сбрасываем: пока говорящий тянет звук, пауза дозревает и
+                # может закоммитить готовые слова. Это и есть «забрать окно
+                # себе»: перевод стартует внутри затяжки, а не после неё.
+                filler_only_update = words == self._prev_words
+        if not filler_only_update:
+            self._last_activity = now
 
         agreed = _common_prefix(self._prev_words, words)
         self._prev_words = words
@@ -156,7 +198,11 @@ class Chunker:
 
     def on_final(self, text: str, now: float) -> list[CommittedUnit]:
         """A final transcript is stable by definition; commit whatever is left."""
-        words = text.split()
+        raw = text.split()
+        words = raw
+        if self._cfg.drop_fillers:
+            words = [w for w in raw if not _is_filler(w)]
+            self._fillers_dropped += len(raw) - len(words)
         self._last_activity = now
         self._prev_words = words
 

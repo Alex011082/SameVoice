@@ -7,6 +7,9 @@ import type {
   JoinResponse,
   JudgeVerdictInput,
   Lang,
+  PhoneChallengeResponse,
+  PhoneVerifiedResponse,
+  RegisterProfileResponse,
   RingPollResponse,
   RingView,
   Tone,
@@ -109,6 +112,18 @@ export const api = {
   health: () => request<{ ok: boolean; service: string; version: string; time: string }>('/healthz'),
 
   config: () => request<AppConfig>('/api/config'),
+
+  startPhoneVerification: (phone: string): Promise<PhoneChallengeResponse> =>
+    post<PhoneChallengeResponse>('/api/auth/phone/start', { phone }),
+
+  verifyPhone: (challengeId: string, code: string): Promise<PhoneVerifiedResponse> =>
+    post<PhoneVerifiedResponse>('/api/auth/phone/verify', { challengeId, code }),
+
+  registerProfile: (
+    registrationToken: string,
+    profile: { displayName: string; lang: Lang; gender: Gender },
+  ): Promise<RegisterProfileResponse> =>
+    post<RegisterProfileResponse>('/api/auth/register', { registrationToken, ...profile }),
 
   listUsers: async (): Promise<UserProfile[]> => (await request<{ users: UserProfile[] }>('/api/users')).users,
 

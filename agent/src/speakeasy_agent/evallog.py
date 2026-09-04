@@ -16,6 +16,29 @@ Two record kinds share the file, keyed on `kind`:
                   the pipeline already measured, and a stable `utteranceId`.
   * `verdict`   - one line per judge verdict, referencing that `utteranceId`.
 
+A LINE IS A CHUNK, NOT AN UTTERANCE. One spoken utterance is committed in
+several pieces, so it produces several `utterance` lines. On the Omri-Maya call
+(27.08.2026) the median committed unit was ONE WORD - "Мне" | "тебя в наушниках"
+| "сейчас" | "вышла." went out as four units; the measurement and that example
+live at `chunker.py:60` and `tests/test_chunker.py:246`. The commit policy has
+been tightened since (`end_of_turn_ms`, the silence guard), so treat one word as
+the worst case that motivated this, not as today's rate - which nothing has
+re-measured. Two of the recorded latencies
+(`speech_start_to_first_partial_ms`, `speech_start_to_first_audio_ms`) are
+anchored on the utterance and not on the chunk, so repeating them on every chunk
+made every percentile in this repo weight an utterance by however many chunks it
+happened to produce. `utteranceKey` (identical on every chunk of one utterance,
+and never reused by another) and `isFirstChunk` exist so a reader can take one
+sample per utterance instead of guessing. `segmentId` cannot do that job:
+adjacent chunks of one utterance get DIFFERENT segment ids.
+
+The writer sets `isFirstChunk` on exactly one chunk per key. A FILE may still
+hold none: a barge-in cancels the unit being spoken and drops the units still
+queued behind it, so the row that carried the mark can be cancelled, errored, or
+never written at all. An aggregator therefore has to count the utterances it
+found no first chunk for and say so - both readers in this repository do - rather
+than let their samples quietly go missing.
+
 Verdicts are appended, never merged into the utterance line: the log is
 append-only so a second verdict on the same utterance is visible as a change of
 mind rather than silently overwriting the first.
@@ -114,6 +137,8 @@ def utterance_record(
     *,
     call_id: str,
     utterance_id: str,
+    utterance_key: str,
+    is_first_chunk: bool,
     segment_id: str,
     speaker: dict[str, Any],
     listener: dict[str, Any],
@@ -130,12 +155,18 @@ def utterance_record(
     cancelled: bool,
     error: str | None,
 ) -> dict[str, Any]:
-    """One translated utterance, flat enough to grep and rich enough to judge.
+    """One committed CHUNK of a translated utterance, flat enough to grep and
+    rich enough to judge.
 
     `tone` is recorded separately from the two participant blocks because the MT
     prompt keys register off the LISTENER's tone - the address form belongs to
     the person being addressed. Recording it explicitly means a later argument
     about "why was this so formal" is settled by the log, not by memory.
+
+    `utterance_key` and `is_first_chunk` are required rather than defaulted:
+    percentiles are wrong without them (see the module docstring), and a writer
+    that forgets them should fail loudly at the first call, not silently produce
+    another log that cannot be aggregated after the fact.
     """
     return {
         "kind": "utterance",
@@ -143,6 +174,13 @@ def utterance_record(
         "ts": round(time.time(), 3),
         "callId": call_id,
         "utteranceId": utterance_id,
+        # Same on every chunk of one utterance; changes when the utterance does.
+        "utteranceKey": utterance_key,
+        # Set by the writer on exactly one chunk per key: the only row whose
+        # speech_start_* latencies mean what their names say. A barge-in can
+        # still leave a key with no such row in the file - see the module
+        # docstring.
+        "isFirstChunk": bool(is_first_chunk),
         "segmentId": segment_id,
         "direction": f"{src_lang}->{dst_lang}",
         "srcLang": src_lang,

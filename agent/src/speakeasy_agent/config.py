@@ -63,6 +63,16 @@ def _env_path(name: str, default: str) -> str:
     return str(Path(raw).expanduser() if Path(raw).expanduser().is_absolute() else _REPO_ROOT / raw)
 
 
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        raise SystemExit(f"{name} must be a number, got {raw!r}") from None
+
+
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     if raw is None or raw.strip() == "":
@@ -153,6 +163,13 @@ class Config:
     #: accepted, so this is an escape hatch rather than a guess baked into code.
     cartesia_api_version: str = ""
     cartesia_sample_rate: int = 24000
+    # Ускорение синтеза (эксп. 14): 1.25 влезает в паузы речи, высота не
+    # меняется (ffmpeg atempo). 1.0 = выключено, поток идёт мимо ffmpeg.
+    tts_tempo: float = 1.0
+    #: Оркестратор броней: у кого спрашивать движок для конкретного звонка.
+    #: Пусто — агент работает как раньше, по переменным окружения.
+    orchestrator_url: str = ""
+    orchestrator_key: str = ""
     runpod_stt_url: str = ""
     runpod_mt_url: str = ""
     runpod_tts_url: str = ""
@@ -209,6 +226,9 @@ class Config:
             cartesia_voice_he=_env("CARTESIA_VOICE_HE", ""),
             cartesia_api_version=_env("CARTESIA_API_VERSION", ""),
             cartesia_sample_rate=_env_int("CARTESIA_SAMPLE_RATE", 24000),
+            tts_tempo=_env_float("SV_TTS_TEMPO", 1.0),
+            orchestrator_url=_env("ORCHESTRATOR_URL", ""),
+            orchestrator_key=_env("ORCHESTRATOR_KEY", ""),
             runpod_stt_url=_env("RUNPOD_STT_URL", ""),
             runpod_mt_url=_env("RUNPOD_MT_URL", ""),
             runpod_tts_url=_env("RUNPOD_TTS_URL", ""),

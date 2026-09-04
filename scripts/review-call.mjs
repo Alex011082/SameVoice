@@ -23,6 +23,17 @@
 //   verdict    written when a tester presses the WRONG button (optionally with
 //              what it should have been)
 //
+// An `utterance` line is one committed CHUNK, and one spoken utterance is
+// several of them — median ONE WORD on the Omri-Maya call (27.08.2026), the
+// measurement kept at agent/src/speakeasy_agent/chunker.py:60. The commit policy
+// has tightened since and nothing has re-measured the ratio. Rows of the same
+// utterance share `utteranceKey`, and the writer marks `isFirstChunk` on exactly
+// one of them — which is what the latency table below aggregates over for the
+// stages that are anchored on speech start. Counting those per chunk weighted
+// every utterance by how many chunks it happened to produce. A log may still
+// hold a key with NO first chunk (a barge-in cancelled or dropped that row);
+// that is counted and printed rather than left to shrink an n silently.
+//
 // Field names are read tolerantly (camelCase and snake_case, a few synonyms):
 // this tool and the writer are built by different people at the same time, and
 // a report that refuses to print because a key is spelled `src_lang` instead of
@@ -101,6 +112,25 @@ const isVerdict = (r) => {
 const uttId = (r) =>
   pick(r, "utteranceId", "utterance_id", "uid", "id", "unitId", "unit_id");
 
+// A log line is one committed CHUNK, and one utterance is several of them.
+// These two readers are what lets a percentile take one sample per utterance
+// instead of one per chunk. `segmentId` cannot do it: adjacent chunks of one
+// utterance get different segment ids.
+//
+// In logs written after the key was made unique it is
+// `<first chunk's utteranceId>@<ms since call start>`. Older logs used the
+// offset alone, so two utterances a fraction of a millisecond apart share a key
+// there — groupingAnomalies counts those and printReport says so.
+const uttKey = (r) => pick(r, "utteranceKey", "utterance_key") ?? uttId(r);
+
+// Missing means a log written before the mark existed — every call recorded so
+// far, 27.08.2026 included. Those files can only support one utterance per row,
+// which is exactly how this tool always read them — so nothing is regrouped.
+const isFirstChunk = (r) => {
+  const v = pick(r, "isFirstChunk", "is_first_chunk", "firstChunk", "first_chunk");
+  return v === undefined ? true : Boolean(v);
+};
+
 /** Latencies live either in a nested object or flat on the record. */
 function latencies(r) {
   const nested = pick(r, "latency", "latencies", "metrics", "timings") ?? {};
@@ -145,6 +175,9 @@ function normalizeUtterance(r) {
   const p = providers(r);
   return {
     id: uttId(r) ?? null,
+    utteranceKey: uttKey(r) ?? null,
+    firstChunk: isFirstChunk(r),
+    hasKey: pick(r, "utteranceKey", "utterance_key") !== undefined,
     ts: pick(r, "ts", "timestamp", "at", "time", "createdAt", "created_at") ?? null,
     callId: pick(r, "callId", "call_id", "call") ?? null,
     srcLang: pick(r, "srcLang", "src_lang", "sourceLang", "source_lang", "from") ?? "?",
@@ -158,6 +191,12 @@ function normalizeUtterance(r) {
     translation: String(pick(r, "dstText", "dst_text", "translation", "translationText", "translation_text", "translated", "dst", "text") ?? ""),
     latency: l,
     providers: p,
+    // Read but NOT filtered on: this tool has always percentiled over every
+    // row, and agent/scripts/review_call.py has always dropped these. Changing
+    // either aggregation here would silently move every number in every past
+    // report, so instead the divergence is counted and printed below.
+    cancelled: Boolean(pick(r, "cancelled", "was_cancelled", "isCancelled") ?? false),
+    error: pick(r, "error", "err", "failure") ?? null,
     verdict: null,
     correction: null,
     verdictBy: null,
@@ -259,21 +298,80 @@ function pct(sorted, p) {
 /** Width of the stage-name column; the longest label plus a space. */
 const STAGE_COL = 22;
 
+/** These chunk rows bucketed per utterance, in first-seen order. A row with no
+ * id at all gets a bucket of its own rather than being merged with every other
+ * id-less row. */
+function groupByUtterance(rows) {
+  const groups = new Map();
+  rows.forEach((u, i) => {
+    const key = u.utteranceKey ?? `#${i}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(u);
+    else groups.set(key, [u]);
+  });
+  return groups;
+}
+
+/** How many utterances these chunk rows came from. */
+function countUtterances(rows) {
+  return groupByUtterance(rows).size;
+}
+
+/** [utterances with NO first chunk here, utterances with MORE THAN ONE].
+ *
+ * Neither is hypothetical and neither shows up in the numbers themselves.
+ *
+ * No first chunk: the row carrying `isFirstChunk` was cancelled by a barge-in,
+ * failed at the provider, or never reached the log (barge-in also drops units
+ * still queued inside the direction, and those are never written). Such an
+ * utterance is counted but contributes ZERO samples to every utterance-basis
+ * stage — which is what makes an `n` below the utterance count look like a
+ * missing metric when it is nothing of the sort.
+ *
+ * More than one: a log written before the key was made unique per utterance,
+ * where two utterances whose speech starts fell in the same millisecond shared
+ * a key. Such a pair is ONE line in the counts and TWO samples above. */
+function groupingAnomalies(rows) {
+  let missing = 0;
+  let excess = 0;
+  for (const group of groupByUtterance(rows).values()) {
+    const firsts = group.filter((u) => u.firstChunk).length;
+    if (firsts === 0) missing += 1;
+    else if (firsts > 1) excess += 1;
+  }
+  return [missing, excess];
+}
+
+// Which rows may enter a percentile.
+//
+//   "utterance"  the metric is anchored on a timestamp belonging to the whole
+//                utterance (speech start, first partial), so it means what its
+//                name says only on the FIRST chunk. On the 2nd chunk
+//                speech -> 1st audio measures "how long until the 2nd chunk was
+//                spoken" — a different question that must not share a
+//                percentile with the first. One sample per utterance.
+//   "chunk"      the metric measures work done for this chunk alone (one MT
+//                call, one synthesis). One sample per chunk, as before.
+const UTTERANCE = "utterance";
+const CHUNK = "chunk";
+
 function stageStats(utterances) {
   const stages = [
     // Labels name what the agent actually measures, so a number here can be
     // traced back to one key in the JSONL without guessing.
-    ["stt", "speech -> 1st partial"],
-    ["chunk", "1st partial -> commit"],
-    ["mt", "commit -> MT done"],
-    ["tts", "MT done -> 1st audio"],
-    ["e2e", "speech -> 1st audio"],
+    ["stt", "speech -> 1st partial", UTTERANCE],
+    ["chunk", "1st partial -> commit", UTTERANCE],
+    ["mt", "commit -> MT done", CHUNK],
+    ["tts", "MT done -> 1st audio", CHUNK],
+    ["e2e", "speech -> 1st audio", UTTERANCE],
   ];
-  return stages.map(([key, label]) => {
-    const vals = utterances.map((u) => u.latency[key]).filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  return stages.map(([key, label, basis]) => {
+    const rows = basis === UTTERANCE ? utterances.filter((u) => u.firstChunk) : utterances;
+    const vals = rows.map((u) => u.latency[key]).filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
     return {
       key,
       label,
+      basis,
       n: vals.length,
       p50: pct(vals, 50),
       p90: pct(vals, 90),
@@ -304,7 +402,9 @@ function printUtterance(u, index) {
     `${c("dim", String(index).padStart(4))} ${marker} ` +
     `${c("cyan", langBadge(u))} ` +
     `${c("dim", `${u.speakerId} ${u.speakerGender}→${u.listenerGender} ${u.tone}`)}` +
-    `${u.latency.e2e !== undefined ? ` ${c("dim", ms(u.latency.e2e))}` : ""}` +
+    // On a later chunk this is "speech start -> THIS chunk's audio", not the
+    // delay the listener perceived, so it is marked rather than shown bare.
+    `${u.latency.e2e !== undefined ? ` ${c("dim", u.firstChunk ? ms(u.latency.e2e) : `${ms(u.latency.e2e)} (to this chunk)`)}` : ""}` +
     `${u.ts ? ` ${c("dim", shortTs(u.ts))}` : ""}`;
   console.log(head);
   // Stacked rather than columnar on purpose: one of these two lines is Hebrew,
@@ -333,8 +433,8 @@ function printReport(callId, path, data) {
   const byDirection = new Map();
   for (const u of utterances) {
     const k = langBadge(u);
-    const e = byDirection.get(k) ?? { total: 0, wrong: 0, ok: 0 };
-    e.total += 1;
+    const e = byDirection.get(k) ?? { rows: [], wrong: 0, ok: 0 };
+    e.rows.push(u);
     if (u.verdict === "wrong") e.wrong += 1;
     if (u.verdict === "ok") e.ok += 1;
     byDirection.set(k, e);
@@ -350,8 +450,13 @@ function printReport(callId, path, data) {
   console.log(line);
 
   // ------------------------------------------------------------ the headline
+  // Both counts, always: a chunk count read as an utterance count is what made
+  // every latency percentile in this repo wrong. A verdict is attached to a
+  // chunk, so the judged numbers below are chunk numbers.
+  const nUtterances = countUtterances(utterances);
   console.log(
-    `  utterances ${c("bold", utterances.length)}` +
+    `  utterances ${c("bold", nUtterances)}` +
+      `   chunks ${c("bold", utterances.length)}` +
       `   flagged wrong ${flagged.length ? c("red", flagged.length) : c("green", "0")}` +
       `   confirmed ok ${okd.length ? c("green", okd.length) : "0"}` +
       `   unjudged ${c("dim", unjudged)}`
@@ -359,29 +464,87 @@ function printReport(callId, path, data) {
   if (utterances.length > 0 && flagged.length + okd.length > 0) {
     const judged = flagged.length + okd.length;
     const acc = ((okd.length / judged) * 100).toFixed(0);
-    console.log(`  judged ${judged}/${utterances.length}   ${c("bold", `${acc}%`)} of judged translations accepted`);
+    console.log(`  judged ${judged}/${utterances.length} chunks   ${c("bold", `${acc}%`)} of judged translations accepted`);
   }
   console.log(`  providers  ${provTriple}${isMock ? c("yellow", "   <- MOCK: mechanics only, translation quality here means nothing") : ""}`);
 
   for (const [dir, e] of byDirection) {
     console.log(
-      `  ${c("cyan", dir.padEnd(8))} ${String(e.total).padStart(4)} utterances` +
+      `  ${c("cyan", dir.padEnd(8))} ${String(countUtterances(e.rows)).padStart(4)} utterances` +
+        ` in ${String(e.rows.length).padStart(4)} chunks` +
         `${e.wrong ? c("red", `   ${e.wrong} wrong`) : ""}${e.ok ? c("green", `   ${e.ok} ok`) : ""}`
     );
   }
 
   // ---------------------------------------------------------------- latency
-  console.log(`\n${c("bold", "  latency")}   ${c("dim", "nearest-rank percentiles over the utterances that carry the metric")}`);
-  console.log(`  ${c("dim", "stage".padEnd(STAGE_COL) + "n".padStart(5) + "p50".padStart(10) + "p90".padStart(10) + "p99".padStart(10) + "max".padStart(10))}`);
+  console.log(`\n${c("bold", "  latency")}   ${c("dim", `nearest-rank percentiles over ${nUtterances} utterance(s) / ${utterances.length} chunk(s); n is the sample count`)}`);
+  console.log(`  ${c("dim", "stage".padEnd(STAGE_COL) + "basis".padEnd(11) + "n".padStart(5) + "p50".padStart(10) + "p90".padStart(10) + "p99".padStart(10) + "max".padStart(10))}`);
   for (const s of stageStats(utterances)) {
     const row =
-      `  ${s.label.padEnd(STAGE_COL)}${String(s.n).padStart(5)}` +
+      `  ${s.label.padEnd(STAGE_COL)}${s.basis.padEnd(11)}${String(s.n).padStart(5)}` +
       `${ms(s.p50).padStart(10)}${ms(s.p90).padStart(10)}${ms(s.p99).padStart(10)}${ms(s.max).padStart(10)}`;
     console.log(s.key === "e2e" ? c("bold", row) : row);
   }
+  console.log(
+    c("dim", `  basis=${UTTERANCE}: ONE sample per utterance, from its FIRST committed chunk only — these`) +
+      c("dim", "\n             stages are anchored on speech start, so on later chunks they measure something else")
+  );
+  console.log(c("dim", `  basis=${CHUNK}: one sample per committed chunk (one MT call, one synthesis)`));
+  const [noFirstChunk, duplicateFirstChunk] = groupingAnomalies(utterances);
+  if (noFirstChunk) {
+    // Printed beside the n it explains: an utterance whose first chunk is gone
+    // is counted above and sampled nowhere, and nothing else on this screen
+    // would tell the reader that.
+    console.log(
+      c("yellow", `  NOTE: ${noFirstChunk} of ${nUtterances} utterance(s) carry no first chunk — a barge-in or a`) +
+        c("yellow", `\n        provider error took that row — so they contribute NOTHING to the ${UTTERANCE}-basis`) +
+        c("yellow", "\n        rows above. That is why those n can be lower than the utterance count.")
+    );
+  }
+  if (duplicateFirstChunk) {
+    console.log(
+      c("yellow", `  NOTE: ${duplicateFirstChunk} utteranceKey(s) carry MORE THAN ONE first chunk. This log predates`) +
+        c("yellow", "\n        the unique key: two utterances whose speech starts fell in the same millisecond") +
+        c("yellow", `\n        share one key, so they are 1 utterance in the counts and 2 samples in the ${UTTERANCE} rows.`)
+    );
+  }
+  if (!utterances.some((u) => u.hasKey)) {
+    console.log(
+      c("yellow", "  NOTE: this log carries no utteranceKey — it predates the per-utterance key, so every") +
+        c("yellow", "\n        chunk is counted as its own utterance, exactly as this tool always did.")
+    );
+  }
+  // The two readers share a basis but NOT an eligibility set, and only one of
+  // them says so. A founder who runs both on a call with a barge-in gets
+  // different n from each, and has to be told which difference is which.
+  const undelivered = utterances.filter((u) => u.cancelled || u.error).length;
+  if (undelivered) {
+    console.log(
+      c("yellow", `  NOTE: ${undelivered} of ${utterances.length} chunk(s) were cancelled or errored, and every number`) +
+        c("yellow", "\n        above INCLUDES them — this tool always has. agent/scripts/review_call.py drops") +
+        c("yellow", "\n        them, so the two readers will report different n for this call. Neither is a bug;") +
+        c("yellow", "\n        review_call.py answers 'what did the listener get', this one 'what did the pipeline do'.")
+    );
+  }
   const e2e = stageStats(utterances).find((s) => s.key === "e2e");
   if (e2e && e2e.n === 0) {
-    console.log(c("dim", "  (no end-to-end metric in this log — the writer is not emitting e2e_ms)"));
+    // "The writer is not emitting it" is only one of the two reasons this n can
+    // be zero, and it used to be printed for both. The other is that every
+    // first-chunk row is gone, which is a fact about THIS call, not about the
+    // writer, and blaming the writer for it sends the reader to the wrong file.
+    // The writer is only to blame if NO row anywhere carries the value. If some
+    // later chunk has it and no first chunk does, the writer is fine and the
+    // basis is what emptied the sample — pointing at the writer there sends the
+    // reader to the wrong file.
+    const writerEmitsE2e = utterances.some((u) => Number.isFinite(u.latency.e2e));
+    console.log(
+      c(
+        "dim",
+        writerEmitsE2e
+          ? "  (no end-to-end metric on any FIRST chunk — the writer emits it, but every first chunk of this call was cancelled, errored or never reached audio)"
+          : "  (no end-to-end metric in this log — the writer is not emitting e2e_ms)"
+      )
+    );
   }
 
   // ------------------------------------------------------- flagged, in full
@@ -422,7 +585,17 @@ function jsonReport(callId, path, data) {
     callId,
     path,
     counts: {
-      utterances: utterances.length,
+      // utterances vs chunks: never one number. See stageStats.
+      utterances: countUtterances(utterances),
+      chunks: utterances.length,
+      // Without these two an `n` that disagrees with `utterances` cannot be
+      // explained from the JSON alone. See groupingAnomalies.
+      utterancesWithoutFirstChunk: groupingAnomalies(utterances)[0],
+      utterancesWithDuplicateFirstChunk: groupingAnomalies(utterances)[1],
+      // Included in every latency number in this file, and excluded from every
+      // latency number in agent/scripts/review_call.py. Published so a diff of
+      // the two JSONs is explainable instead of alarming.
+      cancelledOrErroredChunks: utterances.filter((u) => u.cancelled || u.error).length,
       flaggedWrong: flagged.length,
       confirmedOk: okd.length,
       unjudged: utterances.length - flagged.length - okd.length,
@@ -430,7 +603,7 @@ function jsonReport(callId, path, data) {
       orphanVerdicts,
     },
     providers: utterances.length ? utterances[utterances.length - 1].providers : null,
-    latency: Object.fromEntries(stageStats(utterances).map((s) => [s.key, { n: s.n, p50: s.p50 ?? null, p90: s.p90 ?? null, p99: s.p99 ?? null, max: s.max ?? null }])),
+    latency: Object.fromEntries(stageStats(utterances).map((s) => [s.key, { basis: s.basis, n: s.n, p50: s.p50 ?? null, p90: s.p90 ?? null, p99: s.p99 ?? null, max: s.max ?? null }])),
     flagged: flagged.map((u) => ({
       id: u.id,
       direction: `${u.srcLang}->${u.dstLang}`,
@@ -464,7 +637,8 @@ if (positional.length === 0 || flags.has("--list")) {
     const wrong = data.utterances.filter((u) => u.verdict === "wrong").length;
     console.log(
       `  ${c("bold", call.id.padEnd(18))} ` +
-        `${String(data.utterances.length).padStart(4)} utterances` +
+        `${String(countUtterances(data.utterances)).padStart(4)} utterances` +
+        `${c("dim", ` in ${String(data.utterances.length).padStart(4)} chunks`)}` +
         `${wrong ? c("red", `   ${wrong} flagged`) : c("dim", "   0 flagged")}` +
         `   ${c("dim", new Date(call.mtime).toLocaleString())}`
     );

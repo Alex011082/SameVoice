@@ -73,6 +73,26 @@ export interface ApiError {
   error: { code: string; message: string };
 }
 
+export interface PhoneChallengeResponse {
+  challengeId: string;
+  phone: string;
+  /** Development-only delivery channel. Replaced by SMS later. */
+  devCode: string;
+  expiresInSeconds: number;
+}
+
+export interface PhoneVerifiedResponse {
+  verified: true;
+  phone: string;
+  registrationToken: string;
+  existingUser: UserProfile | null;
+}
+
+export interface RegisterProfileResponse {
+  created: boolean;
+  user: UserProfile;
+}
+
 // --- ringing ---------------------------------------------------------------
 // Presence + ring notification, mirroring backend/src/types.ts. One POST
 // /api/presence is both the heartbeat and the poll; there are no websockets in

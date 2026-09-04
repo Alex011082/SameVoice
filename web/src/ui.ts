@@ -1,6 +1,7 @@
 import { ConnectionQuality, ConnectionState } from 'livekit-client';
 import type { CallMetrics } from './call';
 import { flagPreview, type FlagTarget } from './flags';
+import type { PhoneAuthState } from './phone-auth';
 import { outgoingText, ringClosedText, ringModeText, type RingState } from './ring';
 import { dirForLang, langLabel, type SubtitleLine, type SubtitleView } from './subtitles';
 import type { CallMode, ContactCard, Gender, JoinResponse, Lang, Tone, UserProfile } from './types';
@@ -19,6 +20,20 @@ const el = {
   screenIdentity: () => must<HTMLElement>('screen-identity'),
   identityList: () => must<HTMLUListElement>('identity-list'),
   identityError: () => must<HTMLParagraphElement>('identity-error'),
+  phoneAuth: () => must<HTMLDivElement>('phone-auth'),
+  phoneForm: () => must<HTMLFormElement>('phone-form'),
+  phoneInput: () => must<HTMLInputElement>('phone-input'),
+  phoneCodeForm: () => must<HTMLFormElement>('phone-code-form'),
+  phoneCodeInput: () => must<HTMLInputElement>('phone-code-input'),
+  phoneDestination: () => must<HTMLElement>('phone-destination'),
+  phoneDevCode: () => must<HTMLElement>('phone-dev-code'),
+  phoneChange: () => must<HTMLButtonElement>('phone-change'),
+  phoneAuthError: () => must<HTMLParagraphElement>('phone-auth-error'),
+  profileForm: () => must<HTMLFormElement>('profile-form'),
+  profilePhone: () => must<HTMLElement>('profile-phone'),
+  profileName: () => must<HTMLInputElement>('profile-name'),
+  profileLang: () => must<HTMLSelectElement>('profile-lang'),
+  profileGender: () => must<HTMLSelectElement>('profile-gender'),
 
   screenContacts: () => must<HTMLElement>('screen-contacts'),
   contactList: () => must<HTMLUListElement>('contact-list'),
@@ -109,6 +124,81 @@ export const setCallError = (text: string | null): void => setError(el.callError
 
 export function setFooter(parts: string[]): void {
   el.footer().textContent = parts.join('  ·  ');
+}
+
+export interface PhoneAuthHandlers {
+  onStart(phone: string): void;
+  onVerify(code: string): void;
+  onRestart(): void;
+}
+
+export function renderPhoneAuth(state: PhoneAuthState, handlers: PhoneAuthHandlers): void {
+  const title = must<HTMLElement>('setup-title');
+  const hint = must<HTMLElement>('setup-hint');
+  const setup = must<HTMLElement>('setup');
+  const phoneForm = el.phoneForm();
+  const codeForm = el.phoneCodeForm();
+
+  el.phoneAuth().hidden = state.phase === 'verified';
+  phoneForm.hidden = state.phase !== 'phone';
+  codeForm.hidden = state.phase !== 'code';
+  setup.hidden = true;
+  el.profileForm().hidden = state.phase !== 'verified';
+  setError(el.phoneAuthError(), state.error);
+
+  phoneForm.onsubmit = (event) => {
+    event.preventDefault();
+    handlers.onStart(el.phoneInput().value);
+  };
+  codeForm.onsubmit = (event) => {
+    event.preventDefault();
+    handlers.onVerify(el.phoneCodeInput().value.trim());
+  };
+  el.phoneChange().onclick = () => handlers.onRestart();
+
+  if (state.phase === 'code') {
+    title.textContent = 'Подтвердите номер';
+    hint.textContent = 'Шесть цифр — и номер ваш.';
+    el.phoneDestination().textContent = state.phone;
+    el.phoneDevCode().textContent = state.devCode;
+    queueMicrotask(() => el.phoneCodeInput().focus());
+  } else if (state.phase === 'verified') {
+    title.textContent = 'Создайте профиль';
+    hint.textContent = 'Имя увидят люди, которые добавят вас в контакты.';
+    el.profilePhone().textContent = state.phone;
+  } else {
+    title.textContent = 'Ваш номер';
+    hint.textContent = 'Он станет вашим адресом в SameVoice.';
+  }
+}
+
+export interface ProfileRegistrationInput {
+  displayName: string;
+  lang: Lang;
+  gender: Gender;
+}
+
+export function renderProfileRegistration(
+  onSubmit: (profile: ProfileRegistrationInput) => void,
+): void {
+  const form = el.profileForm();
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    onSubmit({
+      displayName: el.profileName().value.trim(),
+      lang: el.profileLang().value as Lang,
+      gender: el.profileGender().value as Gender,
+    });
+  };
+  queueMicrotask(() => el.profileName().focus());
+}
+
+export function showSeededIdentitySetup(): void {
+  el.phoneAuth().hidden = true;
+  el.profileForm().hidden = true;
+  must<HTMLElement>('setup').hidden = false;
+  must<HTMLElement>('setup-title').textContent = 'Быстрый тест';
+  must<HTMLElement>('setup-hint').textContent = 'Выберите одну из предустановленных личностей.';
 }
 
 /**
@@ -341,37 +431,73 @@ export function renderContacts(
     li.className = 'card';
     li.dataset['userId'] = contact.userId;
 
-    const main = document.createElement('div');
-    main.className = 'card-main';
-
+    // Разметка макета: имя, нить голоса из него (её рисует sv-motion.js) и
+    // направление перевода на правом конце нити. Кнопок в строке нет —
+    // действия раскрываются тапом, звонок начинается протяжкой.
     const name = document.createElement('span');
     name.className = 'card-name';
     name.textContent = contact.displayName;
+    name.lang = contact.lang;
+    name.dir = dirForLang(contact.lang);
 
-    const meta = document.createElement('div');
-    meta.className = 'card-meta';
-    meta.append(presenceDot(presence[contact.userId]));
-    meta.append(langChip(contact.lang));
-    meta.append(document.createTextNode(genderTone(contact.gender, contact.tone)));
+    const willTranslate = contact.forceTranslate || contact.lang !== me.lang;
+    const dir = document.createElement('span');
+    dir.className = 'card-dir';
+    if (willTranslate) {
+      const from = document.createElement('bdi');
+      from.lang = contact.lang;
+      from.dir = dirForLang(contact.lang);
+      from.textContent = langLabel(contact.lang);
+      dir.append(from, document.createTextNode(' ⇄ '), document.createTextNode(langLabel(me.lang)));
+    } else {
+      dir.textContent = `${langLabel(me.lang)} ⇄ ${langLabel(me.lang)}`;
+      dir.dataset['direct'] = '1';
+    }
+
+    // Присутствие живёт точкой у имени, а не отдельной строкой подписей.
+    const dot = presenceDot(presence[contact.userId]);
+
+    const head = document.createElement('div');
+    head.className = 'card-head';
+    head.append(dot, name, dir);
+
+    // Раскрывающаяся часть: то, что в макете появлялось по тапу.
+    const ctx = document.createElement('div');
+    ctx.className = 'card-ctx';
+
+    const explain = document.createElement('p');
+    explain.className = 'card-explain';
+    explain.textContent = willTranslate
+      ? 'Разные языки — включится перевод. Каждый услышит свой.'
+      : 'Один язык — перевод не нужен, соединим напрямую.';
+
+    const acts = document.createElement('div');
+    acts.className = 'card-acts';
+
+    const call = document.createElement('button');
+    call.type = 'button';
+    call.className = 'btn';
+    call.setAttribute('aria-label', `Позвонить: ${contact.displayName}`);
+    call.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      handlers.onCall(contact);
+    });
+
+    acts.append(call);
+
+    // Раскрытие сделано сеткой (0fr -> 1fr), а она задаёт высоту ПЕРВОЙ строке.
+    // Поэтому всё содержимое кладётся в одну обёртку, иначе остальные строки
+    // останутся видимыми при закрытой карточке.
+    const ctxInner = document.createElement('div');
+    ctxInner.className = 'card-ctx-inner';
+    ctxInner.append(explain, acts);
+    ctx.append(ctxInner);
 
     if (Object.keys(contact.overrides).length > 0) {
       const override = document.createElement('code');
       override.textContent = 'override';
-      meta.append(override);
+      ctxInner.append(override);
     }
-
-    // Predicted mode. The backend is the only authority (POST /api/calls), so
-    // this is a preview, not a decision.
-    const predicted = document.createElement('span');
-    predicted.className = 'badge';
-    const willTranslate = contact.forceTranslate || contact.lang !== me.lang;
-    predicted.dataset['mode'] = willTranslate
-      ? contact.forceTranslate
-        ? 'FORCED'
-        : 'TRANSLATED'
-      : 'DIRECT';
-    predicted.textContent = willTranslate ? 'с переводом' : 'без перевода';
-    meta.append(predicted);
 
     const toggle = document.createElement('label');
     toggle.className = 'card-toggle';
@@ -380,18 +506,20 @@ export function renderContacts(
     checkbox.checked = contact.forceTranslate;
     checkbox.addEventListener('change', () => handlers.onToggleForce(contact, checkbox.checked));
     toggle.append(checkbox, document.createTextNode('всегда переводить'));
-    meta.append(toggle);
+    ctxInner.append(toggle);
 
-    main.append(name, meta);
+    li.append(head, ctx);
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn';
-    // Подпись читает скринридер; глазами видна иконка трубки из CSS.
-    btn.setAttribute('aria-label', `Позвонить: ${contact.displayName}`);
-    btn.addEventListener('click', () => handlers.onCall(contact));
+    // Тап раскрывает строку: контекст и действия. Второй тап закрывает.
+    li.addEventListener('click', (ev) => {
+      if ((ev.target as HTMLElement).closest('button, input, label, a')) return;
+      const open = li.classList.toggle('open');
+      for (const other of list.querySelectorAll('li.card.open')) {
+        if (other !== li) other.classList.remove('open');
+      }
+      li.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
 
-    li.append(avatarFor(contact.displayName), main, btn);
     list.append(li);
   }
 }
@@ -417,7 +545,11 @@ const MODE_EXPLAINER: Record<CallMode, string> = {
 };
 
 export function renderCallHeader(join: JoinResponse): void {
-  el.peerName().textContent = join.peer.displayName;
+  const peer = el.peerName();
+  peer.textContent = join.peer.displayName;
+  // Язык на имени включает и шрифт иврита, и правило «язык = цвет» в ZGen.
+  peer.lang = join.peer.lang;
+  peer.dir = dirForLang(join.peer.lang);
 
   const chip = el.peerLang();
   chip.dir = dirForLang(join.peer.lang);
