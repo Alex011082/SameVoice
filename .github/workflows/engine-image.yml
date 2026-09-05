@@ -53,6 +53,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Docker Hub — потому что хосты RunPod тянут оттуда быстро, а из GHCR
+      # ~8 МБ/с: замер 05.09 дал 631 с до готовности вместо 77–180 (4,5 ГБ
+      # наших слоёв качались ~9 минут). Секреты DOCKERHUB_USERNAME и
+      # DOCKERHUB_TOKEN задаёт владелец в настройках репозитория; нет их —
+      # образ уходит только в GHCR, как раньше.
+      - name: Docker Hub настроен?
+        id: hub
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ] && [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            echo "have=true" >> "$GITHUB_OUTPUT"
+            echo "name=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/samevoice-engine" >> "$GITHUB_OUTPUT"
+          else
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "Docker Hub не настроен — образ уйдёт только в GHCR"
+          fi
+
+      - name: Вход в Docker Hub
+        if: steps.hub.outputs.have == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Список тегов
+        id: tags
+        shell: bash
+        run: |
+          {
+            echo "list<<EOF"
+            echo "${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}"
+            echo "${{ steps.image.outputs.name }}:latest"
+            if [ "${{ steps.hub.outputs.have }}" = "true" ]; then
+              echo "${{ steps.hub.outputs.name }}:${{ steps.image.outputs.tag }}"
+              echo "${{ steps.hub.outputs.name }}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Собрать и отправить
         uses: docker/build-push-action@v6
         with:
@@ -60,10 +99,10 @@ jobs:
           file: gpu/Dockerfile.engine
           build-args: IMAGE_TAG=${{ steps.image.outputs.tag }}
           push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
-            ${{ steps.image.outputs.name }}:latest
+          tags: ${{ steps.tags.outputs.list }}
           provenance: false
 
       - name: Итог
-        run: echo "образ ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }} отправлен"
+        run: |
+          echo "GHCR: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}"
+          [ "${{ steps.hub.outputs.have }}" = "true" ] && echo "Docker Hub: ${{ steps.hub.outputs.name }}:${{ steps.image.outputs.tag }}" || echo "Docker Hub: не настроен"
