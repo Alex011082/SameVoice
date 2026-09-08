@@ -3,8 +3,9 @@ import { z } from "zod";
 
 import type { Config } from "../config.js";
 import { grantSession, revokeSession } from "../auth.js";
+import { parseCookies } from "../session.js";
 import { consumeVerifiedPhone, normalizePhone, startPhoneVerification, verifyPhoneCode, } from "../phoneVerification.js";
-import { createUserFromPhone, getUser, getUserByPhone, stage0TestIdentityIdList, STAGE0_AUTO_JOIN_TEST_IDENTITIES, } from "../store.js";
+import { createUserFromPhone, getUser, getUserByPhone, linkContactPair, stage0TestIdentityIdList, STAGE0_AUTO_JOIN_TEST_IDENTITIES, } from "../store.js";
 import { apiError, USER_ID_RE } from "../types.js";
 const startBody = z.object({ phone: z.string().min(1).max(40) }).strict();
 const verifyBody = z
@@ -123,6 +124,36 @@ export function authRoutes(cfg: Config): FastifyPluginAsync {
                 lang: parsed.data.lang,
                 gender: parsed.data.gender,
             });
+            /* Кто позвал этого человека. Токен приглашения оркестратор положил
+             * в куку, когда ссылка была погашена; здесь мы меняем его на
+             * идентификатор пригласившего и связываем пару в обе стороны.
+             *
+             * Зачем: без этого новичок открывал приложение, где звонить некому.
+             * Посеянная четвёрка — пустые профили, за ними нет ни человека, ни
+             * бота, и первый же звонок уходил в тишину.
+             *
+             * Тихо пропускаем любую неудачу: приглашение — удобство, а не
+             * условие. Человек уже зарегистрирован, и падать здесь значило бы
+             * потерять готовую учётную запись из-за недоступного оркестратора. */
+            const inviteToken = parseCookies(req.headers.cookie)["sv_invite_token"];
+            if (inviteToken && cfg.orchestratorKey) {
+                try {
+                    const r = await fetch(
+                        `${cfg.orchestratorUrl}/invite-owner?t=${encodeURIComponent(inviteToken)}`,
+                        { headers: { "x-engine-key": cfg.orchestratorKey }, signal: AbortSignal.timeout(4000) },
+                    );
+                    if (r.ok) {
+                        const body = (await r.json()) as { inviterId?: string | null };
+                        const inviterId = body.inviterId;
+                        if (inviterId && getUser(inviterId)) {
+                            linkContactPair(user.id, inviterId);
+                            req.log.info({ userId: user.id, inviterId }, "новичок связан с пригласившим");
+                        }
+                    }
+                } catch (err) {
+                    req.log.warn({ err: String(err) }, "не удалось спросить, кто пригласил");
+                }
+            }
             // The auto-join is the one side effect of registering that nobody asked
             // for, so it is stated where an operator will actually see it. The phone
             // number is deliberately NOT logged: it is the credential this whole route

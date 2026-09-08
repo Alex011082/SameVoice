@@ -60,6 +60,23 @@ describe('contacts screen model', () => {
     expect(entries[1]).toMatchObject({ saved: false, test: true });
   });
 
+  it('никогда не показывает посеянные пустышки рядом с живым собеседником', () => {
+    // Alex, Noa, Omri и Maya — профили без человека и без программы за ними.
+    // Новичок видел четверых незнакомцев, звонил и слушал тишину. Живой рядом
+    // с ними тонул; поэтому их нет в списке, где есть кому ответить.
+    const bot: UserProfile = {
+      id: 'u_6df46c7f61d47836',
+      handle: 'user_6df46c7f',
+      displayName: 'Тест ИВ',
+      lang: 'he',
+      gender: 'f',
+      tone: 'friendly',
+    };
+    const entries = buildDirectory(me, [card(bot), card(seeded[1]!)], [...seeded, bot]);
+
+    expect(entries.map((entry) => entry.contact.userId)).toEqual(['u_6df46c7f61d47836']);
+  });
+
   it('прячет посеянную сетку, как только есть хоть один живой собеседник', () => {
     // Скрин основателя 02.09.2026: один настоящий Igor тонул среди семи
     // тестовых. Сетка нужна тому, кому иначе некуда звонить, и мешает всем

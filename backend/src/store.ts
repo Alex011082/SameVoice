@@ -636,6 +636,12 @@ export function createUserFromPhone(input: {
   // empty app. He joins the grid rather than only pointing at it, so the test
   // identities can call him back.
   if (STAGE0_AUTO_JOIN_TEST_IDENTITIES) joinEveryone([id, ...stage0TestIdentityIds]);
+  // ИИ-собеседники — единственные, кому новичок может позвонить ПРЯМО СЕЙЧАС
+  // и услышать ответ: посеянная четвёрка это пустые профили, за ними нет ни
+  // человека, ни программы, и первый звонок туда уходил в тишину. Связываем
+  // только с теми, кто реально заведён на этом сервере: в тестах их нет, и
+  // связка просто не создаётся.
+  joinEveryone([id, ...[...COMPANION_IDS].filter((c) => users.has(c))]);
   saveIdentities();
   return user;
 }
@@ -657,10 +663,14 @@ export function updateUser(
  * мусор, в котором тонет живой собеседник (скрин основателя 02.09.2026: один
  * настоящий Igor на семь тестовых). Тестовые видят всех; настоящие — только
  * настоящих; основатель видит ещё и ИИ-собеседников, ему ими тестировать. */
+/** Они же — ИИ-собеседники: отвечают голосом, на них можно проверить перевод. */
 const DRILL_SPEAKER_IDS = new Set([
   "u_141560d817f7c1af", // Тест РУ — браузерный диктор сквозного прогона
   "u_6df46c7f61d47836", // Тест ИВ — серверный диктор сквозного прогона
 ]);
+/** Читаемое имя для той же пары: в списке новичка они не «дикторы», а собеседники. */
+const COMPANION_IDS = DRILL_SPEAKER_IDS;
+
 export function isTestResident(userId: string): boolean {
   // stage0TestIdentityIds заполняется при загрузке стора — проверять надо
   // в момент вопроса, а не в момент импорта модуля (там список ещё пуст).
