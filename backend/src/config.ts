@@ -56,6 +56,10 @@ export interface Config {
   callArchiveDir: string;
   /** Где лежит снимок личностей. Под data/, а не logs/: там телефоны. */
   identityDir: string;
+  /** Оркестратор броней: у него лежат приглашения, он знает, кто кого позвал. */
+  orchestratorUrl: string;
+  /** Ключ к нему. Пусто — связывание по приглашению просто не работает. */
+  orchestratorKey: string;
 
   /** Ключ подписи сессий. Пустой в окружении — сгенерируется случайный. */
   sessionSecret: string;
@@ -294,6 +298,8 @@ export function loadConfig(): Config {
     presencePollIntervalMs: intFromEnv("PRESENCE_POLL_MS", 2000),
     callArchiveDir: pathFromEnv("CALL_ARCHIVE_DIR", "logs/archive"),
     identityDir: pathFromEnv("IDENTITY_DIR", "data/identity"),
+    orchestratorUrl: (process.env.ORCH_URL?.trim() || "http://127.0.0.1:9098").replace(/\/+$/, ""),
+    orchestratorKey: process.env.ORCH_KEY?.trim() ?? "",
     sessionSecret,
     sessionSecretEphemeral,
     // 30 дней. Приложение, в которое надо входить каждую неделю, никто не носит
