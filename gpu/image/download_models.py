@@ -18,6 +18,9 @@ MODELS = [
     os.getenv("ACOUSTIC_HE_MODEL", "ivrit-ai/whisper-large-v3-turbo-ct2"),
     os.getenv("LOCAL_MT_MODEL_RU_HE", "Helsinki-NLP/opus-mt-ru-he"),
     os.getenv("LOCAL_MT_MODEL_HE_RU", "Helsinki-NLP/opus-mt-he-ru"),
+    # Предсказатель следующего слова: без него перевод обязан ждать конца
+    # фразы — самая длинная ступень задержки на живых звонках.
+    os.getenv("PREDICTOR_MODEL", "Qwen/Qwen3-0.6B-Base"),
 ]
 
 
