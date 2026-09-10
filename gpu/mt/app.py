@@ -89,7 +89,11 @@ class MarianEngine:
             model_id = MODEL_IDS[key]
             tokenizer = AutoTokenizer.from_pretrained(model_id)
             model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            # Перевод остаётся на ПЕРВОЙ карте рядом со слухом: вторая отдана
+            # предсказателю целиком.
+            device = os.getenv("MT_DEVICE", "").strip()
+            if not device:
+                device = "cuda:0" if torch.cuda.is_available() else "cpu"
             if device == "cuda":
                 model = model.to(device=device, dtype=torch.float16)
             else:

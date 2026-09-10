@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .acoustic.app import app as stt_app
 from .mt.app import app as mt_app
+from .predictor.app import app as predictor_app
 
 OUT_DIR = Path(os.getenv("ENGINE_OUT_DIR", "/workspace/out"))
 
@@ -37,13 +38,18 @@ def healthz() -> dict[str, object]:
     return {
         "ok": True,
         "service": "engine",
-        "mounts": {"stt": "/stt", "mt": "/mt"},
+        "mounts": {"stt": "/stt", "mt": "/mt", "predictor": "/predictor"},
         "out_dir": str(OUT_DIR),
     }
 
 
 app.mount("/stt", stt_app)
 app.mount("/mt", mt_app)
+# Предсказатель следующего слова. Был обучен 01.09.2026 и всё это время не
+# ехал на под вовсе: агент умеет его звать (providers/build_stt), но звать
+# было некого. Без него перевод обязан ждать конца фразы — а это самая
+# длинная ступень задержки, от 0,3 до 4,4 с на живых звонках.
+app.mount("/predictor", predictor_app)
 
 # Статика последней: иначе "/" перехватит /stt и /mt.
 OUT_DIR.mkdir(parents=True, exist_ok=True)

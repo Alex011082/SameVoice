@@ -85,7 +85,12 @@ class NemotronEngine:
 
             processor = AutoProcessor.from_pretrained(NEMOTRON_MODEL)
             processor.set_num_lookahead_tokens(NEMOTRON_LOOKAHEAD)
-            model = AutoModelForRNNT.from_pretrained(NEMOTRON_MODEL, device_map="auto")
+            # device_map="auto" на двухкарточном поде размазывал бы модель по обеим
+            # картам, а вторая отдана предсказателю целиком. Русский слух живёт
+            # на первой — как и перевод.
+            model = AutoModelForRNNT.from_pretrained(
+                NEMOTRON_MODEL, device_map=os.getenv("ACOUSTIC_RU_DEVICE", "cuda:0")
+            )
             self.processor = processor
             self.model = model
             self.device = str(model.device)
@@ -333,7 +338,8 @@ class HebrewWhisperEngine:
                 raise RuntimeError(
                     "faster-whisper is missing; build with INSTALL_GPU_ENGINES=1"
                 ) from exc
-            device = os.getenv("ACOUSTIC_HE_DEVICE", "cuda")
+            # Слух остаётся на ПЕРВОЙ карте: вторую занимает предсказатель.
+            device = os.getenv("ACOUSTIC_HE_DEVICE", "cuda:0")
             compute_type = os.getenv("ACOUSTIC_HE_COMPUTE_TYPE", "float16")
             self._model = WhisperModel(
                 HEBREW_MODEL,
