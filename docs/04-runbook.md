@@ -453,8 +453,8 @@ npm run check:env        # профиль берётся из .env
 рекомендация переселить агента в регион `eu-central`, которая **ухудшила бы** задержку примерно
 на 120 мс.
 
-Проверено: `speak-easy-xul1tkud.livekit.cloud` и `turn.livekit.cloud` резолвятся в `129.159.158.30`
-и `129.159.152.156` — Oracle Cloud, **Иерусалим, Израиль** (AS31898). Трафик страну не покидает.
+Проверено: `speak-easy-xul1tkud.livekit.cloud` и `turn.livekit.cloud` резолвятся в `[адрес LiveKit]`
+и `[адрес TURN]` — Oracle Cloud, **Иерусалим, Израиль** (AS31898). Трафик страну не покидает.
 
 Замеры с этого Mac, TCP connect, 12 проб, минимум и медиана, 24.08.2026:
 
@@ -646,7 +646,7 @@ npm run build:web
 
 Дальше:
 
-1. Выложить содержимое `web/dist/` в каталог статики, который отдаёт Caddy (точный путь — в `/etc/caddy/Caddyfile` на сервере; SSH: `root@64.176.170.106`, ключ `~/.ssh/id_ed25519_vultr_samevoice` — §9 [07-product-spec.md](07-product-spec.md) напоминает, что ключ авторизован для root, не для `speakeasy`).
+1. Выложить содержимое `web/dist/` в каталог статики, который отдаёт Caddy (точный путь — в `/etc/caddy/Caddyfile` на сервере; SSH: `root@[адрес samevoice]`, ключ `~/.ssh/id_ed25519_vultr_samevoice` — §9 [07-product-spec.md](07-product-spec.md) напоминает, что ключ авторизован для root, не для `speakeasy`).
 2. Проверить с внешнего устройства (не с сервера): страница открывается, `curl -s https://samevoice.0110.digital/healthz` отвечает, и в выложенном бандле нет следа dev-адреса:
 
 ```bash

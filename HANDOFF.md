@@ -618,7 +618,7 @@ confirmation → direct profile entry, and the isolated four-identity debug pick
 Profile navigation uses an explicit URL assignment rather than
 `history.replaceState()` followed by `reload()`: the latter intermittently lost
 the `me` parameter in the production browser during repeated-number entry. The
-profile-creation slice is deployed on the existing Vultr server and has been
+profile-creation slice is deployed on the existing cloud server and has been
 exercised through the public domain. The translation agent was not changed.
 The production Caddy configuration is now mirrored in `infra/Caddyfile`; it
 marks `/` and `/index.html` as `no-cache, no-store, must-revalidate` so browsers
