@@ -210,7 +210,6 @@ h3 { font: 500 14px var(--font); margin: 0 0 6px; }
   color: var(--fg-dim);
   font: 300 14px/1.55 var(--font);
   margin: 0 0 18px;
-  max-width: 34ch;
 }
 
 .label, .incoming-eyebrow, .selfmon-title {
@@ -379,7 +378,7 @@ h3 { font: 500 14px var(--font); margin: 0 0 6px; }
 }
 .card-ctx > * { min-height: 0; }
 .card.open .card-ctx { grid-template-rows: 1fr; opacity: 1; padding-top: 14px; }
-.card-explain { font: 300 13.5px/1.5 var(--font); color: var(--fg-dim); margin: 0 0 12px; max-width: 34ch; }
+.card-explain { font: 300 13.5px/1.5 var(--font); color: var(--fg-dim); margin: 0 0 12px; }
 .card-acts { display: flex; gap: 10px; flex-wrap: wrap; }
 .card-acts .btn::before { content: "позвонить"; }
 .card-acts .btn::after { content: "↑"; font-size: 13px; }
@@ -1381,7 +1380,6 @@ body.zg-on #screen-contacts:has(#outgoing:not([hidden])) #zg-pull { display: non
   margin: 0;
   font: 300 13.5px/1.55 var(--font);
   color: var(--fg-dim);
-  max-width: 34ch;
 }
 
 .contacts-note {
@@ -1426,6 +1424,5 @@ body:not([data-debug]) .card-meta code { display: none; }
   margin: 12px 0 0;
   font: 300 12.5px/1.5 var(--font);
   color: var(--fg-dim);
-  max-width: 40ch;
 }
 .addbox-status:empty { display: none; }
